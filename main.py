@@ -491,8 +491,8 @@ async def run_bot():
             print(f"\n⚠  Erro inesperado: {e}, reiniciando o bot após 5 segundos...")
             message = f"⚠ Erro inesperado: <b>{e}</b>, reiniciando o bot após 5 segundos..."
             send_telegram_message(bot_token, chat_id, message)
-            await asyncio.sleep(2)
-            await run_bot()
+            await asyncio.sleep(5) # Adicionado tempo de espera
+            run_bot() # Removido await
         else:
             print("\n🚨  Número máximo de tentativas de reinício atingido. O bot será desligado.")
             message = "🚨 <b>Número máximo</b> de tentativas de reinício atingido. O bot será desligado."
