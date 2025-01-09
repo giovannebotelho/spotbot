@@ -1,0 +1,32 @@
+olá, quero que você me ajude a criar um script em python ou em node.js (porém prefiro em python, mas me fale qual for melhor) do zero para comprar ativos na corretora binance, usando a api (stream) (https://testnet.binance.vision/api) (https://testnet.binance.vision/) dela para comprar e vender BTC no mercado spot, um robô que compra a determinado preço e vende a determinado preço, sempre monitorando as variações, que ele calcule a taxa de compra e venda para não sair no prejuizo, vendendo com um minimo para ganhos após a compra. usando ws talvez, não sei... vamos começar fazendo esse bot na base de teste (testnet com BTCUSDT - dinheiro falso da binance) que ela disponibiliza para isso.
+
+Quero que você me ajude a fazê-lo da melhor maneira possível, quero operar na com aproximadamente 500 reais (tenho 100 usdt spot), e ganhar pelo menos 10 reais de lucro por operação, já descontado a taxa, quero operações rápidas mesmo que seja sem muito ganho, pode me ajudar? pode ser nas velas de 3 minutos por exemplo, com uma taxa de ganho de aproximadamente 0,005% por operação descontado as taxas. vamos operar no mercado (market)
+
+mais ou menos nessas etapas:
+
+1 - monitoramento
+2 - estratégia
+3 - trade
+
+symbol - obj.s
+best ask - obj.a
+
+que ele imprima mensagem cada vez que compre ou venda no console
+
+podemos configurar um robô para emitir uma mensagem via e-mail ou whatsapp/sms para cada vez que ele comprar e vender, e quando venda, a porcentagem de ganho e o valor liquido de ganho, e comparar o valor inicial de quanto tinha quando iniciamos o bot com o valor da carteira após essa venda.
+
+HMAC-SHA-256 Key registered
+Save these values right now. They won't be shown ever again!
+
+API Key: bj1bhRY27pkU3omP4mitx3OSBMQdp6rP9hHMxCIv49AGsSITC2dVBP4f40SdBDWN
+
+Secret Key: kmfOuOmhdWsfhZrKNNT6kTNaoJbjYLAkSX4KQKPANTvJKUZZOFsM79Rqo951RFHK
+
+vamos instalar todos os pacotes e etc que se requerem para esse programa
+
+vamos prompt a prompt criando esse bot, esse chat servirá para isso.
+
+referências:
+
+https://github.com/binance/binance-spot-api-docs/tree/master/testnet
+https://www.luiztools.com.br/post/como-criar-robo-trader-da-binance-em-nodejs/

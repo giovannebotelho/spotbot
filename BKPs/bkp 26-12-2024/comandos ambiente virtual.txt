@@ -1,0 +1,8 @@
+# Para o bot de spot mainnet
+python -m venv env_spot_refat
+
+# Ative o ambiente no Windows
+.\env_spot_refat\Scripts\activate
+
+# Instale as dependências
+pip install -r requirements.txt
