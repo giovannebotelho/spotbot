@@ -72,5 +72,5 @@ rsi_high_0 = 70 # Limiar para o RSI considerado alto para decisões de venda.
 lucro_multiplier_1 = 1.008  # Multiplicador de lucro para preços menores que 1.
 stop_loss_multiplier_1 = 0.99  # Multiplicador de stop loss para preços menores que 1.
 #else:
-lucro_multiplier_2 = 1.003  # Multiplicador de lucro para preços maiores ou iguais a 1.
-stop_loss_multiplier_2 = 0.9968  # Multiplicador de stop loss para preços maiores ou iguais a 1.
+lucro_multiplier_2 = 1.0033  # Multiplicador de lucro para preços maiores ou iguais a 1.
+stop_loss_multiplier_2 = 0.9965  # Multiplicador de stop loss para preços maiores ou iguais a 1.
