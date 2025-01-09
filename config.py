@@ -1,20 +1,25 @@
+import os
+from dotenv import load_dotenv
+
+load_dotenv()  # Carrega as variáveis do arquivo .env
+
 # Binance API Keys for different environments
 
 # Testnet Spot - Chaves de API para a versão de teste de negociação spot em Binance.
-testnetspot_api_key = 'bj1bhRY27pkU3omP4mitx3OSBMQdp6rP9hHMxCIv49AGsSITC2dVBP4f40SdBDWN'
-testnetspot_secret_key = 'kmfOuOmhdWsfhZrKNNT6kTNaoJbjYLAkSX4KQKPANTvJKUZZOFsM79Rqo951RFHK'
+testnetspot_api_key = os.getenv("testnetspot_api_key")
+testnetspot_secret_key = os.getenv("testnetspot_secret_key")
 
 # Testnet Futures - Chaves de API para a versão de teste de negociação de futuros em Binance.
-testnetfut_api_key = 'ee2df65f4953d5518df19be2a5b0847c3c36f9841932d2b18562afe9f366d12e'
-testnetfut_secret_key = '3b0298d9f9b822a0ec11fcf5d2c8cfd9825463e0e3ae5e135a0effa295f85775'
+testnetfut_api_key = os.getenv("testnetfut_api_key")
+testnetfut_secret_key = os.getenv("testnetfut_secret_key")
 
 # Mainnet - Chaves de API para a versão principal de negociação em Binance.
-mainnet_api_key = "DAomNWz49dTlVhwCQ984hvELKt06IWRHKDHKdSm0zq8wsbyeyTIZ0w6293AoF3xC"
-mainnet_secret_key = "guvkpg3Gn1q5F0WPKmCxC72MMmrP6ecKyqkZkJ8cWtKE1eUd87ST7hLZlSYD7KHl"
+mainnet_api_key = os.getenv("mainnet_api_key")
+mainnet_secret_key = os.getenv("mainnet_secret_key")
 
 # Telegram - Configurações para integração com o bot do Telegram para notificações.
-bot_token = '7407070930:AAHecCdeb3MxHFzw6P9X_4eYugl7w-cRNFI'
-chat_id = '7983896904'
+bot_token = os.getenv("bot_token")
+chat_id = os.getenv("chat_id")
 
 # Interval, period and depth configs - Configurações gerais para busca de dados e cálculos.
 interval = '15m'  # Intervalo de tempo para buscar dados de velas (candles).
