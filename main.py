@@ -460,7 +460,7 @@ async def run_bot():
 
                 await asyncio.sleep(0.1)  # Short pause before checking for new orders or balance updates
 
-            await client.close_connection()
+        await client.close_connection()
             
     except BinanceAPIException as e:
         if restart_attempts < MAX_RESTARTS:
