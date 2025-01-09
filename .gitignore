@@ -1,0 +1,16 @@
+# Virtual environment
+env_spot_refat/
+
+# Arquivos de configuração local
+.env
+
+# Logs
+*.log
+
+# Planilhas de resultados
+*.xlsx
+
+# Outros arquivos temporários
+__pycache__
+*.pyc
+*.pyo
