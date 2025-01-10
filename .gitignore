@@ -1,8 +1,13 @@
-# Virtual environment
-env_spot_refat/
-
-# Pycache
+# Pastas
 __pycache__/
+
+BKPs/
+
+doc/
+
+env_spotbot/
+
+ref/
 
 # Arquivos de configuração local
 .env
