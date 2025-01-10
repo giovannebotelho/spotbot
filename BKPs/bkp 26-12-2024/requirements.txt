@@ -1,7 +1,0 @@
-python-binance==1.0.22
-asyncio
-datetime
-numpy
-pandas
-requests
-openpyxl

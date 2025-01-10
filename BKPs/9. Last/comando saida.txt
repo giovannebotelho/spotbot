@@ -1,5 +1,0 @@
-python binance_bot_vf.py 2>&1 | Tee-Object -FilePath saida.txt -Append
-
----
-
-python meu_script.py 2>&1 | Tee-Object -FilePath saida.txt -Append
