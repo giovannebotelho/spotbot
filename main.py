@@ -233,7 +233,7 @@ async def run_bot():
                 macd_current, signal_line_current = calculate_macd(closes)
                 lower_band, middle_band, upper_band = calculate_bollinger_bands(closes)
                 
-                 #Novo indicador
+                #Novo indicador
                 vwap = calculate_vwap(closes, volumes)
                 
                 if symbol == "ADAUSDT" or symbol == "DOGEUSDT":
