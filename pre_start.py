@@ -2,6 +2,7 @@ import os
 import subprocess
 
 from datetime import datetime, timedelta
+from binance.exceptions import BinanceAPIException
 
 from telegram_integration import send_telegram_message
 from config import bot_token, chat_id
@@ -50,15 +51,23 @@ def synchronize_time():
 
 async def cancel_all_oco_orders(client, symbol):
     """
-    Cancela todas as ordens OCO abertas para um símbolo específico, limpa o estado antes de iniciar novas operações.
+    Cancela todas as ordens OCO abertas para um símbolo específico.
     Args:
         client: Cliente da API do Binance.
         symbol (str): Símbolo de trading para o qual as ordens serão canceladas.
     """
-    open_orders = await client.get_open_orders(symbol=symbol)
-    for order in open_orders:
-        if 'orderListId' in order and order['orderListId'] > -1:
-            await client.cancel_order(symbol=symbol, orderId=order['orderId'])
+    try:
+        open_oco_orders = await client.get_open_oco_orders()  # Obter todas as ordens OCO abertas
+        for order_list in open_oco_orders:
+            if order_list['symbol'] == symbol:
+                order_list_id = order_list['orderListId']
+                await client.cancel_order_list(symbol=symbol, orderListId=order_list_id)
+                print(f"Ordem OCO com orderListId {order_list_id} para o símbolo {symbol} cancelada.")
+
+    except BinanceAPIException as e:
+        print(f"Erro ao cancelar ordens OCO: {e}")
+    except Exception as e:
+        print(f"Erro inesperado ao cancelar ordens OCO: {e}")
 
 def escolher_simbolo():
     """

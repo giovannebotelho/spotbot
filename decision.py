@@ -1,5 +1,6 @@
 import asyncio
 import math
+import time
 from binance.exceptions import BinanceAPIException
 from trading_functions import calculate_moving_average_sell_pressure
 from binance_api import get_order_book
@@ -36,10 +37,10 @@ async def should_place_order(client, symbol, SELL_PRESSURE_THRESHOLD = SELL_PRES
         # Imprime a nova mensagem
         print(f"\r{msg}", end='', flush=True)
         # Espera um breve momento antes de limpar a linha novamente
-        await asyncio.sleep(1)
+        await asyncio.sleep(0.4)
         # Limpa a linha anterior
         print("\033[2K\r", end='')
-        await asyncio.sleep(0.2)
+        await asyncio.sleep(0.15)
     return False
 
 def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_close, lower_band, vwap, candle_patterns):
@@ -150,8 +151,6 @@ async def adjust_and_place_oco_order(client, symbol, quantity, tick_size, min_pr
         try:
             order_book = await get_order_book(client, symbol)
             current_price = float(order_book['asks'][0][0])
-            # Não é necessário reajustar a quantidade, use diretamente executed_qty
-            # adjusted_quantity = adjust_quantity_to_lot_size(quantity, await client.get_symbol_info(symbol))
 
             lucro_multiplier = lucro_multiplier_1 if current_price < 1 else lucro_multiplier_2
             stop_loss_multiplier = stop_loss_multiplier_1 if current_price < 1 else stop_loss_multiplier_2
@@ -160,18 +159,23 @@ async def adjust_and_place_oco_order(client, symbol, quantity, tick_size, min_pr
             stop_loss = adjust_price_to_tick_size(current_price * stop_loss_multiplier, tick_size)
             stop_limit = adjust_price_to_tick_size(stop_loss - (20 * min_price_move), tick_size)
 
-            oco_order = await client.create_oco_order(
-                symbol=symbol,
-                side="SELL",
-                quantity=f"{quantity:.6f}",  # Use a quantidade exata comprada (executed_qty)
-                price=f"{lucro_alvo:.2f}",
-                stopPrice=f"{stop_loss:.2f}",
-                stopLimitPrice=f"{stop_limit:.2f}",
-                stopLimitTimeInForce='GTC'
-            )
-            
-            order_list_id = oco_order.get('orderListId', 'N/A')  # Acessa o ID da ordem OCO, se disponível
+            # Parâmetros para a ordem OCO
+            params = {
+                'symbol': symbol,
+                'side': 'SELL',
+                'quantity': f"{quantity:.6f}",
+                'aboveType': 'LIMIT_MAKER',
+                'belowType': 'STOP_LOSS_LIMIT',
+                'abovePrice': f"{lucro_alvo:.2f}",  # Preço para a ordem LIMIT_MAKER (lucro)
+                'belowStopPrice': f"{stop_loss:.2f}",  # Preço de ativação para a ordem STOP_LOSS_LIMIT
+                'belowPrice': f"{stop_limit:.2f}", # Preço limite para a ordem STOP_LOSS_LIMIT
+                'belowTimeInForce': 'GTC',  # Time in force para a ordem STOP_LOSS_LIMIT
+                'timestamp': int(time.time() * 1000)
+            }
 
+            oco_order = await client.create_oco_order(**params)
+
+            order_list_id = oco_order.get('orderListId', 'N/A')
             limit_order_id = oco_order['orders'][1]['orderId']
             stop_order_id = oco_order['orders'][0]['orderId']
             
@@ -198,7 +202,7 @@ async def adjust_and_place_oco_order(client, symbol, quantity, tick_size, min_pr
     print(f"\n🚨 \033[1;31mFalha\033[0m ao colocar a ordem OCO após {max_attempts} tentativas.")
     message = f'<b>🚨 Falha ao colocar a ordem OCO após {max_attempts} tentativas</b>, Moeda: <b>{symbol}</b>'
     send_telegram_message(bot_token, chat_id, message)
-    return None
+    raise Exception("Falha ao colocar ordem OCO")  # Lança uma exceção
 
 def adjust_rsi_levels(result):
     """

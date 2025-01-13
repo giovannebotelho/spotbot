@@ -276,7 +276,7 @@ async def get_candle_details(client, symbol, interval, limit):
         }
     return None
 
-async def is_market_downward(client, symbol, interval, limit=3, high_amplitude_threshold=0.35):
+async def is_market_downward(client, symbol, interval, limit=4, high_amplitude_threshold=0.25):
     """
     Verifica se o mercado está em tendência de baixa com base nos últimos candles,
     considerando a amplitude dos candles vermelhos.
@@ -332,6 +332,8 @@ async def calculate_fee(client, symbol, executed_qty, price):
             fee_rate = 0.00075  # Taxa com desconto para BNB
         else:
             fee_rate = trade_fee  # Taxa padrão
+        
+        print(f"Dados para calcular a taxa: symbol={symbol}, executed_qty={executed_qty}, price={price}")
 
         return executed_qty * price * fee_rate
     

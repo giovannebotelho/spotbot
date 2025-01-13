@@ -1,4 +1,4 @@
-python-binance==1.0.22
+python-binance
 asyncio
 datetime
 numpy

@@ -44,10 +44,10 @@ SELL_PRESSURE_THRESHOLD_1 = 0.6  # Limiar de pressão de venda para decidir sobr
 volume_avg = 35 # 35%
 
 # Configurações de níveis de RSI
-lvl0 = 15 # (apenas RSI)
-lvl1 = 22 # (RSI+VWAP)
-lvl2 = 23 # (RSI+TREND+VWAP)
-lvl3 = 24 # (RSI+TREND+VWAP+MACD OU RSI+CANDLE)
+lvl0 = 17 # (apenas RSI)
+lvl1 = 23 # (RSI+VWAP)
+lvl2 = 24 # (RSI+TREND+VWAP)
+lvl3 = 25 # (RSI+TREND+VWAP+MACD OU RSI+CANDLE)
 
 rsi_low_level_0 = lvl0 # Limiar para o RSI considerado muito baixo.
 rsi_low_level_1 = lvl1 # Limiar para o RSI considerado baixo e considerando o indicador VWAP.
