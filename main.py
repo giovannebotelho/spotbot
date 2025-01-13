@@ -3,13 +3,13 @@ import winsound
 import os
 import pandas as pd
 from datetime import datetime, timedelta
-from binance.streams import BinanceSocketManager
+from binance import BinanceSocketManager
 from binance import AsyncClient as BinanceAsyncClient
 from binance.exceptions import BinanceAPIException
 
 from config import bot_token, chat_id, mainnet_api_key, mainnet_secret_key, testnetspot_api_key, testnetspot_secret_key
 from config import volume_avg, dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3
-from config import interval, limit #importar interval e limit
+from config import interval, limit
 from pre_start import synchronize_time, escolher_simbolo, cancel_all_oco_orders
 from binance_api import get_closes, get_usdt_balance, get_volumes, get_order_details, get_klines
 from trading_functions import calculate_rsi, calculate_macd, calculate_bollinger_bands, check_trend, check_candle_patterns, calculate_vwap, get_candle_details, calculate_ema, is_market_downward
@@ -180,8 +180,7 @@ async def run_bot():
         
         rsi = calculate_rsi(closes)
         
-        print(f"\n📊 RSI Atual para {symbol}: \033[1;33m{rsi:.1f}\033[0m")
-        
+        print(f"\n📊 RSI Inicial para {symbol}: \033[1;33m{rsi:.1f}\033[0m")
         
         symbol_info = await client.get_symbol_info(symbol)
         quote_precision = int(symbol_info['baseAssetPrecision'])
@@ -246,42 +245,49 @@ async def run_bot():
                 #Novo indicador
                 vwap = calculate_vwap(closes, volumes)
                 
+                msg_rsi = f"📊 RSI Atual para {symbol}: \033[1;33m{rsi:.1f}\033[0m"
+                print(f"\r{msg_rsi}", end='', flush=True)
+                await asyncio.sleep(0.4)
+                print("\033[2K\r", end='')
+                
+                await asyncio.sleep(0.15)
+                
                 if symbol == "ADAUSDT" or symbol == "DOGEUSDT":
                     msg_macd = f"📊 MACD Atual para {symbol}: \033[1;33m{macd_current:.4f}\033[0m, Linha de sinal: \033[1;33m{signal_line_current:.4f}\033[0m"
                 else:
                     msg_macd = f"📊 MACD Atual para {symbol}: \033[1;33m{macd_current:.2f}\033[0m, Linha de sinal: \033[1;33m{signal_line_current:.2f}\033[0m"
                 print(f"\r{msg_macd}", end='', flush=True)
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.4)
                 print("\033[2K\r", end='')
                 
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.15)
                 
                 if symbol == "ADAUSDT" or symbol == "DOGEUSDT":
                     msg_bb = f"📊 Bandas de Bollinger para {symbol}: Inferior: \033[1;31m${lower_band:.4f}\033[0m, Média: \033[1;33m${middle_band:.4f}\033[0m, Superior: \033[1;32m${upper_band:.4f}\033[0m"
                 else:
                    msg_bb = f"📊 Bandas de Bollinger para {symbol}: Inferior: \033[1;31m${lower_band:.2f}\033[0m, Média: \033[1;33m${middle_band:.2f}\033[0m, Superior: \033[1;32m${upper_band:.2f}\033[0m"
                 print(f"\r{msg_bb}", end='', flush=True)
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.4)
                 print("\033[2K\r", end='')
                 
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.15)
                 
                 msg_vwap = f"📊 VWAP Atual para {symbol}: \033[1;33m{vwap:.2f}\033[0m"
                 print(f"\r{msg_vwap}", end='', flush=True)
-                await asyncio.sleep(0.5)
+                await asyncio.sleep(0.4)
                 print("\033[2K\r", end='')
                 
-                await asyncio.sleep(0.2)
+                await asyncio.sleep(0.15)
 
                 if volumes_series.iloc[-1] > volume_ma * (1 + volume_avg / 100):
                     msg = f"⚠️ Alto volume detectado, possível \033[1;33mvolatilidade de mercado\033[0m. Operação suspensa."
                     # Imprime a nova mensagem
                     print(f"\r{msg}", end='', flush=True)
                     # Espera um breve momento antes de limpar a linha novamente
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(0.4)
                     # Limpa a linha anterior
                     print("\033[2K\r", end='')
-                    await asyncio.sleep(0.2)
+                    await asyncio.sleep(0.15)
                     continue
                     
                 trend_is_up = await check_trend(client, symbol)
