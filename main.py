@@ -1,12 +1,13 @@
 import asyncio
 import winsound
+import os
 import pandas as pd
 from datetime import datetime, timedelta
 from binance import BinanceSocketManager
 from binance import AsyncClient as BinanceAsyncClient
 from binance.exceptions import BinanceAPIException
 
-from config import bot_token, chat_id, testnetspot_api_key, testnetspot_secret_key
+from config import bot_token, chat_id, mainnet_api_key, mainnet_secret_key, testnetspot_api_key, testnetspot_secret_key
 from config import volume_avg, dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3
 from config import interval, limit
 from pre_start import synchronize_time, escolher_simbolo, cancel_all_oco_orders
@@ -16,8 +17,17 @@ from decision import should_place_order, should_buy, should_sell, adjust_and_pla
 from post_trade import process_order_details, log_and_notify_results, create_data_row, save_to_excel
 from telegram_integration import send_telegram_message
 
-api_key = testnetspot_api_key
-api_secret = testnetspot_secret_key
+# Seleciona o ambiente com base na variável de ambiente
+environment = os.getenv("BOT_ENVIRONMENT", "mainnet")  # Valor padrão: mainnet
+
+if environment == "mainnet":
+    api_key = mainnet_api_key
+    api_secret = mainnet_secret_key
+elif environment == "testnet":
+    api_key = testnetspot_api_key
+    api_secret = testnetspot_secret_key
+else:
+    raise ValueError(f"Ambiente inválido: {environment}")
 
 # Variáveis globais
 quantia_usdt_investimento_inicial = None
