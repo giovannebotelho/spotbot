@@ -10,9 +10,9 @@ from config import lucro_multiplier_1, stop_loss_multiplier_1, lucro_multiplier_
 from config import SELL_PRESSURE_THRESHOLD_1
 from config import interval, limit #importar interval e limit
 from config import (
-    dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3,
-    rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_high_0,
-    rsi_min_level_0, rsi_min_level_1, rsi_min_level_2, rsi_min_level_3
+    dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4,
+    rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_low_level_4, rsi_high_0,
+    rsi_min_level_0, rsi_min_level_1, rsi_min_level_2, rsi_min_level_3, rsi_min_level_4
 )
 
 async def should_place_order(client, symbol, SELL_PRESSURE_THRESHOLD = SELL_PRESSURE_THRESHOLD_1, interval=interval, limit=limit): # 🟣🟣
@@ -63,38 +63,45 @@ def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_close, 
     rsi_low_level1 = rsi <= rsi_low_level_1
     rsi_low_level2 = rsi <= rsi_low_level_2
     rsi_low_level3 = rsi <= rsi_low_level_3
+    rsi_low_level4 = rsi <= rsi_low_level_4
     
     # Corrigido: Adicionado 'and' para verificar se o MACD está realmente acima da linha de sinal
     macd_bullish = macd_current > signal_line_current and last_close < lower_band  
-    vwap_tolerance = 0.05  # 5% de tolerância
+    vwap_tolerance = 0.07  # 7% de tolerância
     price_below_vwap = last_close < vwap * (1 + vwap_tolerance)
     
     # Adicionado: Verifica se há algum padrão de candle na lista
     has_candle_patterns = candle_patterns is not None and len(candle_patterns) > 0  
 
     if rsi_low_level0:
-        print("\nEntrando na condição 1 de compra do RSI_lvl0")
-        message = "Entrando na <b>condição 1</b> de compra do <b>RSI_lvl0</b>"
+        print("\nEntrando na condição 0 de compra do RSI considerado muito baixo")
+        message = "Entrando na <b>condição 0</b> de compra do <b>RSI considerado muito baixo</b>"
         send_telegram_message(bot_token, chat_id, message)
         return {"buy": True, "message": "RSI_lvl0", "candle_data": ""}
 
     elif rsi_low_level1 and price_below_vwap:
-        print("\nEntrando na condição 2 de compra do RSI_lvl1 e VWAP")
-        message = "Entrando na <b>condição 2</b> de compra do <b>RSI_lvl1 e VWAP</b>"
+        print("\nEntrando na condição 1 de compra do RSI considerado baixo e considerando o indicador VWAP")
+        message = "Entrando na <b>condição 1</b> de compra do <b>RSI considerado baixo e considerando o indicador VWAP</b>"
         send_telegram_message(bot_token, chat_id, message)
         return {"buy": True, "message": "RSI_lvl1 e VWAP", "candle_data": ""}
     
-    elif rsi_low_level2 and trend_is_up and price_below_vwap:  
-        print("\nEntrando na condição 3 de compra do RSI_lvl2, tendência e VWAP")
-        message = "Entrando na <b>condição 3</b> de compra do <b>RSI_lvl2, tendência e VWAP</b>"
+    elif rsi_low_level2 and has_candle_patterns:  
+        print("\nEntrando na condição 2 de compra do RSI considerado médio e considerando padrões de Candle")
+        message = "Entrando na <b>condição 2</b> de compra do <b>RSI considerado médio e considerando padrões de Candle</b>"
         send_telegram_message(bot_token, chat_id, message)
-        return {"buy": True, "message": "RSI_lvl2, tendência e VWAP", "candle_data": ""}
+        return {"buy": True, "message": "RSI_lvl2 e candles", "candle_data": ""}
+    
+    elif rsi_low_level3 and trend_is_up and price_below_vwap:  
+        print("\nEntrando na condição 3 de compra do RSI considerado médio-alto considerando tendências de alta e o indicador VWAP")
+        message = "Entrando na <b>condição 3</b> de compra do <b>RSI considerado médio-alto considerando tendências de alta e o indicador VWAP</b>"
+        send_telegram_message(bot_token, chat_id, message)
+        return {"buy": True, "message": "RSI_lvl3, tendência e VWAP", "candle_data": ""}
 
-    elif rsi_low_level3 and ((trend_is_up and price_below_vwap and macd_bullish) or has_candle_patterns):
-        print("\nEntrando na condição 4 de compra do RSI_lvl3, tendência, VWAP e MACD ou RSI_lvl3 e candles")
-        message = "Entrando na <b>condição 4</b> de compra do <b>RSI_lvl3, tendência, VWAP e MAC</b> ou <b>RSI_lvl3 e candles</b>"
+    elif rsi_low_level4 and trend_is_up and price_below_vwap and macd_bullish:
+        print("\nEntrando na condição 4 de compra do RSI considerado alto considerando tendências de alta, indicador VWAP e MACD")
+        message = "Entrando na <b>condição 4</b> de compra do <b>RSI considerado alto considerando tendências de alta, indicador VWAP e MACD</b>"
         send_telegram_message(bot_token, chat_id, message)
-        return {"buy": True, "message": "RSI_lvl3, tendência, VWAP e MACD ou RSI_lvl3 e candles", "candle_data": ""}
+        return {"buy": True, "message": "RSI_lvl4, tendência, VWAP e MACD", "candle_data": ""}
     
     return {"buy": False, "message": None, "candle_data": ""}
 
@@ -210,7 +217,7 @@ def adjust_rsi_levels(result):
     Args:
         result (str): Resultado da última ordem ('profit' ou 'stop loss').
     """
-    global dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3
+    global dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4
 
     if result == 'stop loss':
         # Reduz níveis de RSI
@@ -218,13 +225,15 @@ def adjust_rsi_levels(result):
         dynamic_rsi_low_1 = max(dynamic_rsi_low_1 - 1, rsi_min_level_1)
         dynamic_rsi_low_2 = max(dynamic_rsi_low_2 - 1, rsi_min_level_2)
         dynamic_rsi_low_3 = max(dynamic_rsi_low_3 - 1, rsi_min_level_3)
+        dynamic_rsi_low_4 = max(dynamic_rsi_low_4 - 1, rsi_min_level_4)
     elif result == 'profit':
         # Aumenta níveis de RSI, mas não excede os valores iniciais
         dynamic_rsi_low_0 = min(dynamic_rsi_low_0 + 2, rsi_low_level_0)
         dynamic_rsi_low_1 = min(dynamic_rsi_low_1 + 2, rsi_low_level_1)
         dynamic_rsi_low_2 = min(dynamic_rsi_low_2 + 2, rsi_low_level_2)
         dynamic_rsi_low_3 = min(dynamic_rsi_low_3 + 2, rsi_low_level_3)
+        dynamic_rsi_low_4 = min(dynamic_rsi_low_4 + 2, rsi_low_level_4)
 
-    print(f"\033[1mRSI ajustados:\033[0m {dynamic_rsi_low_0}, {dynamic_rsi_low_1}, {dynamic_rsi_low_2}, {dynamic_rsi_low_3}")
-    message = f'<b>RSI ajustados:</b> {dynamic_rsi_low_0}, {dynamic_rsi_low_1}, {dynamic_rsi_low_2}, {dynamic_rsi_low_3}'
+    print(f"\033[1mRSI ajustados:\033[0m {dynamic_rsi_low_0}, {dynamic_rsi_low_1}, {dynamic_rsi_low_2}, {dynamic_rsi_low_3}, {dynamic_rsi_low_4}")
+    message = f'<b>RSI ajustados:</b> {dynamic_rsi_low_0}, {dynamic_rsi_low_1}, {dynamic_rsi_low_2}, {dynamic_rsi_low_3}, {dynamic_rsi_low_4}'
     send_telegram_message(bot_token, chat_id, message)

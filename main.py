@@ -8,7 +8,7 @@ from binance import AsyncClient as BinanceAsyncClient
 from binance.exceptions import BinanceAPIException
 
 from config import bot_token, chat_id, mainnet_api_key, mainnet_secret_key, testnetspot_api_key, testnetspot_secret_key
-from config import volume_avg, dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3
+from config import volume_avg, dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4
 from config import interval, limit
 from pre_start import synchronize_time, escolher_simbolo, cancel_all_oco_orders
 from binance_api import get_closes, get_usdt_balance, get_volumes, get_order_details, get_klines
@@ -106,15 +106,16 @@ async def check_rsi_reset(symbol):
     global last_operation_time
     
     # Removendo a importação das variáveis locais e importanto as globais
-    global dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3
-    from config import rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3
+    global dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4
+    from config import rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_low_level_4
 
     if last_operation_time and (datetime.now() - last_operation_time) > timedelta(seconds=7200):
         # Verifica se os níveis de RSI dinâmicos são iguais aos níveis padrão
         if dynamic_rsi_low_0 == rsi_low_level_0 and \
            dynamic_rsi_low_1 == rsi_low_level_1 and \
            dynamic_rsi_low_2 == rsi_low_level_2 and \
-           dynamic_rsi_low_3 == rsi_low_level_3:
+           dynamic_rsi_low_3 == rsi_low_level_3 and \
+           dynamic_rsi_low_4 == rsi_low_level_4:
             print(f"\n⏳ Níveis de RSI já estão em Standard para {symbol}.")
             message = f"⏳ Níveis de RSI já estão em Standard para <b>{symbol}</b>."
             send_telegram_message(bot_token, chat_id, message)
@@ -124,6 +125,7 @@ async def check_rsi_reset(symbol):
             dynamic_rsi_low_1 = rsi_low_level_1
             dynamic_rsi_low_2 = rsi_low_level_2
             dynamic_rsi_low_3 = rsi_low_level_3
+            dynamic_rsi_low_4 = rsi_low_level_4
             print(f"\n⏳ Níveis de RSI resetados para {symbol} devido à inatividade.")
             message = f"⏳ Níveis de RSI resetados para <b>{symbol}</b> devido à inatividade."
             send_telegram_message(bot_token, chat_id, message)

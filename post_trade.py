@@ -110,7 +110,7 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
     """
     Atualiza a linha de dados para incluir variáveis de configuração e salva no Excel.
     """
-    from config import rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_high_0
+    from config import rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_low_level_4, rsi_high_0
     from config import lucro_multiplier_1, lucro_multiplier_2, stop_loss_multiplier_1, stop_loss_multiplier_2
     from config import SELL_PRESSURE_THRESHOLD_1, interval, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg
 
@@ -158,10 +158,11 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
         "Banda Superior BB": upper_band,
         "Tendência de Alta": trend_is_up,
         # Adicionando variáveis de configuração
-        "RSI Baixo Nível 0": rsi_low_level_0,
-        "RSI Baixo Nível 1": rsi_low_level_1,
-        "RSI Baixo Nível 2": rsi_low_level_2,
-        "RSI Baixo Nível 3": rsi_low_level_3,
+        "RSI Nível 0": rsi_low_level_0,
+        "RSI Nível 1": rsi_low_level_1,
+        "RSI Nível 2": rsi_low_level_2,
+        "RSI Nível 3": rsi_low_level_3,
+        "RSI Nível 4": rsi_low_level_4,
         "RSI Alto Nível 0": rsi_high_0,
         "Multiplicador de Lucro (Preço < 1)": lucro_multiplier_1,
         "Multiplicador de Stop Loss (Preço < 1)": stop_loss_multiplier_1,
