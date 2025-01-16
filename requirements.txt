@@ -6,3 +6,5 @@ pandas
 requests
 openpyxl
 python-dotenv
+google-generativeai
+pyautogui

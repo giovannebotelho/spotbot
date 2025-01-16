@@ -8,7 +8,7 @@ from config import bot_token, chat_id
 
 from decision import adjust_rsi_levels
 
-async def process_order_details(client, limit_order_details, stop_order_details, price, executed_qty, quantia_usdt_investimento_inicial):
+async def process_order_details(symbol, client, limit_order_details, stop_order_details, price, executed_qty, quantia_usdt_investimento_inicial):
     """
     Analisa os resultados das ordens OCO e atualiza o saldo baseado nos resultados das ordens de lucro ou stop loss.
     Também ajusta dinamicamente os níveis de RSI com base nos resultados das ordens.
@@ -22,7 +22,6 @@ async def process_order_details(client, limit_order_details, stop_order_details,
     Returns:
         tuple: Resultado da ordem, resultado financeiro, saldo atualizado e timestamp da ordem.
     """
-    from config import symbol
     
     if limit_order_details['status'] == 'FILLED':
         oco_order_result = 'profit'
@@ -44,7 +43,8 @@ async def process_order_details(client, limit_order_details, stop_order_details,
         fee = await calculate_fee(client, symbol, executed_qty, price_sold) # Enviando symbol como parametro
         trade_result_liquid = trade_result - fee  # Resultado final menos a taxa
         
-        novo_saldo_usdt = quantia_usdt_investimento_inicial + trade_result_liquid
+        # Mantenha o cálculo do novo_saldo_usdt usando o trade_result BRUTO, para os juros compostos
+        novo_saldo_usdt = quantia_usdt_investimento_inicial + trade_result
     else:
         trade_result = 0
         novo_saldo_usdt = quantia_usdt_investimento_inicial  # Mantém o saldo atual se não houve ordem preenchida
@@ -53,7 +53,7 @@ async def process_order_details(client, limit_order_details, stop_order_details,
 
     oco_timestamp = datetime.now().strftime("%d/%m/%Y at %H:%M:%S") if oco_order_result else None
 
-    return oco_order_result, trade_result, novo_saldo_usdt, oco_timestamp, fee, trade_result_liquid
+    return symbol, oco_order_result, trade_result, novo_saldo_usdt, oco_timestamp, fee, trade_result_liquid
 
 def log_and_notify_results(order_result, symbol, trade_result, total_difference, timestamp, vwap, fee, trade_result_liquid):
     """

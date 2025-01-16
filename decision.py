@@ -1,6 +1,9 @@
 import asyncio
 import math
 import time
+import os
+from dotenv import load_dotenv
+load_dotenv()  # Carregue as variáveis de ambiente do arquivo .env, incluindo GEMINI_API_KEY
 from binance.exceptions import BinanceAPIException
 from trading_functions import calculate_moving_average_sell_pressure
 from binance_api import get_order_book
@@ -14,6 +17,7 @@ from config import (
     rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_low_level_4, rsi_high_0,
     rsi_min_level_0, rsi_min_level_1, rsi_min_level_2, rsi_min_level_3, rsi_min_level_4
 )
+from gemini_analysis import analyze_with_gemini  # Importe a função analyze_with_gemin
 
 async def should_place_order(client, symbol, SELL_PRESSURE_THRESHOLD = SELL_PRESSURE_THRESHOLD_1, interval=interval, limit=limit): # 🟣🟣
     """
@@ -37,13 +41,13 @@ async def should_place_order(client, symbol, SELL_PRESSURE_THRESHOLD = SELL_PRES
         # Imprime a nova mensagem
         print(f"\r{msg}", end='', flush=True)
         # Espera um breve momento antes de limpar a linha novamente
-        await asyncio.sleep(0.4)
+        await asyncio.sleep(0.6)
         # Limpa a linha anterior
         print("\033[2K\r", end='')
         await asyncio.sleep(0.15)
     return False
 
-def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_close, lower_band, vwap, candle_patterns):
+async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_close, lower_band, vwap, candle_patterns):
     """
     Avalia se as condições são adequadas para comprar baseando-se em RSI, tendência, decisão de vela e MACD.
     Args:
@@ -71,7 +75,22 @@ def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_close, 
     price_below_vwap = last_close < vwap * (1 + vwap_tolerance)
     
     # Adicionado: Verifica se há algum padrão de candle na lista
-    has_candle_patterns = candle_patterns is not None and len(candle_patterns) > 0  
+    has_candle_patterns = candle_patterns is not None and len(candle_patterns) > 0
+    
+    # Condição 5: Análise do Gemini
+    # Obter o loop de eventos atual
+    loop = asyncio.get_running_loop()
+
+    # Executar a função assíncrona dentro do loop de eventos atual
+    gemini_buy_signal = await loop.run_in_executor(
+        None,  # Usa o executor padrão (pool de threads)
+        analyze_with_gemini,  # A função a ser executada
+        os.getenv("gemini_api"),  # Argumentos para a função
+        5,
+        90,
+        1920,
+        950
+    )
 
     if rsi_low_level0:
         print("\nEntrando na condição 0 de compra do RSI considerado muito baixo")
@@ -102,6 +121,17 @@ def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_close, 
         message = "Entrando na <b>condição 4</b> de compra do <b>RSI considerado alto considerando tendências de alta, indicador VWAP e MACD</b>"
         send_telegram_message(bot_token, chat_id, message)
         return {"buy": True, "message": "RSI_lvl4, tendência, VWAP e MACD", "candle_data": ""}
+    
+    elif gemini_buy_signal:
+        print("\nEntrando na condição 5 de compra: Sinal de COMPRA do Gemini")
+        message = "Entrando na <b>condição 5</b> de compra: <b>Sinal de COMPRA do Gemini</b>"
+        send_telegram_message(bot_token, chat_id, message)
+        return {"buy": True, "message": "Gemini Buy Signal", "candle_data": ""}
+    
+    elif gemini_buy_signal is False:
+        print("Sinal \033[1;33mNEUTRO\033[0m ou \033[1;31mVENDA\033[0m recebido do Gemini.\n")
+        # Se o sinal for de venda, você pode optar por não comprar ou adicionar outra lógica aqui
+        return {"buy": False, "message": "Gemini Sell Signal", "candle_data": ""}
     
     return {"buy": False, "message": None, "candle_data": ""}
 

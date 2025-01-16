@@ -116,7 +116,7 @@ async def check_rsi_reset(symbol):
            dynamic_rsi_low_2 == rsi_low_level_2 and \
            dynamic_rsi_low_3 == rsi_low_level_3 and \
            dynamic_rsi_low_4 == rsi_low_level_4:
-            print(f"\n⏳ Níveis de RSI já estão em Standard para {symbol}.")
+            print(f"\n⏳ Níveis de RSI já estão em Standard para {symbol}.\n")
             message = f"⏳ Níveis de RSI já estão em Standard para <b>{symbol}</b>."
             send_telegram_message(bot_token, chat_id, message)
         else:
@@ -249,7 +249,7 @@ async def run_bot():
                 
                 msg_rsi = f"📊 RSI Atual para {symbol}: \033[1;33m{rsi:.1f}\033[0m"
                 print(f"\r{msg_rsi}", end='', flush=True)
-                await asyncio.sleep(0.4)
+                await asyncio.sleep(0.6)
                 print("\033[2K\r", end='')
                 
                 await asyncio.sleep(0.15)
@@ -259,7 +259,7 @@ async def run_bot():
                 else:
                     msg_macd = f"📊 MACD Atual para {symbol}: \033[1;33m{macd_current:.2f}\033[0m, Linha de sinal: \033[1;33m{signal_line_current:.2f}\033[0m"
                 print(f"\r{msg_macd}", end='', flush=True)
-                await asyncio.sleep(0.4)
+                await asyncio.sleep(0.6)
                 print("\033[2K\r", end='')
                 
                 await asyncio.sleep(0.15)
@@ -269,14 +269,14 @@ async def run_bot():
                 else:
                    msg_bb = f"📊 Bandas de Bollinger para {symbol}: Inferior: \033[1;31m${lower_band:.2f}\033[0m, Média: \033[1;33m${middle_band:.2f}\033[0m, Superior: \033[1;32m${upper_band:.2f}\033[0m"
                 print(f"\r{msg_bb}", end='', flush=True)
-                await asyncio.sleep(0.4)
+                await asyncio.sleep(0.6)
                 print("\033[2K\r", end='')
                 
                 await asyncio.sleep(0.15)
                 
                 msg_vwap = f"📊 VWAP Atual para {symbol}: \033[1;33m{vwap:.2f}\033[0m"
                 print(f"\r{msg_vwap}", end='', flush=True)
-                await asyncio.sleep(0.4)
+                await asyncio.sleep(0.6)
                 print("\033[2K\r", end='')
                 
                 await asyncio.sleep(0.15)
@@ -286,7 +286,7 @@ async def run_bot():
                     # Imprime a nova mensagem
                     print(f"\r{msg}", end='', flush=True)
                     # Espera um breve momento antes de limpar a linha novamente
-                    await asyncio.sleep(0.4)
+                    await asyncio.sleep(0.6)
                     # Limpa a linha anterior
                     print("\033[2K\r", end='')
                     await asyncio.sleep(0.15)
@@ -303,7 +303,7 @@ async def run_bot():
                 
                 if await should_place_order(client, symbol) and not market_downward:
                     
-                    buy_result = should_buy(rsi, trend_is_up, macd_current, signal_line_current, closes[-1], lower_band, vwap, candle_patterns)
+                    buy_result = await should_buy(rsi, trend_is_up, macd_current, signal_line_current, closes[-1], lower_band, vwap, candle_patterns)
                     if buy_result["buy"]:  # Verifica as condições de compra
                         executed_condition = buy_result["message"]  # Atribui a mensagem da condição atendida
                         
@@ -401,14 +401,17 @@ async def run_bot():
                                     # Busca os detalhes das ordens executadas
                                     limit_order_details = await get_order_details(client, symbol, limit_order_id)
                                     stop_order_details = await get_order_details(client, symbol, stop_order_id)
-                                    
+
                                     # Atualize total_difference depois de chamar process_order_details
-                                    order_result, trade_result, novo_saldo_usdt, oco_timestamp, fee, trade_result_liquid = await process_order_details(client, limit_order_details, stop_order_details,
-                                                                                                                                                 price, executed_qty, quantia_usdt_investimento_inicial)
+                                    # Posição correta dos argumentos (symbol como primeiro argumento)
+                                    symbol, order_result, trade_result, novo_saldo_usdt, oco_timestamp, fee, trade_result_liquid = await process_order_details(symbol, client, limit_order_details, 
+                                                                                                                                                               stop_order_details, price, executed_qty, 
+                                                                                                                                                               quantia_usdt_investimento_inicial)
+
                                     # Atualiza o saldo atual e a diferença total
                                     saldo_atual_usdt = novo_saldo_usdt
-                                    total_difference += trade_result  # Acumula os resultados ao total
-                                    quantia_usdt_investimento_inicial = saldo_atual_usdt  # Atualiza o montante para reinvestimento
+                                    total_difference += trade_result  # Acumula os resultados ao total (usando trade_result bruto)
+                                    quantia_usdt_investimento_inicial = saldo_atual_usdt  # Atualiza o montante para reinvestimento (usando novo_saldo_usdt, que considera o resultado bruto)
                                     
                                     if order_result:
                                         # Registra os resultados no log e envia mensagens
@@ -454,10 +457,10 @@ async def run_bot():
                         # Imprime a nova mensagem
                         print(f"\r{msg}", end='', flush=True)
                         # Espera um breve momento antes de limpar a linha novamente
-                        await asyncio.sleep(0.5)
+                        await asyncio.sleep(0.6)
                         # Limpa a linha anterior
                         print("\033[2K\r", end='')
-                        await asyncio.sleep(0.2)
+                        await asyncio.sleep(0.15)
                         continue
                     else:
                         ticker = await client.get_symbol_ticker(symbol=symbol)
@@ -470,13 +473,13 @@ async def run_bot():
                         # Imprime a nova mensagem
                         print(f"\r{msg}", end='', flush=True)
                         # Espera um breve momento antes de limpar a linha novamente
-                        await asyncio.sleep(0.5)
+                        await asyncio.sleep(0.6)
                         # Limpa a linha anterior
                         print("\033[2K\r", end='')
-                        await asyncio.sleep(0.2)
+                        await asyncio.sleep(0.15)
                         continue
 
-                await asyncio.sleep(0.1)  # Short pause before checking for new orders or balance updates
+                await asyncio.sleep(0.5)  # Short pause before checking for new orders or balance updates
 
         await client.close_connection()
             

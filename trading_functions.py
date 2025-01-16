@@ -218,7 +218,7 @@ async def check_candle_patterns(client, symbol, interval=interval, limit=limit):
     # Imprime a nova mensagem
     print(f"\r{msg}", end='', flush=True)
     # Espera um breve momento antes de limpar a linha novamente
-    await asyncio.sleep(0.4)
+    await asyncio.sleep(0.6)
     # Limpa a linha anterior
     print("\033[2K\r", end='')
     
@@ -323,15 +323,11 @@ async def calculate_fee(client, symbol, executed_qty, price):
         # Verifica se o usuário tem BNB suficiente para cobrir a taxa
         bnb_balance = await client.get_asset_balance(asset='BNB')
         bnb_balance = float(bnb_balance['free'])
-        
-        # Obtém a taxa de trading atual para o símbolo
-        trade_fee = await client.get_trade_fee(symbol=symbol)
-        trade_fee = float(trade_fee['tradeFee'][0]['makerCommission'])  # Assumindo que estamos usando a taxa 'maker'
 
         if bnb_balance > 0:
             fee_rate = 0.00075 * 2  # Taxa com desconto para BNB (considerando compra e venda)
         else:
-            fee_rate = trade_fee  # Taxa padrão
+            fee_rate = 0.001 * 2  # Taxa padrão (considerando compra e venda)
         
         print(f"Dados para calcular a taxa: symbol={symbol}, executed_qty={executed_qty}, price={price}")
 

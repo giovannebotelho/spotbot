@@ -44,11 +44,11 @@ SELL_PRESSURE_THRESHOLD_1 = 0.65  # Limiar de pressão de venda para decidir sob
 volume_avg = 40 # 40%
 
 # Configurações de níveis de RSI
-lvl0 = 17 # (apenas RSI)
+lvl0 = 15 # (apenas RSI)
 lvl1 = 25 # (RSI+VWAP)
-lvl2 = 30 # (RSI+CANDLE)
-lvl3 = 35 # (RSI+TREND+VWAP)
-lvl4 = 40 # (RSI+TREND+VWAP+MACD)
+lvl2 = 25 # (RSI+CANDLE)
+lvl3 = 30 # (RSI+TREND+VWAP)
+lvl4 = 35 # (RSI+TREND+VWAP+MACD)
 
 rsi_low_level_0 = lvl0 # Limiar para o RSI considerado muito baixo.
 rsi_low_level_1 = lvl1 # Limiar para o RSI considerado baixo e considerando o indicador VWAP.
@@ -77,5 +77,5 @@ rsi_high_0 = 70 # Limiar para o RSI considerado alto para decisões de venda.
 lucro_multiplier_1 = 1.008  # Multiplicador de lucro para preços menores que 1.
 stop_loss_multiplier_1 = 0.99  # Multiplicador de stop loss para preços menores que 1.
 #else:
-lucro_multiplier_2 = 1.0033  # Multiplicador de lucro para preços maiores ou iguais a 1.
+lucro_multiplier_2 = 1.003  # Multiplicador de lucro para preços maiores ou iguais a 1.
 stop_loss_multiplier_2 = 0.9964  # Multiplicador de stop loss para preços maiores ou iguais a 1.
