@@ -168,11 +168,11 @@ def analyze_with_gemini(api_key, x, y, width, height):
         if screenshot:
             gemini_response = send_screenshot_to_gemini(screenshot, api_key)
             signal = interpret_gemini_response(gemini_response)
-            print(f"\nResposta do Gemini: \033[1m{gemini_response}\033[0m")
+            # print(f"\nResposta do Gemini: \033[1m{gemini_response}\033[0m")
 
             if signal is True:
-                print("Sinal de \033[1;32mCOMPRA\033[0m recebido do Gemini.\n")
-                time.sleep(53)
+                print("Sinal de \033[1;32mCOMPRA\033[0m recebido do Gemini.")
+                time.sleep(1)
                 return True
             elif signal is False:
                 print("Sinal de \033[1;31mVENDA\033[0m recebido do Gemini.\n")
