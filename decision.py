@@ -129,9 +129,8 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
         return {"buy": True, "message": "Gemini Buy Signal", "candle_data": ""}
     
     elif gemini_buy_signal is False:
-        print("Sinal \033[1;33mNEUTRO\033[0m ou \033[1;31mVENDA\033[0m recebido do Gemini.\n")
-        # Se o sinal for de venda, você pode optar por não comprar ou adicionar outra lógica aqui
-        return {"buy": False, "message": "Gemini Sell Signal", "candle_data": ""}
+        # print("Sinal \033[1;33mNEUTRO\033[0m ou \033[1;31mVENDA\033[0m recebido do Gemini.\n")
+        pass
     
     return {"buy": False, "message": None, "candle_data": ""}
 

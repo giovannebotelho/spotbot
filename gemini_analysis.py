@@ -56,7 +56,7 @@ def get_binance_screenshot(x, y, width, height):
 
     return screenshot
 
-def send_screenshot_to_gemini(image, api_key, model="gemini-1.5-flash"):
+def send_screenshot_to_gemini(image, api_key, model="gemini-2.0-flash-exp"):
     """
     Envia a screenshot para a API do Gemini para análise.
     """
@@ -83,7 +83,8 @@ def send_screenshot_to_gemini(image, api_key, model="gemini-1.5-flash"):
         "Responda com:\n"
         "*   '**sinal=compra**' se for um bom momento para **comprar**.\n"
         "*   '**sinal=venda**' se for um bom momento para **vender**.\n"
-        "*   '**sinal=neutro**' se não houver um sinal claro ou se for melhor aguardar.\n\n"
+        "*   '**sinal=neutro**' se não houver um sinal claro ou se for melhor aguardar.\n"
+        "(OBS: Manter formato de resposta 'sinal=x' e não 'sinal:x' ou algo diferente, por exemplo.)\n\n"
         "**Justifique sua recomendação com base nos indicadores e padrões observados.** Seja específico e detalhista na sua explicação."
     )
 
@@ -132,7 +133,7 @@ def send_screenshot_to_gemini(image, api_key, model="gemini-1.5-flash"):
         json=data,
     )
     
-    #Verifica se houve erro na resposta
+    # Verifica se houve erro na resposta
     if response.status_code != 200:
       print(f"Erro na solicitação à API do Gemini: {response.status_code} - {response.text}")
       return None
@@ -140,8 +141,7 @@ def send_screenshot_to_gemini(image, api_key, model="gemini-1.5-flash"):
     response.raise_for_status()
 
     # Mostra a URL da prompt
-    print(f"Prompt enviada para o Gemini")
-    # print(f"Prompt enviada para o Gemini: {response.url}")
+    print(f"Prompt enviada para o Gemini") # or print(f"Prompt enviada para o Gemini: {response.url}")
 
     return response.json()['candidates'][0]['content']['parts'][0]['text']
 
@@ -168,25 +168,27 @@ def analyze_with_gemini(api_key, x, y, width, height):
         if screenshot:
             gemini_response = send_screenshot_to_gemini(screenshot, api_key)
             signal = interpret_gemini_response(gemini_response)
-            # print(f"Resposta do Gemini: {gemini_response}")
+            print(f"\nResposta do Gemini: \033[1m{gemini_response}\033[0m")
 
             if signal is True:
-                print("\nSinal de \033[1;32mCOMPRA\033[0m recebido do Gemini.")
-                time.sleep(5)
+                print("Sinal de \033[1;32mCOMPRA\033[0m recebido do Gemini.\n")
+                time.sleep(53)
                 return True
             elif signal is False:
-                print("\nSinal de \033[1;31mVENDA\033[0m recebido do Gemini.")
-                time.sleep(5)
+                print("Sinal de \033[1;31mVENDA\033[0m recebido do Gemini.\n")
+                time.sleep(53)
                 return False
             else:
-                print("\nSinal \033[1;33mNEUTRO\033[0m ou não interpretado do Gemini.")
-                time.sleep(5)
+                print("Sinal \033[1;33mNEUTRO\033[0m ou não interpretado do Gemini.\n")
+                time.sleep(53)
                 return False  # Retorna False em caso de sinal neutro
         else:
             print("Não foi possível capturar a screenshot.")
+            time.sleep(53)
             return False  # Retorna False se não conseguiu capturar a screenshot
     except Exception as e:
         print(f"Ocorreu um erro: {e}")
+        time.sleep(53)
         return False  # Retorna False em caso de erro
 
 if __name__ == "__main__":
