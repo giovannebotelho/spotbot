@@ -13,11 +13,11 @@ from config import lucro_multiplier_1, stop_loss_multiplier_1, lucro_multiplier_
 from config import SELL_PRESSURE_THRESHOLD_1
 from config import interval, limit #importar interval e limit
 from config import (
-    dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4,
-    rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_low_level_4, rsi_high_0,
-    rsi_min_level_0, rsi_min_level_1, rsi_min_level_2, rsi_min_level_3, rsi_min_level_4
+    dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4, dynamic_rsi_low_5,
+    rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_low_level_4, rsi_low_level_5, rsi_high_0,
+    rsi_min_level_0, rsi_min_level_1, rsi_min_level_2, rsi_min_level_3, rsi_min_level_4, rsi_min_level_5
 )
-from gemini_analysis import analyze_with_gemini  # Importe a função analyze_with_gemin
+from gemini_analysis import analyze_with_gemini, interpret_gemini_response  # Importe a função analyze_with_gemin
 
 async def should_place_order(client, symbol, SELL_PRESSURE_THRESHOLD = SELL_PRESSURE_THRESHOLD_1, interval=interval, limit=limit): # 🟣🟣
     """
@@ -68,6 +68,7 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
     rsi_low_level2 = rsi <= rsi_low_level_2
     rsi_low_level3 = rsi <= rsi_low_level_3
     rsi_low_level4 = rsi <= rsi_low_level_4
+    rsi_low_level5 = rsi <= rsi_low_level_5
     
     # Corrigido: Adicionado 'and' para verificar se o MACD está realmente acima da linha de sinal
     macd_bullish = macd_current > signal_line_current and last_close < lower_band  
@@ -82,15 +83,22 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
     loop = asyncio.get_running_loop()
 
     # Executar a função assíncrona dentro do loop de eventos atual
-    gemini_buy_signal = await loop.run_in_executor(
+    gemini_response = await loop.run_in_executor(
         None,  # Usa o executor padrão (pool de threads)
         analyze_with_gemini,  # A função a ser executada
         os.getenv("gemini_api"),  # Argumentos para a função
-        5,
-        90,
-        1920,
-        950
+        5,    # binance_x
+        90,   # binance_y
+        1920, # binance_width
+        950,  # binance_height
+        5,    # tradingview_x
+        90,   # tradingview_y
+        1920, # tradingview_width
+        950   # tradingview_height
     )
+    
+    # Extrai o sinal da resposta do Gemini
+    gemini_buy_signal = interpret_gemini_response(gemini_response)
 
     if rsi_low_level0:
         print("\nEntrando na condição 0 de compra do RSI considerado muito baixo")
@@ -122,17 +130,17 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
         send_telegram_message(bot_token, chat_id, message)
         return {"buy": True, "message": "RSI_lvl4, tendência, VWAP e MACD", "candle_data": ""}
     
-    elif gemini_buy_signal:
-        print("\nEntrando na condição 5 de compra: Sinal de COMPRA do Gemini")
-        message = "Entrando na <b>condição 5</b> de compra: <b>Sinal de COMPRA do Gemini</b>"
+    elif gemini_buy_signal and rsi_low_level5:
+        print("\nEntrando na condição 5 de compra: Sinal de COMPRA do Gemini e RSI")
+        message = "Entrando na <b>condição 5</b> de compra: <b>Sinal de COMPRA do Gemini e RSI</b>"
         send_telegram_message(bot_token, chat_id, message)
-        return {"buy": True, "message": "Gemini Buy Signal", "candle_data": ""}
+        return {"buy": True, "message": "Gemini Buy Signal e RSI", "candle_data": "", "gemini_response": gemini_response}
     
     elif gemini_buy_signal is False:
         # print("Sinal \033[1;33mNEUTRO\033[0m ou \033[1;31mVENDA\033[0m recebido do Gemini.\n")
         pass
     
-    return {"buy": False, "message": None, "candle_data": ""}
+    return {"buy": False, "message": None, "candle_data": "", "gemini_response": gemini_response}
 
 def should_sell(rsi, trend_is_up, macd_current, signal_line_current, last_close, lower_band, vwap):
     """
@@ -246,7 +254,7 @@ def adjust_rsi_levels(result):
     Args:
         result (str): Resultado da última ordem ('profit' ou 'stop loss').
     """
-    global dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4
+    global dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4, dynamic_rsi_low_5
 
     if result == 'stop loss':
         # Reduz níveis de RSI
@@ -255,6 +263,7 @@ def adjust_rsi_levels(result):
         dynamic_rsi_low_2 = max(dynamic_rsi_low_2 - 1, rsi_min_level_2)
         dynamic_rsi_low_3 = max(dynamic_rsi_low_3 - 1, rsi_min_level_3)
         dynamic_rsi_low_4 = max(dynamic_rsi_low_4 - 1, rsi_min_level_4)
+        dynamic_rsi_low_5 = max(dynamic_rsi_low_5 - 1, rsi_min_level_5)
     elif result == 'profit':
         # Aumenta níveis de RSI, mas não excede os valores iniciais
         dynamic_rsi_low_0 = min(dynamic_rsi_low_0 + 2, rsi_low_level_0)
@@ -262,7 +271,8 @@ def adjust_rsi_levels(result):
         dynamic_rsi_low_2 = min(dynamic_rsi_low_2 + 2, rsi_low_level_2)
         dynamic_rsi_low_3 = min(dynamic_rsi_low_3 + 2, rsi_low_level_3)
         dynamic_rsi_low_4 = min(dynamic_rsi_low_4 + 2, rsi_low_level_4)
+        dynamic_rsi_low_5 = min(dynamic_rsi_low_5 + 2, rsi_low_level_5)
 
-    print(f"\033[1mRSI ajustados:\033[0m {dynamic_rsi_low_0}, {dynamic_rsi_low_1}, {dynamic_rsi_low_2}, {dynamic_rsi_low_3}, {dynamic_rsi_low_4}")
-    message = f'<b>RSI ajustados:</b> {dynamic_rsi_low_0}, {dynamic_rsi_low_1}, {dynamic_rsi_low_2}, {dynamic_rsi_low_3}, {dynamic_rsi_low_4}'
+    print(f"\033[1mRSI ajustados:\033[0m {dynamic_rsi_low_0}, {dynamic_rsi_low_1}, {dynamic_rsi_low_2}, {dynamic_rsi_low_3}, {dynamic_rsi_low_4}, {dynamic_rsi_low_5}")
+    message = f'<b>RSI ajustados:</b> {dynamic_rsi_low_0}, {dynamic_rsi_low_1}, {dynamic_rsi_low_2}, {dynamic_rsi_low_3}, {dynamic_rsi_low_4}, {dynamic_rsi_low_5}'
     send_telegram_message(bot_token, chat_id, message)

@@ -55,7 +55,7 @@ async def process_order_details(symbol, client, limit_order_details, stop_order_
 
     return symbol, oco_order_result, trade_result, novo_saldo_usdt, oco_timestamp, fee, trade_result_liquid
 
-def log_and_notify_results(order_result, symbol, trade_result, total_difference, timestamp, vwap, fee, trade_result_liquid):
+def log_and_notify_results(order_result, symbol, trade_result, total_difference, timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_usdt):
     """
     Registra e notifica os resultados das ordens, enviando detalhes relevantes via Telegram.
     Args:
@@ -78,39 +78,54 @@ def log_and_notify_results(order_result, symbol, trade_result, total_difference,
 
     # Exibe e envia notificações sobre o resultado financeiro
     if trade_result >= 0:
-        result_message = f'\nLucro Bruto: 🟢 \033[1;32m${trade_result:.2f}\033[0m\nTaxa: 🔴 \033[1;31m${fee:.2f}\033[0m\nLucro Líquido: 🟢 \033[1;32m${trade_result_liquid:.2f}\033[0m'
-        telegram_message1 = f'Lucro Bruto: 🟢 <b>${trade_result:.2f}</b>\nTaxa: 🔴 <b>${fee:.2f}</b>\nLucro Líquido: 🟢 <b>${trade_result_liquid:.2f}</b>'
+        result_message = f'\nLucro Parcial Bruto: 🟢 \033[1;32m${trade_result:.2f}\033[0m\nTaxa: 🔴 \033[1;31m${fee:.2f}\033[0m\nLucro Parcial Líquido: 🟢 \033[1;32m${trade_result_liquid:.2f}\033[0m\n'
+        telegram_message1 = f'Lucro Parcial Bruto: 🟢 <b>${trade_result:.2f}</b>\nTaxa: 🔴 <b>${fee:.2f}</b>\nLucro Parcial Líquido: 🟢 <b>${trade_result_liquid:.2f}</b>'
         send_telegram_message(bot_token, chat_id, telegram_message1)
     else:
-        result_message = f'\nPrejuízo Bruto: 🔴 \033[1;31m${trade_result:.2f}\033[0m\nTaxa: 🔴 \033[1;31m${fee:.2f}\033[0m\nPrejuízo Líquido: 🔴 \033[1;31m${trade_result_liquid:.2f}\033[0m'
-        telegram_message1 = f'Prejuízo Bruto: 🔴 <b>${trade_result:.2f}</b>\nTaxa: 🔴 <b>${fee:.2f}</b>\nPrejuízo Líquido: 🔴 <b>${trade_result_liquid:.2f}</b>'
+        result_message = f'\nPrejuízo Parcial Bruto: 🔴 \033[1;31m${trade_result:.2f}\033[0m\nTaxa: 🔴 \033[1;31m${fee:.2f}\033[0m\nPrejuízo Parcial Líquido: 🔴 \033[1;31m${trade_result_liquid:.2f}\033[0m\n'
+        telegram_message1 = f'Prejuízo Parcial Bruto: 🔴 <b>${trade_result:.2f}</b>\nTaxa: 🔴 <b>${fee:.2f}</b>\nPrejuízo Parcial Líquido: 🔴 <b>${trade_result_liquid:.2f}</b>'
         send_telegram_message(bot_token, chat_id, telegram_message1)
     print(result_message)
 
     # Notifica sobre a diferença total no saldo
     if total_difference >= 0:
-        total_balance_message = f'Diferença total no saldo: 🟢 \033[1;32m${total_difference:.2f}\033[0m\n'
-        telegram_message2 = f'Diferença total no saldo: 🟢 <b>${total_difference:.2f}</b>'
+        total_balance_message = f'Diferença total bruta no saldo: 🟢 \033[1;32m${total_difference:.2f}\033[0m'
+        telegram_message2 = f'Diferença total bruta no saldo: 🟢 <b>${total_difference:.2f}</b>'
         send_telegram_message(bot_token, chat_id, telegram_message2)
     else:
-        total_balance_message = f'Diferença total no saldo: 🔴 \033[1;31m${total_difference:.2f}\033[0m\n'
-        telegram_message2 = f'Diferença total no saldo: 🔴 <b>${total_difference:.2f}</b>'
+        total_balance_message = f'Diferença total bruta no saldo: 🔴 \033[1;31m${total_difference:.2f}\033[0m'
+        telegram_message2 = f'Diferença total bruta no saldo: 🔴 <b>${total_difference:.2f}</b>'
         send_telegram_message(bot_token, chat_id, telegram_message2)
     print(total_balance_message)
+    
+    # Adiciona a notificação sobre a diferença total líquida
+    if total_difference_liquid >= 0:
+        total_balance_liquid_message = f'Diferença total líquida no saldo: 🟢 \033[1;32m${total_difference_liquid:.2f}\033[0m\n'
+        telegram_message3 = f'Diferença total líquida no saldo: 🟢 <b>${total_difference_liquid:.2f}</b>'
+        send_telegram_message(bot_token, chat_id, telegram_message3)
+    else:
+        total_balance_liquid_message = f'Diferença total líquida no saldo: 🔴 \033[1;31m${total_difference_liquid:.2f}\033[0m\n'
+        telegram_message3 = f'Diferença total líquida no saldo: 🔴 <b>${total_difference_liquid:.2f}</b>'
+        send_telegram_message(bot_token, chat_id, telegram_message3)
+    print(total_balance_liquid_message)
+    
+    # Exibe o saldo de BNB em USDT
+    print(f"💰 Saldo BNB em USDT na carteira: \033[1;34m${bnb_balance_usdt:.2f}\033[0m")
+    message = f"💰 Saldo BNB em USDT na carteira: <b>${bnb_balance_usdt:.2f}</b>"
+    send_telegram_message(bot_token, chat_id, message)
 
-    print(f'📊 VWAP: {vwap:.2f}') #Adicionado
+    # print(f'📊 VWAP: {vwap:.2f}') #Adicionado
 
 def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_inicial, symbol,
                     executed_qty, price_rounded, purchase_timestamp, lucro_alvo, stop_loss, stop_limit,
                     order_result, oco_timestamp, trade_result, total_difference, saldo_atual_usdt,
-                    rsi, executed_condition, vwap, # rsi_value alterado para rsi (igual ao nome na definição da função)
-                    candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation,
+                    rsi, executed_condition, vwap, candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation,
                     ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, volume_avg, amplitude, macd_current, signal_line_current, 
-                    lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid):
+                    lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid, total_difference_liquid, gemini_response, bnb_balance_usdt):
     """
     Atualiza a linha de dados para incluir variáveis de configuração e salva no Excel.
     """
-    from config import rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_low_level_4, rsi_high_0
+    from config import rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_low_level_4, rsi_low_level_5, rsi_high_0
     from config import lucro_multiplier_1, lucro_multiplier_2, stop_loss_multiplier_1, stop_loss_multiplier_2
     from config import SELL_PRESSURE_THRESHOLD_1, interval, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg
 
@@ -134,11 +149,13 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
         "Limite de Stop OCO": stop_limit,
         "Resultado da Ordem OCO": order_result,
         "Data/Hora OCO": oco_timestamp,
-        "Resultado da Transação": round(trade_result, 2),
+        "Resultado Parcial da Transação": round(trade_result, 2),
         "Taxa": fee, # Nova coluna
-        "Resultado Líquido": round(trade_result_liquid, 2), # Nova coluna
-        "Resultado Total": round(total_difference, 2),
+        "Resultado Parcial da Transação Líquido": round(trade_result_liquid, 2), # Nova coluna
+        "Resultado Total Bruto": round(total_difference, 2),
+        "Resultado Total Liquido": round(total_difference_liquid, 2),
         "Saldo Final em USDT": round(saldo_atual_usdt, 2),
+        "Saldo BNB em USDT": bnb_balance_usdt,
         "RSI da operação": rsi,
 	    "Condição Atendida": executed_condition,
         "Intervalo de tempo (Candles)": interval,
@@ -163,6 +180,7 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
         "RSI Nível 2": rsi_low_level_2,
         "RSI Nível 3": rsi_low_level_3,
         "RSI Nível 4": rsi_low_level_4,
+        "RSI Nível 5": rsi_low_level_5,
         "RSI Alto Nível 0": rsi_high_0,
         "Multiplicador de Lucro (Preço < 1)": lucro_multiplier_1,
         "Multiplicador de Stop Loss (Preço < 1)": stop_loss_multiplier_1,
@@ -177,6 +195,7 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
 	    "Profundidade do livro de ofertas": depth,
 	    "Tamanho máximo para deque": maxlen,
 	    "Condicional volume": volume_avg,
+        "Resposta do Gemini": gemini_response, # Adiciona a resposta do Gemini à linha de dados
     }
   
 def save_to_excel(data_row):

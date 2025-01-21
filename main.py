@@ -8,10 +8,10 @@ from binance import AsyncClient as BinanceAsyncClient
 from binance.exceptions import BinanceAPIException
 
 from config import bot_token, chat_id, mainnet_api_key, mainnet_secret_key, testnetspot_api_key, testnetspot_secret_key
-from config import volume_avg, dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4
+from config import volume_avg, dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4, dynamic_rsi_low_5
 from config import interval, limit
 from pre_start import synchronize_time, escolher_simbolo, cancel_all_oco_orders
-from binance_api import get_closes, get_usdt_balance, get_volumes, get_order_details, get_klines
+from binance_api import get_closes, get_usdt_balance, get_volumes, get_order_details, get_klines, get_bnb_price
 from trading_functions import calculate_rsi, calculate_macd, calculate_bollinger_bands, check_trend, check_candle_patterns, calculate_vwap, get_candle_details, calculate_ema, is_market_downward
 from decision import should_place_order, should_buy, should_sell, adjust_and_place_oco_order, adjust_rsi_levels
 from post_trade import process_order_details, log_and_notify_results, create_data_row, save_to_excel
@@ -65,7 +65,7 @@ async def check_stop_losses(current_time):
         # temos 2 ou mais stop losses em menos de 15 minutos
         if stop_loss_count > 1:
             # Pausa longa (1 hora) e reseta o contador
-            print("\n 🚨 Mais de 1 stop loss detectado dentro de 15 minutos. Bloqueando o bot por 1 hora.\n")
+            print("🚨 Mais de 1 stop loss detectado dentro de 15 minutos. Bloqueando o bot por 1 hora.\n")
             message = "🚨 Mais de 1 stop loss detectado dentro de 15 minutos. Bloqueando o bot por 1 hora."
             send_telegram_message(bot_token, chat_id, message)
 
@@ -89,7 +89,7 @@ async def check_stop_losses(current_time):
         # Primeiro stop loss, então incrementa o contador
         stop_loss_count += 1
         # Pausa curta (10 minutos)
-        print("\n 🚨 Stop loss detectado. Pausando o bot por 10 minutos.")
+        print("🚨 Stop loss detectado. Pausando o bot por 10 minutos.")
         message = "🚨 Stop loss detectado. Pausando o bot por 10 minutos."
         send_telegram_message(bot_token, chat_id, message)
 
@@ -106,8 +106,8 @@ async def check_rsi_reset(symbol):
     global last_operation_time
     
     # Removendo a importação das variáveis locais e importanto as globais
-    global dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4
-    from config import rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_low_level_4
+    global dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4, dynamic_rsi_low_5
+    from config import rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_low_level_4, rsi_low_level_5
 
     if last_operation_time and (datetime.now() - last_operation_time) > timedelta(seconds=7200):
         # Verifica se os níveis de RSI dinâmicos são iguais aos níveis padrão
@@ -115,7 +115,8 @@ async def check_rsi_reset(symbol):
            dynamic_rsi_low_1 == rsi_low_level_1 and \
            dynamic_rsi_low_2 == rsi_low_level_2 and \
            dynamic_rsi_low_3 == rsi_low_level_3 and \
-           dynamic_rsi_low_4 == rsi_low_level_4:
+           dynamic_rsi_low_4 == rsi_low_level_4 and \
+           dynamic_rsi_low_5 == rsi_low_level_5:
             print(f"\n⏳ Níveis de RSI já estão em Standard para {symbol}.\n")
             message = f"⏳ Níveis de RSI já estão em Standard para <b>{symbol}</b>."
             send_telegram_message(bot_token, chat_id, message)
@@ -126,6 +127,7 @@ async def check_rsi_reset(symbol):
             dynamic_rsi_low_2 = rsi_low_level_2
             dynamic_rsi_low_3 = rsi_low_level_3
             dynamic_rsi_low_4 = rsi_low_level_4
+            dynamic_rsi_low_5 = rsi_low_level_5
             print(f"\n⏳ Níveis de RSI resetados para {symbol} devido à inatividade.")
             message = f"⏳ Níveis de RSI resetados para <b>{symbol}</b> devido à inatividade."
             send_telegram_message(bot_token, chat_id, message)
@@ -140,6 +142,7 @@ async def run_bot():
     
     # Inicializações
     total_difference = 0
+    total_difference_liquid = 0
     
     print("\n🚀 \033[5;33mBot iniciado!\033[0m 🚀\n")
     message = "<b>🚀 Bot iniciado! 🚀</b>"
@@ -387,6 +390,9 @@ async def run_bot():
                         # Calcula os valores de MACD e Bollinger
                         macd_current, signal_line_current = calculate_macd(closes)
                         lower_band, middle_band, upper_band = calculate_bollinger_bands(closes)
+                        
+                        # Obter a resposta do Gemini do resultado da função should_buy
+                        gemini_response = buy_result["gemini_response"]
                                  
                         oco_order, limit_order_id, stop_order_id, lucro_alvo, stop_loss, stop_limit = await adjust_and_place_oco_order(client, symbol, executed_qty, tick_size, min_price_move)
                         
@@ -411,11 +417,18 @@ async def run_bot():
                                     # Atualiza o saldo atual e a diferença total
                                     saldo_atual_usdt = novo_saldo_usdt
                                     total_difference += trade_result  # Acumula os resultados ao total (usando trade_result bruto)
+                                    total_difference_liquid += trade_result_liquid  # Acumula os resultados líquidos ao total
                                     quantia_usdt_investimento_inicial = saldo_atual_usdt  # Atualiza o montante para reinvestimento (usando novo_saldo_usdt, que considera o resultado bruto)
+                                    
+                                    # Obter saldo de BNB e converter para USDT
+                                    bnb_balance = await client.get_asset_balance(asset='BNB')
+                                    bnb_balance = float(bnb_balance['free'])
+                                    bnb_price_usdt = await get_bnb_price(client) # Utilize a nova função para obter o preço do BNB
+                                    bnb_balance_usdt = bnb_balance * bnb_price_usdt
                                     
                                     if order_result:
                                         # Registra os resultados no log e envia mensagens
-                                        log_and_notify_results(order_result, symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid)
+                                        log_and_notify_results(order_result, symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_usdt)
                                         
                                         # Salva resultados na planilha Excel
                                         data_row = create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_inicial, symbol,
@@ -423,7 +436,8 @@ async def run_bot():
                                                                     order_result, oco_timestamp, trade_result, total_difference, saldo_atual_usdt,
                                                                     rsi, executed_condition, vwap, candle_open, candle_high, candle_low, candle_close, candle_volume, 
                                                                     variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, volume_avg, 
-                                                                    amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid)
+                                                                    amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid,
+                                                                    total_difference_liquid, gemini_response, bnb_balance_usdt)
                                         save_to_excel(data_row)
                                     
                                         print(f"Saldo atual investido em USDT: \033[1;36m${quantia_usdt_investimento_inicial:.2f}\033[0m\n")

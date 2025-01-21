@@ -329,7 +329,7 @@ async def calculate_fee(client, symbol, executed_qty, price):
         else:
             fee_rate = 0.001 * 2  # Taxa padrão (considerando compra e venda)
         
-        print(f"Dados para calcular a taxa: symbol={symbol}, executed_qty={executed_qty}, price={price}")
+        # print(f"Dados para calcular a taxa: symbol={symbol}, executed_qty={executed_qty}, price={price}")
 
         return executed_qty * price * fee_rate
     

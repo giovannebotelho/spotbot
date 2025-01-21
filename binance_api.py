@@ -80,3 +80,10 @@ async def get_klines(client, symbol, interval, limit):
     """
     klines = await client.get_klines(symbol=symbol, interval=interval, limit=limit)
     return klines
+
+async def get_bnb_price(client):
+    """
+    Obtém o preço atual de BNB em USDT.
+    """
+    ticker = await client.get_symbol_ticker(symbol="BNBUSDT")
+    return float(ticker['price'])

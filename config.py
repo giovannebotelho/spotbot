@@ -49,18 +49,21 @@ lvl1 = 25 # (RSI+VWAP)
 lvl2 = 25 # (RSI+CANDLE)
 lvl3 = 30 # (RSI+TREND+VWAP)
 lvl4 = 35 # (RSI+TREND+VWAP+MACD)
+lvl5 = 40 # (Gemini)
 
 rsi_low_level_0 = lvl0 # Limiar para o RSI considerado muito baixo.
 rsi_low_level_1 = lvl1 # Limiar para o RSI considerado baixo e considerando o indicador VWAP.
 rsi_low_level_2 = lvl2 # Limiar para o RSI considerado médio e considerando padrões de Candle.
 rsi_low_level_3 = lvl3 # Limiar para o RSI considerado médio-alto considerando tendências de alta e o indicador VWAP.
 rsi_low_level_4 = lvl4 # Limiar para o RSI considerado alto considerando tendências de alta, indicador VWAP e MACD.
+rsi_low_level_5 = lvl5 # Limiar para o RSI considerado muito alto considerando análise da inteligência artificial Gemini.
 
 rsi_min_level_0 = lvl0 - 4
 rsi_min_level_1 = lvl1 - 4
 rsi_min_level_2 = lvl2 - 4
 rsi_min_level_3 = lvl3 - 4
 rsi_min_level_4 = lvl4 - 4
+rsi_min_level_5 = lvl5 - 4
 
 
 # Configurações dinâmicas de RSI
@@ -69,6 +72,7 @@ dynamic_rsi_low_1 = rsi_low_level_1
 dynamic_rsi_low_2 = rsi_low_level_2
 dynamic_rsi_low_3 = rsi_low_level_3
 dynamic_rsi_low_4 = rsi_low_level_4
+dynamic_rsi_low_5 = rsi_low_level_5
 
 rsi_high_0 = 70 # Limiar para o RSI considerado alto para decisões de venda.
 
@@ -78,4 +82,4 @@ lucro_multiplier_1 = 1.008  # Multiplicador de lucro para preços menores que 1.
 stop_loss_multiplier_1 = 0.99  # Multiplicador de stop loss para preços menores que 1.
 #else:
 lucro_multiplier_2 = 1.003  # Multiplicador de lucro para preços maiores ou iguais a 1.
-stop_loss_multiplier_2 = 0.9964  # Multiplicador de stop loss para preços maiores ou iguais a 1.
+stop_loss_multiplier_2 = 0.9968  # Multiplicador de stop loss para preços maiores ou iguais a 1.
