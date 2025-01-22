@@ -23,9 +23,9 @@ def calculate_sell_pressure(order_book):
     return total_asks / total if total > 0 else 0
 
 # Cria um deque para armazenar o histórico de pressão de venda, limitado ao tamanho máximo definido em 'maxlen'.
-sell_pressure_history = deque(maxlen=maxlen) # 🟣🟣
+sell_pressure_history = deque(maxlen=maxlen)
 
-async def calculate_moving_average_sell_pressure(client, symbol, interval=interval, limit=limit, depth=depth): # 🟣🟣
+async def calculate_moving_average_sell_pressure(client, symbol, interval=interval, limit=limit, depth=depth):
     """
     Calcula a média móvel da pressão de venda para um símbolo específico.
     Args:
@@ -40,7 +40,7 @@ async def calculate_moving_average_sell_pressure(client, symbol, interval=interv
     sell_pressure_history.append(sell_pressure)
     return sum(sell_pressure_history) / len(sell_pressure_history)
 
-def calculate_rsi(closes, period=period): # 🟣🟣
+def calculate_rsi(closes, period=period):
     """
     Calcula o Índice de Força Relativa (RSI) para uma lista de preços de fechamento.
     Args:
@@ -64,7 +64,7 @@ def calculate_rsi(closes, period=period): # 🟣🟣
     rsi = 100 - (100 / (1 + rs))
     return rsi
 
-def calculate_macd(closes, slow=macd_slow, fast=macd_fast, signal=macd_signal): # 🟣🟣
+def calculate_macd(closes, slow=macd_slow, fast=macd_fast, signal=macd_signal):
     """
     Calcula a Convergência/Divergência da Média Móvel (MACD) e a linha de sinal.
     Args:
@@ -82,7 +82,7 @@ def calculate_macd(closes, slow=macd_slow, fast=macd_fast, signal=macd_signal): 
     signal_line = macd.ewm(span=signal, adjust=False).mean()
     return macd.iloc[-1], signal_line.iloc[-1]
 
-def calculate_bollinger_bands(closes, period=period, num_std=num_std): # 🟣🟣
+def calculate_bollinger_bands(closes, period=period, num_std=num_std):
     """
     Calcula as Bandas de Bollinger para uma lista de preços de fechamento.
     Args:
@@ -101,7 +101,7 @@ def calculate_bollinger_bands(closes, period=period, num_std=num_std): # 🟣�
     
     return lower_band.iloc[-1], ma.iloc[-1], upper_band.iloc[-1]
 
-def calculate_volume_moving_average(volumes, period=period): # 🟣🟣
+def calculate_volume_moving_average(volumes, period=period):
     """
     Calcula a média móvel do volume de negociação.
     Args:
@@ -138,7 +138,7 @@ def calculate_moving_average(closes, period):
     """
     return sum(closes[-period:]) / period
 
-async def check_trend(client, symbol, interval=interval, short_period=short_period, long_period=long_period): # 🟣🟣
+async def check_trend(client, symbol, interval=interval, short_period=short_period, long_period=long_period):
     """
     Determina a tendência do mercado com base em médias móveis de curto e longo prazo.
     Args:
@@ -165,7 +165,7 @@ async def check_candle_patterns(client, symbol, interval=interval, limit=limit):
         tuple: Decisão ('buy', 'sell', ou None) e mensagem descrevendo o padrão detectado.
     """
     # Obter os últimos candles necessários para análise de padrão
-    klines = await client.get_klines(symbol=symbol, interval=interval, limit=limit) # 🟣🟣
+    klines = await client.get_klines(symbol=symbol, interval=interval, limit=limit)
     
     if not klines or len(klines) < 3: # verifica se existem dados suficientes
         return None # retorna nulo caso não exista dados para verificar

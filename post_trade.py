@@ -195,7 +195,7 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
 	    "Profundidade do livro de ofertas": depth,
 	    "Tamanho máximo para deque": maxlen,
 	    "Condicional volume": volume_avg,
-        "Resposta do Gemini": gemini_response, # Adiciona a resposta do Gemini à linha de dados
+        "Resposta do Gemini": gemini_response if gemini_response is not None else "N/A", # Adiciona a resposta do Gemini à linha de dados
     }
   
 def save_to_excel(data_row):

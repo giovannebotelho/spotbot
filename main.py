@@ -143,6 +143,7 @@ async def run_bot():
     # Inicializações
     total_difference = 0
     total_difference_liquid = 0
+    gemini_response = None
     
     print("\n🚀 \033[5;33mBot iniciado!\033[0m 🚀\n")
     message = "<b>🚀 Bot iniciado! 🚀</b>"

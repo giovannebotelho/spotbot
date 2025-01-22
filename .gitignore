@@ -26,3 +26,6 @@ ref/
 *.pyc
 *.pyo
 last_sync_time.txt
+
+# Outros/testes
+mouse_position.py

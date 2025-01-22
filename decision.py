@@ -19,7 +19,7 @@ from config import (
 )
 from gemini_analysis import analyze_with_gemini, interpret_gemini_response  # Importe a função analyze_with_gemin
 
-async def should_place_order(client, symbol, SELL_PRESSURE_THRESHOLD = SELL_PRESSURE_THRESHOLD_1, interval=interval, limit=limit): # 🟣🟣
+async def should_place_order(client, symbol, SELL_PRESSURE_THRESHOLD = SELL_PRESSURE_THRESHOLD_1, interval=interval, limit=limit):
     """
     Determina se uma ordem deve ser colocada com base na pressão de venda média.
     Args:
@@ -104,31 +104,31 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
         print("\nEntrando na condição 0 de compra do RSI considerado muito baixo")
         message = "Entrando na <b>condição 0</b> de compra do <b>RSI considerado muito baixo</b>"
         send_telegram_message(bot_token, chat_id, message)
-        return {"buy": True, "message": "RSI_lvl0", "candle_data": ""}
+        return {"buy": True, "message": "RSI_lvl0", "candle_data": "", "gemini_response": None}
 
     elif rsi_low_level1 and price_below_vwap:
         print("\nEntrando na condição 1 de compra do RSI considerado baixo e considerando o indicador VWAP")
         message = "Entrando na <b>condição 1</b> de compra do <b>RSI considerado baixo e considerando o indicador VWAP</b>"
         send_telegram_message(bot_token, chat_id, message)
-        return {"buy": True, "message": "RSI_lvl1 e VWAP", "candle_data": ""}
+        return {"buy": True, "message": "RSI_lvl1 e VWAP", "candle_data": "", "gemini_response": None}
     
     elif rsi_low_level2 and has_candle_patterns:  
         print("\nEntrando na condição 2 de compra do RSI considerado médio e considerando padrões de Candle")
         message = "Entrando na <b>condição 2</b> de compra do <b>RSI considerado médio e considerando padrões de Candle</b>"
         send_telegram_message(bot_token, chat_id, message)
-        return {"buy": True, "message": "RSI_lvl2 e candles", "candle_data": ""}
+        return {"buy": True, "message": "RSI_lvl2 e candles", "candle_data": "", "gemini_response": None}
     
     elif rsi_low_level3 and trend_is_up and price_below_vwap:  
         print("\nEntrando na condição 3 de compra do RSI considerado médio-alto considerando tendências de alta e o indicador VWAP")
         message = "Entrando na <b>condição 3</b> de compra do <b>RSI considerado médio-alto considerando tendências de alta e o indicador VWAP</b>"
         send_telegram_message(bot_token, chat_id, message)
-        return {"buy": True, "message": "RSI_lvl3, tendência e VWAP", "candle_data": ""}
+        return {"buy": True, "message": "RSI_lvl3, tendência e VWAP", "candle_data": "", "gemini_response": None}
 
     elif rsi_low_level4 and trend_is_up and price_below_vwap and macd_bullish:
         print("\nEntrando na condição 4 de compra do RSI considerado alto considerando tendências de alta, indicador VWAP e MACD")
         message = "Entrando na <b>condição 4</b> de compra do <b>RSI considerado alto considerando tendências de alta, indicador VWAP e MACD</b>"
         send_telegram_message(bot_token, chat_id, message)
-        return {"buy": True, "message": "RSI_lvl4, tendência, VWAP e MACD", "candle_data": ""}
+        return {"buy": True, "message": "RSI_lvl4, tendência, VWAP e MACD", "candle_data": "", "gemini_response": None}
     
     elif gemini_buy_signal and rsi_low_level5:
         print("\nEntrando na condição 5 de compra: Sinal de COMPRA do Gemini e RSI")
@@ -157,7 +157,7 @@ def should_sell(rsi, trend_is_up, macd_current, signal_line_current, last_close,
     Returns:
         bool: True se as condições forem favoráveis para venda, False caso contrário.
     """
-    rsi_high = rsi >= rsi_high_0  # 🟣🟣
+    rsi_high = rsi >= rsi_high_0
     macd_bearish = macd_current < signal_line_current and last_close > lower_band
     
     price_above_vwap = last_close > vwap

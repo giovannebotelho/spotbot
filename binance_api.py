@@ -11,7 +11,7 @@ async def get_usdt_balance(client):
     balance = await client.get_asset_balance(asset='USDT')
     return float(balance['free'])
 
-async def get_order_book(client, symbol, depth=depth): # 🟣🟣
+async def get_order_book(client, symbol, depth=depth):
     """
     Recupera o livro de ofertas (order book) para um símbolo específico com a profundidade definida.
     Args:
@@ -37,7 +37,7 @@ async def get_order_details(client, symbol, order_id):
     order_details = await client.get_order(symbol=symbol, orderId=order_id)
     return order_details
 
-async def get_closes(client, symbol, interval=interval, limit=limit): # 🟣🟣
+async def get_closes(client, symbol, interval=interval, limit=limit):
     """
     Obtém os preços de fechamento de velas para um símbolo específico.
     Args:
@@ -52,7 +52,7 @@ async def get_closes(client, symbol, interval=interval, limit=limit): # 🟣🟣
     closes = [float(kline[4]) for kline in klines]
     return closes
 
-async def get_volumes(client, symbol, interval=interval, limit=limit): # 🟣🟣
+async def get_volumes(client, symbol, interval=interval, limit=limit):
     """
     Obtém os volumes de trading de velas para um símbolo específico.
     Args:
