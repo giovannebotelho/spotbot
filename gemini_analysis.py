@@ -43,12 +43,12 @@ def get_binance_screenshot(x, y, width, height):
     screenshot = pyautogui.screenshot(region=(x, y, width, height))
 
     # Salva a screenshot em um arquivo
-    screenshot_folder = r"C:\Projetos\spotbot\prints"
-    os.makedirs(screenshot_folder, exist_ok=True)
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    screenshot_path = os.path.join(screenshot_folder, f"screenshot_{timestamp}.png")
-    screenshot.save(screenshot_path)
-    print(f"Screenshot da Binance salva em: {screenshot_path}")
+    # screenshot_folder = r"C:\Projetos\spotbot\prints"
+    # os.makedirs(screenshot_folder, exist_ok=True)
+    # timestamp = time.strftime("%Y%m%d-%H%M%S")
+    # screenshot_path = os.path.join(screenshot_folder, f"screenshot_{timestamp}.png")
+    # screenshot.save(screenshot_path)
+    # print(f"Screenshot da Binance salva em: {screenshot_path}")
 
     return screenshot
 
@@ -103,12 +103,12 @@ def get_tradingview_screenshot(x, y, width, height):
     pyautogui.keyUp('alt')
 
     # Salva a screenshot em um arquivo (opcional)
-    screenshot_folder = r"C:\Projetos\spotbot\prints"  # Modifique para o caminho desejado
-    os.makedirs(screenshot_folder, exist_ok=True)
-    timestamp = time.strftime("%Y%m%d-%H%M%S")
-    screenshot_path = os.path.join(screenshot_folder, f"screenshot_tradingview_{timestamp}.png")
-    screenshot.save(screenshot_path)
-    print(f"Screenshot do TradingView salva em: {screenshot_path}")
+    # screenshot_folder = r"C:\Projetos\spotbot\prints"  # Modifique para o caminho desejado
+    # os.makedirs(screenshot_folder, exist_ok=True)
+    # timestamp = time.strftime("%Y%m%d-%H%M%S")
+    # screenshot_path = os.path.join(screenshot_folder, f"screenshot_tradingview_{timestamp}.png")
+    # screenshot.save(screenshot_path)
+    # print(f"Screenshot do TradingView salva em: {screenshot_path}")
 
     return screenshot
 

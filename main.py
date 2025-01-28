@@ -109,7 +109,7 @@ async def check_rsi_reset(symbol):
     global dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4, dynamic_rsi_low_5
     from config import rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_low_level_4, rsi_low_level_5
 
-    if last_operation_time and (datetime.now() - last_operation_time) > timedelta(seconds=7200):
+    if last_operation_time and (datetime.now() - last_operation_time) > timedelta(seconds=6*60*60):
         # Verifica se os níveis de RSI dinâmicos são iguais aos níveis padrão
         if dynamic_rsi_low_0 == rsi_low_level_0 and \
            dynamic_rsi_low_1 == rsi_low_level_1 and \

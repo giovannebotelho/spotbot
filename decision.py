@@ -258,12 +258,12 @@ def adjust_rsi_levels(result):
 
     if result == 'stop loss':
         # Reduz níveis de RSI
-        dynamic_rsi_low_0 = max(dynamic_rsi_low_0 - 1, rsi_min_level_0)
-        dynamic_rsi_low_1 = max(dynamic_rsi_low_1 - 1, rsi_min_level_1)
-        dynamic_rsi_low_2 = max(dynamic_rsi_low_2 - 1, rsi_min_level_2)
-        dynamic_rsi_low_3 = max(dynamic_rsi_low_3 - 1, rsi_min_level_3)
-        dynamic_rsi_low_4 = max(dynamic_rsi_low_4 - 1, rsi_min_level_4)
-        dynamic_rsi_low_5 = max(dynamic_rsi_low_5 - 1, rsi_min_level_5)
+        dynamic_rsi_low_0 = max(dynamic_rsi_low_0 - 2, rsi_min_level_0)
+        dynamic_rsi_low_1 = max(dynamic_rsi_low_1 - 2, rsi_min_level_1)
+        dynamic_rsi_low_2 = max(dynamic_rsi_low_2 - 2, rsi_min_level_2)
+        dynamic_rsi_low_3 = max(dynamic_rsi_low_3 - 2, rsi_min_level_3)
+        dynamic_rsi_low_4 = max(dynamic_rsi_low_4 - 2, rsi_min_level_4)
+        dynamic_rsi_low_5 = max(dynamic_rsi_low_5 - 2, rsi_min_level_5)
     elif result == 'profit':
         # Aumenta níveis de RSI, mas não excede os valores iniciais
         dynamic_rsi_low_0 = min(dynamic_rsi_low_0 + 2, rsi_low_level_0)
