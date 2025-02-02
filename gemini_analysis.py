@@ -144,7 +144,7 @@ def send_screenshots_to_gemini(binance_image, tradingview_image, api_key, model=
         "10. **Padrões de Candle:** Identifique e interprete quaisquer padrões de candle de 1h significativos (por exemplo, martelo, estrela cadente, engolfo, doji, etc.). Considere o contexto em que esses padrões aparecem (em suportes/resistências, após movimentos fortes, etc.).\n"
         "11. **Volume:** Analise o volume de negociação em conjunto com os outros indicadores. Um movimento de preço acompanhado de alto volume é geralmente mais significativo do que um movimento com baixo volume. Observe picos de volume e compare o volume atual com a média histórica no gráfico de 1h.\n"
         "12. **Livro de Ordens:** Analise a profundidade do livro de ordens na Binance. Há mais ordens de compra ou venda? Qual a diferença de volume entre as ordens de compra e venda nos níveis de preço próximos ao preço atual? Isso indica pressão de compra ou venda?\n\n"
-        "Com base em sua análise detalhada de TODOS os indicadores e padrões acima no gráfico de **1 hora**, e considerando que estamos buscando operações de **longo prazo** com um **lucro alvo de 0.5%** e um **stop loss de 0.5%**, forneça uma recomendação clara e concisa:\n\n"
+        "Com base em sua análise detalhada de TODOS os indicadores e padrões acima no gráfico de **1 hora**, e considerando que estamos buscando operações de **curto prazo** com um **lucro alvo de 0.5%** e um **stop loss de 0.6%**, forneça uma recomendação clara e concisa:\n\n"
         "Responda com:\n"
         "*   '**sinal=compra**' se for um bom momento para **comprar**, com base em uma confluência de indicadores e padrões que indiquem alta probabilidade de sucesso, considerando o risco definido (stop loss de 0.5%).\n"
         "*   '**sinal=venda**' se for um bom momento para **vender**, com base em uma confluência de indicadores e padrões que indiquem alta probabilidade de queda.\n"
@@ -223,6 +223,10 @@ def interpret_gemini_response(response_text):
     """
     Interpreta a resposta do Gemini para extrair o sinal de compra ou venda.
     """
+    
+    if response_text is None:
+        return None  # Retorna None se a resposta for None
+    
     if "sinal=compra" in response_text.lower():
         print("Sinal de \033[1;32mCOMPRA\033[0m recebido do Gemini.")
         time.sleep(1)

@@ -13,6 +13,8 @@ prints/
 
 ref/
 
+VirtualBox VMs/
+
 # Arquivos de configuração local
 .env
 
@@ -29,3 +31,4 @@ last_sync_time.txt
 
 # Outros/testes
 mouse_position.py
+Win11_24H2_BrazilianPortuguese_x64.iso

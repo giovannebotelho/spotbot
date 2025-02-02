@@ -98,7 +98,10 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
     )
     
     # Extrai o sinal da resposta do Gemini
-    gemini_buy_signal = interpret_gemini_response(gemini_response)
+    if gemini_response:
+        gemini_buy_signal = interpret_gemini_response(gemini_response)
+    else:
+        gemini_buy_signal = None  # Ou False, dependendo de como você quer tratar a ausência de resposta do Gemini
 
     if rsi_low_level0:
         print("\nEntrando na condição 0 de compra do RSI considerado muito baixo")
@@ -136,7 +139,7 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
         send_telegram_message(bot_token, chat_id, message)
         return {"buy": True, "message": "Gemini Buy Signal e RSI", "candle_data": "", "gemini_response": gemini_response}
     
-    elif gemini_buy_signal is False:
+    elif gemini_buy_signal in (False, None):
         # print("Sinal \033[1;33mNEUTRO\033[0m ou \033[1;31mVENDA\033[0m recebido do Gemini.\n")
         pass
     

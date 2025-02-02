@@ -49,7 +49,7 @@ lvl1 = 25 # (RSI+VWAP)
 lvl2 = 30 # (RSI+CANDLE)
 lvl3 = 35 # (RSI+TREND+VWAP)
 lvl4 = 40 # (RSI+TREND+VWAP+MACD)
-lvl5 = 55 # (Gemini)
+lvl5 = 60 # (Gemini)
 
 rsi_low_level_0 = lvl0 # Limiar para o RSI considerado muito baixo.
 rsi_low_level_1 = lvl1 # Limiar para o RSI considerado baixo e considerando o indicador VWAP.
