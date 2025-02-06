@@ -6,11 +6,11 @@ from dotenv import load_dotenv
 load_dotenv()  # Carregue as variáveis de ambiente do arquivo .env, incluindo GEMINI_API_KEY
 from binance.exceptions import BinanceAPIException
 from trading_functions import calculate_moving_average_sell_pressure
-from binance_api import get_order_book
+from binance_api import get_order_book, get_klines
 from telegram_integration import send_telegram_message
 from config import bot_token, chat_id
 from config import lucro_multiplier_1, stop_loss_multiplier_1, lucro_multiplier_2, stop_loss_multiplier_2
-from config import SELL_PRESSURE_THRESHOLD_1
+from config import SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, depth, maxlen, volume_avg
 from config import interval, limit #importar interval e limit
 from config import (
     dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4, dynamic_rsi_low_5,
@@ -47,21 +47,10 @@ async def should_place_order(client, symbol, SELL_PRESSURE_THRESHOLD = SELL_PRES
         await asyncio.sleep(0.15)
     return False
 
-async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_close, lower_band, vwap, candle_patterns):
+async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_close, lower_band, middle_band, upper_band, vwap, candle_patterns, candle_open, candle_high, candle_low, 
+                     candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, symbol):
     """
     Avalia se as condições são adequadas para comprar baseando-se em RSI, tendência, decisão de vela e MACD.
-    Args:
-        rsi (float): Valor atual do RSI.
-        trend_is_up (bool): Indica se a tendência está subindo.
-        candle_decision (str): Decisão tomada com base no padrão de vela.
-        macd_current (float): Valor atual do MACD.
-        signal_line_current (float): Valor atual da linha de sinal do MACD.
-        last_close (float): Último preço de fechamento.
-        lower_band (float): Banda inferior de Bollinger.
-        vwap (float): Valor atual do VWAP.
-        candle_patterns (list): Lista de padrões de candle detectados.
-    Returns:
-        dict: Um dicionário com True ou False (compra), uma mensagem (qual condição de compra) e dados da candle atual.
     """
     rsi_low_level0 = rsi <= rsi_low_level_0
     rsi_low_level1 = rsi <= rsi_low_level_1
@@ -69,35 +58,60 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
     rsi_low_level3 = rsi <= rsi_low_level_3
     rsi_low_level4 = rsi <= rsi_low_level_4
     rsi_low_level5 = rsi <= rsi_low_level_5
-    
-    # Corrigido: Adicionado 'and' para verificar se o MACD está realmente acima da linha de sinal
-    macd_bullish = macd_current > signal_line_current and last_close < lower_band  
+
+    macd_bullish = macd_current > signal_line_current and last_close < lower_band
     vwap_tolerance = 0.07  # 7% de tolerância
     price_below_vwap = last_close < vwap * (1 + vwap_tolerance)
-    
-    # Adicionado: Verifica se há algum padrão de candle na lista
-    has_candle_patterns = candle_patterns is not None and len(candle_patterns) > 0
-    
-    # Condição 5: Análise do Gemini
-    # Obter o loop de eventos atual
-    loop = asyncio.get_running_loop()
 
-    # Executar a função assíncrona dentro do loop de eventos atual
-    gemini_response = await loop.run_in_executor(
-        None,  # Usa o executor padrão (pool de threads)
-        analyze_with_gemini,  # A função a ser executada
-        os.getenv("gemini_api"),  # Argumentos para a função
-        5,    # binance_x
-        90,   # binance_y
-        1920, # binance_width
-        950,  # binance_height
-        5,    # tradingview_x
-        90,   # tradingview_y
-        1920, # tradingview_width
-        950   # tradingview_height
+    has_candle_patterns = candle_patterns is not None and len(candle_patterns) > 0
+
+    # Coleta dos dados para o Gemini
+    klines = await get_klines(client, symbol, interval, limit)
+    candle_data = "\n".join([str(kline) for kline in klines])
+
+    order_book = await get_order_book(client, symbol)
+    sell_pressure = await calculate_moving_average_sell_pressure(client, symbol)
+
+    # Padronizar as informações de saída:
+    macd_str = f"MACD: {macd_current:.2f}, Linha de Sinal: {signal_line_current:.2f}"
+    bollinger_bands_str = f"Inferior: {lower_band:.2f}, Média: {middle_band:.2f}, Superior: {upper_band:.2f}"
+
+    gemini_response = await get_gemini_analysis(
+        candle_data,
+        candle_patterns,
+        rsi,
+        macd_str,
+        bollinger_bands_str,
+        sell_pressure,
+        order_book,
+        candle_open,
+        candle_high,
+        candle_low,
+        candle_close,
+        candle_volume,
+        variation_24h,
+        candle_variation,
+        ema7,
+        ema15,
+        ema25,
+        ema50,
+        ema100,
+        ema200,
+        vwap,
+        trend_is_up,
+        SELL_PRESSURE_THRESHOLD_1,
+        period,
+        num_std,
+        short_period,
+        long_period,
+        limit,
+        depth,
+        maxlen,
+        volume_avg,
+        client,
+        symbol
     )
-    
-    # Extrai o sinal da resposta do Gemini
+
     if gemini_response:
         gemini_buy_signal = interpret_gemini_response(gemini_response)
     else:
@@ -114,14 +128,14 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
         message = "Entrando na <b>condição 1</b> de compra do <b>RSI considerado baixo e considerando o indicador VWAP</b>"
         send_telegram_message(bot_token, chat_id, message)
         return {"buy": True, "message": "RSI_lvl1 e VWAP", "candle_data": "", "gemini_response": None}
-    
-    elif rsi_low_level2 and has_candle_patterns:  
+
+    elif rsi_low_level2 and has_candle_patterns:
         print("\nEntrando na condição 2 de compra do RSI considerado médio e considerando padrões de Candle")
         message = "Entrando na <b>condição 2</b> de compra do <b>RSI considerado médio e considerando padrões de Candle</b>"
         send_telegram_message(bot_token, chat_id, message)
         return {"buy": True, "message": "RSI_lvl2 e candles", "candle_data": "", "gemini_response": None}
-    
-    elif rsi_low_level3 and trend_is_up and price_below_vwap:  
+
+    elif rsi_low_level3 and trend_is_up and price_below_vwap:
         print("\nEntrando na condição 3 de compra do RSI considerado médio-alto considerando tendências de alta e o indicador VWAP")
         message = "Entrando na <b>condição 3</b> de compra do <b>RSI considerado médio-alto considerando tendências de alta e o indicador VWAP</b>"
         send_telegram_message(bot_token, chat_id, message)
@@ -132,18 +146,63 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
         message = "Entrando na <b>condição 4</b> de compra do <b>RSI considerado alto considerando tendências de alta, indicador VWAP e MACD</b>"
         send_telegram_message(bot_token, chat_id, message)
         return {"buy": True, "message": "RSI_lvl4, tendência, VWAP e MACD", "candle_data": "", "gemini_response": None}
-    
+
     elif gemini_buy_signal and rsi_low_level5:
         print("\nEntrando na condição 5 de compra: Sinal de COMPRA do Gemini e RSI")
         message = "Entrando na <b>condição 5</b> de compra: <b>Sinal de COMPRA do Gemini e RSI</b>"
         send_telegram_message(bot_token, chat_id, message)
         return {"buy": True, "message": "Gemini Buy Signal e RSI", "candle_data": "", "gemini_response": gemini_response}
-    
+
     elif gemini_buy_signal in (False, None):
         # print("Sinal \033[1;33mNEUTRO\033[0m ou \033[1;31mVENDA\033[0m recebido do Gemini.\n")
         pass
-    
+
     return {"buy": False, "message": None, "candle_data": "", "gemini_response": gemini_response}
+
+async def get_gemini_analysis(candle_data, candle_patterns, rsi, macd, bollinger_bands, sell_pressure, order_book, candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation, 
+                              ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, client, symbol):
+    """Função auxiliar para obter a análise do Gemini."""
+    gemini_api_key = os.getenv("gemini_api")
+    try:
+        return await asyncio.get_running_loop().run_in_executor(
+            None,  # Usa o executor padrão (pool de threads)
+            analyze_with_gemini,
+            gemini_api_key,
+            candle_data,
+            candle_patterns,
+            rsi,
+            macd,
+            bollinger_bands,
+            sell_pressure,
+            order_book,
+            candle_open,
+            candle_high,
+            candle_low,
+            candle_close,
+            candle_volume,
+            variation_24h,
+            candle_variation,
+            ema7,
+            ema15,
+            ema25,
+            ema50,
+            ema100,
+            ema200,
+            vwap,
+            trend_is_up,
+            SELL_PRESSURE_THRESHOLD_1,
+            period,
+            num_std,
+            short_period,
+            long_period,
+            limit,
+            depth,
+            maxlen,
+            volume_avg
+        )
+    except Exception as e:
+        print(f"Erro ao obter análise do Gemini: {e}")
+        return None
 
 def should_sell(rsi, trend_is_up, macd_current, signal_line_current, last_close, lower_band, vwap):
     """

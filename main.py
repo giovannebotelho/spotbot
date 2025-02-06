@@ -78,7 +78,6 @@ async def check_stop_losses(current_time):
             print("\n ✅️ Voltando a operar após pausa de 1 hora.")
             message = "✅️ Voltando a operar após pausa de 1 hora."
             send_telegram_message(bot_token, chat_id, message)
-            adjust_rsi_levels('stop loss')  # Reduz ainda mais os níveis de RSI após pausa longa
             return  # Importante: retorna da função após a pausa longa
     else:
         # Se não houve stop loss recente (mais de 15 minutos), reseta o contador
@@ -100,7 +99,6 @@ async def check_stop_losses(current_time):
         print("\n ✅️ Voltando a operar após pausa de 10 minutos.\n")
         message = "✅️ Voltando a operar após pausa de 10 minutos."
         send_telegram_message(bot_token, chat_id, message)
-        adjust_rsi_levels('stop loss')  # Reduz os níveis de RSI após a pausa
    
 async def check_rsi_reset(symbol):
     global last_operation_time
@@ -236,9 +234,23 @@ async def run_bot():
             middle_band = 0
             upper_band = 0
             vwap = 0
+            candle_open = 0
+            candle_high = 0
+            candle_low = 0
+            candle_close = 0
+            candle_volume = 0
+            variation_24h = 0
+            candle_variation = 0
+            ema7 = 0
+            ema15 = 0
+            ema25 = 0
+            ema50 = 0
+            ema100 = 0
+            ema200 = 0
+            
             while True:
                 closes = await get_closes(client, symbol)
-                volumes = await get_volumes(client, symbol) #pega os volumes das velas
+                volumes = await get_volumes(client, symbol) # Pega os volumes das velas
                 
                 rsi = calculate_rsi(closes)
                 
@@ -307,7 +319,65 @@ async def run_bot():
                 
                 if await should_place_order(client, symbol) and not market_downward:
                     
-                    buy_result = await should_buy(rsi, trend_is_up, macd_current, signal_line_current, closes[-1], lower_band, vwap, candle_patterns)
+                    # Busca detalhes da candle da operação para registro em planilha e para ter detalhes das operações
+                    candle_details = await get_candle_details(client, symbol, interval, limit)
+                    if candle_details:
+                        candle_open = candle_details['open']
+                        candle_high = candle_details['high']
+                        candle_low = candle_details['low']
+                        candle_close = candle_details['close']
+                        candle_volume = candle_details['volume']
+                        # Calcula amplitude
+                        amplitude = ((candle_high - candle_low) / candle_open) * 100 if candle_open !=0 else 0
+                    else: # Pega esses valores caso a API de erro, pra garantir que o bot não quebre
+                        candle_open = 0
+                        candle_high = 0
+                        candle_low = 0
+                        candle_close = 0
+                        candle_volume = 0
+                        amplitude = 0
+                        
+                    # Pega o preço do candle de 24h atrás para usar na variação
+                    try:
+                        klines_24h = await get_klines(client, symbol, interval, 24) #pega o preço de fechamento do candle de 24h atras em ms, e o atual
+                        if klines_24h and len(klines_24h) >= 24:  # Para evitar erros do codigo caso ele nao consiga pegar os dados
+                            price_24h_ago = float(klines_24h[0][4]) if klines_24h else 0  # o valor que queremos para usar no calculo é o candle anterior ao atual
+                            candle_variation = ((candle_close - candle_open) / candle_open) * 100 if candle_open != 0 else 0 # calculo variacao percentual de preço da vela
+                            
+                            ema7 = calculate_ema(closes, 7)
+                            ema15 = calculate_ema(closes, 15)
+                            ema25 = calculate_ema(closes, 25)
+                            ema50 = calculate_ema(closes, 50)
+                            ema100 = calculate_ema(closes, 100)
+                            ema200 = calculate_ema(closes, 200)
+                        else:
+                            price_24h_ago = 0  # Caso a api de problema ou algo de errado, seta para 0
+                            candle_variation = 0
+                            ema7 = 0
+                            ema15 = 0
+                            ema25 = 0
+                            ema50 = 0
+                            ema100 = 0
+                            ema200 = 0
+                        # Garante que price_now seja definido mesmo se klines_24h não atender à condição
+                        price_now = closes[-1] if closes else 0
+                        variation_24h = ((price_now - price_24h_ago) / price_24h_ago) * 100 if price_24h_ago != 0 else 0
+                    
+                    except Exception as e: # caso de algum erro, os valores devem continuar como 0 pra que o programa não quebre
+                        price_24h_ago = 0
+                        variation_24h = 0
+                        candle_variation = 0
+                        ema7 = 0
+                        ema15 = 0
+                        ema25 = 0
+                        ema50 = 0
+                        ema100 = 0
+                        ema200 = 0
+                        print(f"\nErro ao buscar dados para variação de 24h: {e}")
+                    
+                    # Dentro do loop principal em main.py
+                    buy_result = await should_buy(rsi, trend_is_up, macd_current, signal_line_current, closes[-1], lower_band, middle_band, upper_band, vwap, candle_patterns, candle_open, candle_high, 
+                                                  candle_low, candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, symbol)
                     if buy_result["buy"]:  # Verifica as condições de compra
                         executed_condition = buy_result["message"]  # Atribui a mensagem da condição atendida
                         
@@ -343,7 +413,7 @@ async def run_bot():
                                 print(f"\nPadrões de candle: {', '.join(candle_patterns)}")  # Imprime a lista com elementos separados por vírgula
                         else:
                             print("\nPadrões de candle: Nenhum encontrado")
-
+                            
                         # Busca detalhes da candle da operação para registro em planilha e para ter detalhes das operações
                         candle_details = await get_candle_details(client, symbol, interval, limit)
                         if candle_details:
@@ -453,6 +523,7 @@ async def run_bot():
                                         if stop_order_details['status'] == 'FILLED':
                                             stop_loss_count += 1
                                             last_stop_loss_time = datetime.now()
+                                            adjust_rsi_levels('stop loss')  # Reduz os níveis de RSI após a pausa
                                             await check_stop_losses(last_stop_loss_time)  # Passa o tempo atual para a função de pausa
                                         elif limit_order_details['status'] == 'FILLED':
                                             # Reseta o contador de stop losses se uma ordem de lucro for executada

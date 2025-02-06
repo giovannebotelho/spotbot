@@ -9,3 +9,4 @@ python-dotenv
 google-generativeai
 google-genai
 pyautogui
+Pillow

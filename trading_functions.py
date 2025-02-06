@@ -303,8 +303,11 @@ async def is_market_downward(client, symbol, interval, limit=4, high_amplitude_t
 
         if close_price < open_price and amplitude >= high_amplitude_threshold:
             red_high_amplitude_candles += 1
-
-    return red_high_amplitude_candles >= 2
+    
+    if red_high_amplitude_candles >= 2:
+        return True
+    else:
+        return False
 
 async def calculate_fee(client, symbol, executed_qty, price):
     """
