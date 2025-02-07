@@ -13,7 +13,7 @@ from config import interval, limit
 from pre_start import synchronize_time, escolher_simbolo, cancel_all_oco_orders
 from binance_api import get_closes, get_usdt_balance, get_volumes, get_order_details, get_klines, get_bnb_price
 from trading_functions import calculate_rsi, calculate_macd, calculate_bollinger_bands, check_trend, check_candle_patterns, calculate_vwap, get_candle_details, calculate_ema, is_market_downward
-from decision import should_place_order, should_buy, should_sell, adjust_and_place_oco_order, adjust_rsi_levels
+from decision import should_place_order, should_buy, should_sell, adjust_and_place_oco_order
 from post_trade import process_order_details, log_and_notify_results, create_data_row, save_to_excel
 from telegram_integration import send_telegram_message
 
@@ -523,7 +523,6 @@ async def run_bot():
                                         if stop_order_details['status'] == 'FILLED':
                                             stop_loss_count += 1
                                             last_stop_loss_time = datetime.now()
-                                            adjust_rsi_levels('stop loss')  # Reduz os níveis de RSI após a pausa
                                             await check_stop_losses(last_stop_loss_time)  # Passa o tempo atual para a função de pausa
                                         elif limit_order_details['status'] == 'FILLED':
                                             # Reseta o contador de stop losses se uma ordem de lucro for executada
