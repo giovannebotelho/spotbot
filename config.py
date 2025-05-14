@@ -22,12 +22,12 @@ bot_token = os.getenv("bot_token")
 chat_id = os.getenv("chat_id")
 
 # Interval, period and depth configs - Configurações gerais para busca de dados e cálculos.
-interval = '1h'  # Intervalo de tempo para buscar dados de velas (candles).
+interval = '1h'   # Intervalo de tempo para buscar dados de velas (candles).
 period = 20       # Período utilizado para cálculos que envolvem médias móveis ou outros indicadores.
 num_std = 2       # Número de desvios padrões para cálculo das Bandas de Bollinger.
-short_period = 12  # Período curto para cálculos de média móvel em comparações de tendência.
+short_period = 12 # Período curto para cálculos de média móvel em comparações de tendência.
 long_period = 26  # Período longo para cálculos de média móvel em comparações de tendência.
-limit = 50        # Limite de dados históricos (por exemplo, velas) para recuperar de uma vez.
+limit = 70        # Limite de dados históricos (por exemplo, velas) para recuperar de uma vez.
 depth = 20        # Profundidade do livro de ofertas para recuperar em consultas ao order book.
 maxlen = 20       # Tamanho máximo para deque usados em médias móveis de pressão de venda.
 
@@ -41,7 +41,7 @@ SELL_PRESSURE_THRESHOLD_1 = 0.65  # Limiar de pressão de venda para decidir sob
 
 # Configuração inicial de um limiar de volume que pode ser ajustada conforme necessário.
 # Verificação condicional que compara o último volume coletado com a média móvel ajustada por um percentual específico (volume_avg).
-volume_avg = 40 # 40%
+volume_avg = 45 # 45%
 
 # Configurações de níveis de RSI
 lvl0 = 15 # (apenas RSI)
@@ -49,7 +49,7 @@ lvl1 = 25 # (RSI+VWAP)
 lvl2 = 30 # (RSI+CANDLE)
 lvl3 = 35 # (RSI+TREND+VWAP)
 lvl4 = 40 # (RSI+TREND+VWAP+MACD)
-lvl5 = 60 # (Gemini)
+lvl5 = 50 # (Gemini)
 
 rsi_low_level_0 = lvl0 # Limiar para o RSI considerado muito baixo.
 rsi_low_level_1 = lvl1 # Limiar para o RSI considerado baixo e considerando o indicador VWAP.
@@ -81,5 +81,5 @@ rsi_high_0 = 70 # Limiar para o RSI considerado alto para decisões de venda.
 lucro_multiplier_1 = 1.008  # Multiplicador de lucro para preços menores que 1.
 stop_loss_multiplier_1 = 0.99  # Multiplicador de stop loss para preços menores que 1.
 #else:
-lucro_multiplier_2 = 1.005  # Multiplicador de lucro para preços maiores ou iguais a 1.
-stop_loss_multiplier_2 = 0.994  # Multiplicador de stop loss para preços maiores ou iguais a 1.
+lucro_multiplier_2 = 1.0045  # Multiplicador de lucro para preços maiores ou iguais a 1.
+stop_loss_multiplier_2 = 0.992  # Multiplicador de stop loss para preços maiores ou iguais a 1.

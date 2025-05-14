@@ -6,7 +6,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def send_data_to_gemini(candle_data, candle_patterns, rsi, macd, bollinger_bands, sell_pressure, order_book, candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation, 
-                        ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, api_key, model="gemini-2.0-flash-exp"):
+                        ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, historical_trades_data,
+                        api_key, model="gemini-2.5-flash-preview-04-17"):
     """Envia os dados das velas, padrões e indicadores para a API do Gemini."""
 
     headers = {
@@ -14,36 +15,42 @@ def send_data_to_gemini(candle_data, candle_patterns, rsi, macd, bollinger_bands
     }
 
     prompt = (
-        "Você é um assistente especializado em negociação de criptomoedas, focado em análise técnica do Bitcoin (BTC/USDT) no gráfico de **1 hora (1h)** da Binance. "
-        "Analise os dados das velas, padrões de vela, indicadores técnicos e dados do livro de ofertas fornecidos, com um viés equilibrado, considerando tanto a preservação do capital quanto a busca por oportunidades de compra com **risco moderado e boa probabilidade de sucesso** em um horizonte de **curto a médio prazo**, alinhado com um **lucro alvo de 0.5%**.\n\n"
-        "Preste atenção especial aos seguintes indicadores e padrões, considerando o contexto do mercado e a volatilidade atual:\n\n"
-        "1. **Dados das Velas:** Analise os preços de abertura, fechamento, máximo e mínimo de cada vela, bem como o volume do último candle. Identifique tendências, suportes e resistências.\n"
-        "2. **Padrões de Vela:** Identifique e interprete os padrões de vela fornecidos. Considere o contexto em que esses padrões aparecem (em suportes/resistências, após movimentos fortes, etc.).\n"
-        "3. **Indicadores Técnicos:** Analise o RSI, MACD e as Bandas de Bollinger para identificar condições de sobrecompra/sobrevenda, divergências e possíveis reversões de tendência.\n"
-        "4. **Volume do Último Candle:** Considere o volume do último candle. Um volume alto pode indicar um maior interesse no ativo e aumentar a probabilidade de movimentos significativos.\n"
-        "5. **Volume de Negociação em 24h:** Avalie o volume total de negociação nas últimas 24 horas para identificar a liquidez do mercado e possíveis níveis de suporte e resistência.\n"
-        "6. **Variação de Preço em 24h:** Analise a variação de preço nas últimas 24 horas para entender a tendência de curto prazo e identificar possíveis pontos de entrada ou saída.\n"
-        "7. **VWAP:** Analise o VWAP e sua relação com o preço atual. \n"
-        "8. **Tendência:** Analise a tendência. \n"
-        "9. **Limiar de pressão de venda:** Analise o limiar de pressão de venda. \n"
-        "10. **Período de cálculo do RSI e médias móveis:** Analise o período de cálculo do RSI e médias móveis. \n"
-        "11. **Número desvios padrões Bollinger:** Analise o número de desvios padrões de bollinger. \n"
-        "12. **Período curto cálculo média móvel <> tendência:** Analise o período curto cálculo média móvel. \n"
-        "13. **Período longo cálculo média móvel <> tendência:** Analise o período longo cálculo média móvel. \n"
-        "14. **Limite dados históricos para recuperar de uma vez:** Analise o limite de dados históricos para recuperar de uma vez. \n"
-        "15. **Profundidade do livro de ofertas:** Analise a profundidade do livro de ofertas. \n"
-        "16. **Tamanho máximo para deque:** Analise o tamanho máximo para deque. \n"
-        "17. **Condicional volume:** Analise o condicional volume.\n"
-        "18. **Pressão de Venda:** Avalie a pressão de venda média para determinar o sentimento do mercado e identificar possíveis oportunidades de compra em momentos de baixa.\n"
-        "19. **Livro de Ofertas:** Analise a profundidade do livro de ofertas para identificar níveis de suporte e resistência, bem como a liquidez do mercado.\n"
-        "Com base em sua análise detalhada dos dados das velas, padrões, indicadores e livro de ofertas, e considerando que estamos buscando operações de **curto prazo** com um **lucro alvo de 0.5%** e um **stop loss de 0.6%**, forneça uma recomendação clara e concisa:\n\n"
-        "Responda com:\n"
-        "*   '**sinal=compra**' se for um bom momento para **comprar**, com base em uma confluência de indicadores e padrões que indiquem alta probabilidade de sucesso, considerando o risco definido (stop loss de 0.5%).\n"
-        "*   '**sinal=venda**' se for um bom momento para **vender**, com base em uma confluência de indicadores e padrões que indiquem alta probabilidade de queda.\n"
-        "*   '**sinal=neutro**' se não houver um sinal claro, se houver sinais conflitantes, ou se o risco for considerado alto para a meta de lucro definida.\n\n"
-        "**Importante:**\n"
-        "*   Mantenha o formato de resposta exatamente como especificado acima ('sinal=compra', 'sinal=venda' ou 'sinal=neutro').\n"
-        "*   Justifique sua recomendação com base nos dados fornecidos."
+        "Você é um assistente especializado em negociação de criptomoedas, focado em análise técnica do Bitcoin (BTC/USDT) no gráfico de **1 hora (1h)** da Binance."
+        "Analise os dados fornecidos, incluindo informações sobre o preço de fechamento das velas, indicadores técnicos, padrões de vela e dados históricos de trades, com um viés crítico."
+        "Seu objetivo é identificar **oportunidades de compra com médio risco e alta probabilidade de sucesso** em um horizonte de **curto/médio prazo**.\n"
+
+        "Preste atenção especial aos seguintes aspectos:\n"
+
+        "1. **Dados das Velas:** Analise os preços de abertura, fechamento, máximo e mínimo de cada vela, bem como o volume. Identifique tendências, suportes e resistências.\n"
+
+        "2. **Indicadores Técnicos:** Analise o RSI, MACD e as Bandas de Bollinger para identificar condições de sobrecompra/sobrevenda, divergências e possíveis reversões de tendência.\n"
+
+        "3. **Dados Históricos de Trades:**"
+        "*   A presente string de dados representa o histórico de operações realizadas até o momento, e tem como objetivo identificar a maior quantidade de padrões e regras que garantam a assertividade para as próximas operações."
+        "*   Cada linha nesta string representa um trade, e os dados a seguir estão presentes:"
+                "*   **Símbolo:** O símbolo do ativo negociado (por exemplo, BTCUSDT)."
+                "*   **Preço de Compra:** O preço no qual a ordem de compra foi executada."
+                "*   **VWAP:** Valor do VWAP no momento da compra."
+                "*   **Data/Hora da Compra:** Data e hora em que a ordem de compra foi executada."
+                "*   **Resultado da Ordem OCO:** Resultado da ordem OCO (profit ou stop loss)."
+                "*   **Data/Hora OCO:** Data e hora em que a ordem OCO foi concluída."
+                "*   **RSI da Operação:** O valor do RSI no momento da compra."
+                "*   **Condição Atendida:** A condição específica que foi atendida para disparar a ordem (por exemplo, RSI_lvl1, MACD_crossover, etc.)."
+                "*   **Intervalo de Tempo (Candles):** O intervalo de tempo usado para as velas (por exemplo, 15m, 1h)."
+                "*   **Padrões de Candle:** Quaisquer padrões de candle identificados no momento da compra."
+                "*   **Tendência de Alta:** Indica se a tendência era de alta no momento da compra (True ou False).\n"
+
+        "4.  **Com base nos dados históricos, identifique:**"
+            "*   Quais condições de compra levam aos resultados mais lucrativos?"
+            "*   Quais níveis de RSI são mais propensos a gerar lucros?"
+            "*   Quais padrões de candle são mais confiáveis?"
+            "*   Em quais condições de mercado (tendência de alta, etc.) a estratégia tem melhor desempenho?\n"
+        
+        "5.  **Com base na análise histórica, formule um conjunto de regras específicas que devem ser seguidas para aumentar a probabilidade de sucesso de novas operações.**"
+            "*Analise a consistência entre as EMAs, e cruze as informações de trades anteriores para definir qual o melhor ponto de entrada\n"
+        
+        "Com base na análise dos dados das velas, indicadores técnicos, dados históricos de trades e levando em conta o objetivo de **0.45%** de lucro e **0.8%** de stop loss, qual sua recomendação (sinal=compra, sinal=venda ou sinal=neutro)?\n"
+        "Justifique sua resposta detalhadamente e inclua um resumo das principais regras que você formulou a partir dos dados históricos."
     )
 
     data = {
@@ -83,6 +90,7 @@ def send_data_to_gemini(candle_data, candle_patterns, rsi, macd, bollinger_bands
                             f"Condicional volume: {volume_avg}\n"
                             f"Pressão de Venda: {sell_pressure}\n"
                             f"Livro de Ofertas: {order_book}\n"
+                            f"Dados Históricos de Trades:\n{historical_trades_data}\n"
                             f"{prompt}"
                         )
                     }
@@ -125,7 +133,8 @@ def send_data_to_gemini(candle_data, candle_patterns, rsi, macd, bollinger_bands
     response.raise_for_status()
 
     # Mostra a URL da prompt
-    print(f"Prompt enviada para o Gemini: {response.url}")
+    #print(f"Prompt enviada para o Gemini.")
+    print(f"\033[1;36mPrompt enviada para o Gemini:\033[0m {response.url}")
 
     return response.json()['candidates'][0]['content']['parts'][0]['text']
 
@@ -135,28 +144,30 @@ def interpret_gemini_response(response_text):
         return None
 
     if "sinal=compra" in response_text.lower():
-        print("Sinal de COMPRA recebido do Gemini.")
+        print("🟢 Sinal de \033[1;32mCOMPRA\033[0m recebido do Gemini.\n")
         time.sleep(1)
         return True
     elif "sinal=venda" in response_text.lower():
-        print("Sinal de VENDA recebido do Gemini.")
+        print("🔴 Sinal de \033[1;31mVENDA\033[0m recebido do Gemini.\n")
         time.sleep(60)
         return False
     else:
-        print("Sinal NEUTRO ou não interpretado do Gemini.")
+        print("🟡 Sinal \033[1;33mNEUTRO\033[0m ou não interpretado do Gemini.\n")
         time.sleep(60)
         return None
 
 def analyze_with_gemini(api_key, candle_data, candle_patterns, rsi, macd, bollinger_bands, sell_pressure, order_book, candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation, 
-                        ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg):
+                        ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, historical_trades_data):
     """Envia os dados das velas, padrões e indicadores para o Gemini e interpreta a resposta."""
     try:
         gemini_response = send_data_to_gemini(candle_data, candle_patterns, rsi, macd, bollinger_bands, sell_pressure, order_book, candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation, 
-                        ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, api_key)
+                        ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, historical_trades_data, 
+                        api_key)
 
         # Verifica se a resposta do Gemini não é None antes de tentar acessá-la
         if gemini_response:
-            print(f"\nResposta do Gemini: \033[1m{gemini_response}\033[0m")
+            #print(f"A resposta do Gemini foi gerada.") 
+            print(f"\n\033[1;36mResposta do Gemini:\033[0m \033[1m{gemini_response}\033[0m")
             return gemini_response
         else:
             print("Resposta do Gemini é None.")

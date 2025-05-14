@@ -23,6 +23,7 @@ VirtualBox VMs/
 
 # Planilhas de resultados
 *.xlsx
+*.csv
 
 # Outros arquivos temporários
 *.pyc

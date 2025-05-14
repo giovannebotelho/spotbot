@@ -2,6 +2,8 @@ import asyncio
 import math
 import time
 import os
+import pandas as pd
+from pathlib import Path
 from dotenv import load_dotenv
 load_dotenv()  # Carregue as variáveis de ambiente do arquivo .env, incluindo GEMINI_API_KEY
 from binance.exceptions import BinanceAPIException
@@ -18,6 +20,8 @@ from config import (
     rsi_min_level_0, rsi_min_level_1, rsi_min_level_2, rsi_min_level_3, rsi_min_level_4, rsi_min_level_5
 )
 from gemini_analysis import analyze_with_gemini, interpret_gemini_response  # Importe a função analyze_with_gemin
+
+pd.set_option('future.no_silent_downcasting', True)
 
 async def should_place_order(client, symbol, SELL_PRESSURE_THRESHOLD = SELL_PRESSURE_THRESHOLD_1, interval=interval, limit=limit):
     """
@@ -64,6 +68,8 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
     price_below_vwap = last_close < vwap * (1 + vwap_tolerance)
 
     has_candle_patterns = candle_patterns is not None and len(candle_patterns) > 0
+    
+    historical_trades_data = await get_historical_trades_data()
 
     # Coleta dos dados para o Gemini
     klines = await get_klines(client, symbol, interval, limit)
@@ -108,6 +114,7 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
         depth,
         maxlen,
         volume_avg,
+        historical_trades_data,
         client,
         symbol
     )
@@ -160,7 +167,8 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
     return {"buy": False, "message": None, "candle_data": "", "gemini_response": gemini_response}
 
 async def get_gemini_analysis(candle_data, candle_patterns, rsi, macd, bollinger_bands, sell_pressure, order_book, candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation, 
-                              ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, client, symbol):
+                              ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, historical_trades_data,
+                              client, symbol):
     """Função auxiliar para obter a análise do Gemini."""
     gemini_api_key = os.getenv("gemini_api")
     try:
@@ -198,7 +206,8 @@ async def get_gemini_analysis(candle_data, candle_patterns, rsi, macd, bollinger
             limit,
             depth,
             maxlen,
-            volume_avg
+            volume_avg,
+            historical_trades_data
         )
     except Exception as e:
         print(f"Erro ao obter análise do Gemini: {e}")
@@ -338,3 +347,31 @@ def adjust_rsi_levels(result):
     print(f"\033[1mRSI ajustados:\033[0m {dynamic_rsi_low_0}, {dynamic_rsi_low_1}, {dynamic_rsi_low_2}, {dynamic_rsi_low_3}, {dynamic_rsi_low_4}, {dynamic_rsi_low_5}")
     message = f'<b>RSI ajustados:</b> {dynamic_rsi_low_0}, {dynamic_rsi_low_1}, {dynamic_rsi_low_2}, {dynamic_rsi_low_3}, {dynamic_rsi_low_4}, {dynamic_rsi_low_5}'
     send_telegram_message(bot_token, chat_id, message)
+
+async def get_historical_trades_data():
+    """
+    Lê os dados da planilha results.xlsx e formata para enviar ao Gemini.
+    Retorna uma string formatada com os dados dos trades ou None se a planilha não existir.
+    """
+    filename = "results.xlsx"
+    filepath = Path(__file__).parent / filename  # Salva na mesma pasta do script
+
+    if not filepath.exists():
+        return "Planilha de resultados não existe."
+
+    try:
+        df = pd.read_excel(filepath, index_col=0)
+
+        # Seleciona as colunas relevantes e formata os dados
+        df = df[["Símbolo", "Preço de Compra", "VWAP", "Data/Hora da Compra", "Resultado da Ordem OCO", "Data/Hora OCO",
+                 "RSI da operação", "Condição Atendida", "Intervalo de tempo (Candles)", "Padrões de Candle", 
+                 "Tendência de Alta"]] # Seleciona as colunas que quer enviar
+        # Substitui 'profit' por 1 e 'stop loss' por 0
+        df = df.infer_objects(copy=False) # Aplica infer_objects ao DataFrame ANTES da substituição
+        df["Resultado da Ordem OCO"] = df["Resultado da Ordem OCO"].replace({"profit": 1, "stop loss": 0}).astype(int) # Formato as strings para int
+        # Formata os dados para uma string
+        formatted_data = df.to_string()
+        return formatted_data
+
+    except Exception as e:
+        return f"Erro ao ler a planilha: {e}"
