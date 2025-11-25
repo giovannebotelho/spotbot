@@ -1,0 +1,50 @@
+[
+    {
+        "rsi_name": "Conservative RSI",
+        "atr_name": "Tight ATR (1.5/2.0)",
+        "profit": -1.6867595530274855,
+        "profit_percent": -1.6867595530274855,
+        "trades": 48,
+        "final_balance": 98.31324044697251
+    },
+    {
+        "rsi_name": "Standard RSI",
+        "atr_name": "Tight ATR (1.5/2.0)",
+        "profit": -9.773673938981673,
+        "profit_percent": -9.773673938981673,
+        "trades": 112,
+        "final_balance": 90.22632606101833
+    },
+    {
+        "rsi_name": "Standard RSI",
+        "atr_name": "Standard ATR (2.0/3.0)",
+        "profit": -10.218173358328883,
+        "profit_percent": -10.218173358328883,
+        "trades": 80,
+        "final_balance": 89.78182664167112
+    },
+    {
+        "rsi_name": "Conservative RSI",
+        "atr_name": "Standard ATR (2.0/3.0)",
+        "profit": -14.648214297226005,
+        "profit_percent": -14.648214297226007,
+        "trades": 36,
+        "final_balance": 85.351785702774
+    },
+    {
+        "rsi_name": "Conservative RSI",
+        "atr_name": "Wide ATR (3.0/5.0)",
+        "profit": -99.99999999999999,
+        "profit_percent": -99.99999999999999,
+        "trades": 31,
+        "final_balance": 1.4210854715202004e-14
+    },
+    {
+        "rsi_name": "Standard RSI",
+        "atr_name": "Wide ATR (3.0/5.0)",
+        "profit": -100.0,
+        "profit_percent": -100.0,
+        "trades": 55,
+        "final_balance": 0.0
+    }
+]

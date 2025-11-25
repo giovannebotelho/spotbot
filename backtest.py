@@ -43,7 +43,7 @@ class MockClient:
     def set_current_price(self, price):
         self.current_price = price
 
-async def run_backtest(symbol='BTCUSDT', days=60, initial_capital=100.0):
+async def run_backtest(symbol='BTCUSDT', days=60, initial_capital=100.0, config_override=None):
     print(f"🚀 Iniciando Backtest para {symbol} nos últimos {days} dias...")
     
     client = await AsyncClient.create(api_key=API_KEYS['mainnet']['key'], api_secret=API_KEYS['mainnet']['secret'])
@@ -154,7 +154,7 @@ async def run_backtest(symbol='BTCUSDT', days=60, initial_capital=100.0):
                     rsi, trend_is_up, macd, signal, close_price, lower, middle, upper, vwap,
                     candle_patterns, open_price, high_price, low_price, close_price, volume,
                     variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200,
-                    mock_client, symbol, current_klines, silent=True
+                    mock_client, symbol, current_klines, silent=True, config_override=config_override
                 )
                 
                 if decision['buy']:
@@ -165,7 +165,7 @@ async def run_backtest(symbol='BTCUSDT', days=60, initial_capital=100.0):
                     # We need to mock get_order_book in mock_client to return current close_price
                     
                     _, _, _, tp, sl, _ = await adjust_and_place_oco_order(
-                        mock_client, symbol, quantity, 0.01, 0.01, current_klines, silent=True
+                        mock_client, symbol, quantity, 0.01, 0.01, current_klines, silent=True, config_override=config_override
                     )
                     
                     active_trade = {
@@ -212,6 +212,13 @@ async def run_backtest(symbol='BTCUSDT', days=60, initial_capital=100.0):
         else:
             pnl_color = "\033[1;32m" if t['pnl'] > 0 else "\033[1;31m"
             print(f"🔴 VENDA  em {t['time']} @ ${t['price']:.2f} | PnL: {pnl_color}${t['pnl']:.2f}\033[0m | Motivo: {t['reason']}")
+
+    return {
+        "profit": profit,
+        "profit_percent": profit_percent,
+        "trades": len(trades),
+        "final_balance": balance
+    }
 
 if __name__ == "__main__":
     try:

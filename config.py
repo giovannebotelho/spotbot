@@ -44,32 +44,32 @@ TRADING_CONFIG = {
     "macd_signal": 9
 }
 
-# RSI Configuration
+# RSI Configuration (Optimized: Conservative)
 RSI_CONFIG = {
     "levels": {
-        0: 20,
-        1: 25,
-        2: 30,
-        3: 35,
+        0: 15,
+        1: 20,
+        2: 25,
+        3: 30,
         4: 40,
         5: 45
     },
-    "high": 70,
+    "high": 65,
     "dynamic_low": {
-        0: 20,
-        1: 25,
-        2: 30,
-        3: 35,
+        0: 15,
+        1: 20,
+        2: 25,
+        3: 30,
         4: 40,
         5: 45
     },
     "min": {
-        0: 14, # 20 - 6
-        1: 19, # 25 - 6
-        2: 24, # 30 - 6
-        3: 29, # 35 - 6
-        4: 34, # 40 - 6
-        5: 39  # 45 - 6
+        0: 10,
+        1: 15,
+        2: 20,
+        3: 25,
+        4: 30,
+        5: 35
     }
 }
 
@@ -85,11 +85,11 @@ OCO_CONFIG = {
     }
 }
 
-# ATR Configuration
+# ATR Configuration (Optimized: Tight)
 ATR_CONFIG = {
     "period": 14,
-    "sl_multiplier": 2.0,
-    "tp_multiplier": 3.0,
+    "sl_multiplier": 1.5,
+    "tp_multiplier": 2.0,
     "use_atr_stop": True
 }
 

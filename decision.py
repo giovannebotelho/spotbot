@@ -42,17 +42,20 @@ async def should_place_order(client, symbol, sell_pressure_threshold=None, inter
     return False
 
 async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_close, lower_band, middle_band, upper_band, vwap, candle_patterns, candle_open, candle_high, candle_low, 
-                     candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, symbol, klines, silent=False):
+                     candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, symbol, klines, silent=False, config_override=None):
     """
     Avalia se as condições são adequadas para comprar.
     """
+    # Use config override if provided
+    rsi_config = config_override.get('RSI_CONFIG', RSI_CONFIG) if config_override else RSI_CONFIG
+    
     # Use dynamic RSI levels
-    rsi_low_level0 = rsi <= RSI_CONFIG['dynamic_low'][0]
-    rsi_low_level1 = rsi <= RSI_CONFIG['dynamic_low'][1]
-    rsi_low_level2 = rsi <= RSI_CONFIG['dynamic_low'][2]
-    rsi_low_level3 = rsi <= RSI_CONFIG['dynamic_low'][3]
-    rsi_low_level4 = rsi <= RSI_CONFIG['dynamic_low'][4]
-    rsi_low_level5 = rsi <= RSI_CONFIG['dynamic_low'][5]
+    rsi_low_level0 = rsi <= rsi_config['dynamic_low'][0]
+    rsi_low_level1 = rsi <= rsi_config['dynamic_low'][1]
+    rsi_low_level2 = rsi <= rsi_config['dynamic_low'][2]
+    rsi_low_level3 = rsi <= rsi_config['dynamic_low'][3]
+    rsi_low_level4 = rsi <= rsi_config['dynamic_low'][4]
+    rsi_low_level5 = rsi <= rsi_config['dynamic_low'][5]
 
     macd_bullish = macd_current > signal_line_current and last_close < lower_band
     vwap_tolerance = 0.07
@@ -217,10 +220,14 @@ def calculate_adjustment(price, quantity, required_notional, current_notional):
         return price, new_quantity
     return price, quantity
 
-async def adjust_and_place_oco_order(client, symbol, quantity, tick_size, min_price_move, klines, silent=False):
+async def adjust_and_place_oco_order(client, symbol, quantity, tick_size, min_price_move, klines, silent=False, config_override=None):
     """
     Calcula preços e coloca ordem OCO.
     """
+    # Use config override if provided
+    atr_config = config_override.get('ATR_CONFIG', ATR_CONFIG) if config_override else ATR_CONFIG
+    oco_config = config_override.get('OCO_CONFIG', OCO_CONFIG) if config_override else OCO_CONFIG
+
     max_attempts = 3
     
     for attempt in range(max_attempts):
@@ -241,13 +248,13 @@ async def adjust_and_place_oco_order(client, symbol, quantity, tick_size, min_pr
             current_price = float(order_book['asks'][0][0])
 
             # Calculate ATR
-            atr = calculate_atr(klines, ATR_CONFIG['period'])
+            atr = calculate_atr(klines, atr_config['period'])
             
-            use_atr = ATR_CONFIG.get('use_atr_stop', False)
+            use_atr = atr_config.get('use_atr_stop', False)
             
             if use_atr and atr > 0:
-                lucro_alvo = current_price + (atr * ATR_CONFIG['tp_multiplier'])
-                stop_loss = current_price - (atr * ATR_CONFIG['sl_multiplier'])
+                lucro_alvo = current_price + (atr * atr_config['tp_multiplier'])
+                stop_loss = current_price - (atr * atr_config['sl_multiplier'])
                 
                 if not silent: print(f"🔹 Usando ATR para SL/TP. ATR: {atr:.4f}, TP: {lucro_alvo:.4f}, SL: {stop_loss:.4f}")
                 
@@ -257,11 +264,11 @@ async def adjust_and_place_oco_order(client, symbol, quantity, tick_size, min_pr
                     print("🔸 ATR inválido ou insuficiente. Usando multiplicadores fixos.")
                 
                 if current_price < 1:
-                    lucro_multiplier = OCO_CONFIG['price_under_1']['profit_multiplier']
-                    stop_loss_multiplier = OCO_CONFIG['price_under_1']['stop_loss_multiplier']
+                    lucro_multiplier = oco_config['price_under_1']['profit_multiplier']
+                    stop_loss_multiplier = oco_config['price_under_1']['stop_loss_multiplier']
                 else:
-                    lucro_multiplier = OCO_CONFIG['price_over_1']['profit_multiplier']
-                    stop_loss_multiplier = OCO_CONFIG['price_over_1']['stop_loss_multiplier']
+                    lucro_multiplier = oco_config['price_over_1']['profit_multiplier']
+                    stop_loss_multiplier = oco_config['price_over_1']['stop_loss_multiplier']
 
                 lucro_alvo = current_price * lucro_multiplier
                 stop_loss = current_price * stop_loss_multiplier
