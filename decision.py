@@ -61,6 +61,24 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
     vwap_tolerance = 0.07
     price_below_vwap = last_close < vwap * (1 + vwap_tolerance)
 
+    # EMA200 Trend Filter
+    use_ema_filter = TRADING_CONFIG.get('use_ema_filter', True)
+    if config_override and 'TRADING_CONFIG' in config_override:
+        use_ema_filter = config_override['TRADING_CONFIG'].get('use_ema_filter', use_ema_filter)
+
+    trend_confirmed = True
+    if use_ema_filter:
+        if ema200 > 0:
+            trend_confirmed = last_close > ema200
+        else:
+            # If EMA200 is not available (not enough data), we might want to skip or fallback.
+            # For safety, let's assume no trend if data is missing, or allow if we want to be risky.
+            # Let's be conservative: if we want a filter and data is missing, we don't buy.
+            trend_confirmed = False
+
+    if not trend_confirmed:
+        return {"buy": False, "message": "Trend not confirmed (Price < EMA200)", "candle_data": "", "gemini_response": None}
+
     # Prepare data for Gemini
     gemini_response = await get_gemini_analysis(
         f"Open: {candle_open}, High: {candle_high}, Low: {candle_low}, Close: {candle_close}, Volume: {candle_volume}",

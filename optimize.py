@@ -42,21 +42,25 @@ async def run_optimization(days=60):
             "config": {"period": 14, "sl_multiplier": 3.0, "tp_multiplier": 5.0, "use_atr_stop": True}
         }
     ]
+
+    ema_variations = [True, False]
     
     results = []
     
-    combinations = list(itertools.product(rsi_variations, atr_variations))
+    combinations = list(itertools.product(rsi_variations, atr_variations, ema_variations))
     total_combinations = len(combinations)
     
     print(f"🔍 Testando {total_combinations} combinações...")
     
-    for i, (rsi_var, atr_var) in enumerate(combinations):
-        print(f"\n[{i+1}/{total_combinations}] Testando: {rsi_var['name']} + {atr_var['name']}")
+    for i, (rsi_var, atr_var, use_ema) in enumerate(combinations):
+        ema_name = "EMA On" if use_ema else "EMA Off"
+        print(f"\n[{i+1}/{total_combinations}] Testando: {rsi_var['name']} + {atr_var['name']} + {ema_name}")
         
         # Construct config override
         config_override = {
             "RSI_CONFIG": rsi_var['config'],
             "ATR_CONFIG": atr_var['config'],
+            "TRADING_CONFIG": {"use_ema_filter": use_ema}
             # Keep OCO default for now, or add to grid
         }
         
@@ -69,6 +73,7 @@ async def run_optimization(days=60):
             results.append({
                 "rsi_name": rsi_var['name'],
                 "atr_name": atr_var['name'],
+                "ema_status": ema_name,
                 "profit": result['profit'],
                 "profit_percent": result['profit_percent'],
                 "trades": result['trades'],
@@ -81,19 +86,19 @@ async def run_optimization(days=60):
     # Sort results by profit
     results.sort(key=lambda x: x['profit'], reverse=True)
     
-    print("\n" + "="*50)
+    print("\n" + "="*60)
     print("🏆 RESULTADOS DA OTIMIZAÇÃO")
-    print("="*50)
+    print("="*60)
     
-    print(f"{'RSI':<20} | {'ATR':<20} | {'Lucro %':<10} | {'Trades':<6}")
-    print("-" * 65)
+    print(f"{'RSI':<20} | {'ATR':<20} | {'EMA':<8} | {'Lucro %':<10} | {'Trades':<6}")
+    print("-" * 80)
     
     for res in results:
         color = "\033[1;32m" if res['profit'] > 0 else "\033[1;31m"
-        print(f"{res['rsi_name']:<20} | {res['atr_name']:<20} | {color}{res['profit_percent']:6.2f}%\033[0m | {res['trades']:<6}")
+        print(f"{res['rsi_name']:<20} | {res['atr_name']:<20} | {res['ema_status']:<8} | {color}{res['profit_percent']:6.2f}%\033[0m | {res['trades']:<6}")
 
     best = results[0]
-    print(f"\n✅ Melhor Configuração: {best['rsi_name']} + {best['atr_name']} (Lucro: {best['profit_percent']:.2f}%)")
+    print(f"\n✅ Melhor Configuração: {best['rsi_name']} + {best['atr_name']} + {best['ema_status']} (Lucro: {best['profit_percent']:.2f}%)")
     
     # Save to file
     with open("optimization_results.json", "w") as f:

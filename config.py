@@ -41,35 +41,36 @@ TRADING_CONFIG = {
     "sell_pressure_threshold": 0.65,
     "macd_fast": 12,
     "macd_slow": 26,
-    "macd_signal": 9
+    "macd_signal": 9,
+    "use_ema_filter": False
 }
 
-# RSI Configuration (Optimized: Conservative)
+# RSI Configuration (Optimized: Standard)
 RSI_CONFIG = {
     "levels": {
-        0: 15,
-        1: 20,
-        2: 25,
-        3: 30,
+        0: 20,
+        1: 25,
+        2: 30,
+        3: 35,
         4: 40,
-        5: 45
+        5: 50
     },
-    "high": 65,
+    "high": 70,
     "dynamic_low": {
-        0: 15,
-        1: 20,
-        2: 25,
-        3: 30,
+        0: 20,
+        1: 25,
+        2: 30,
+        3: 35,
         4: 40,
-        5: 45
+        5: 50
     },
     "min": {
-        0: 10,
-        1: 15,
-        2: 20,
-        3: 25,
-        4: 30,
-        5: 35
+        0: 15,
+        1: 20,
+        2: 25,
+        3: 30,
+        4: 35,
+        5: 45
     }
 }
 

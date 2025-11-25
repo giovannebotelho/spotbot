@@ -2,7 +2,7 @@
 
 **SpotBot Pro** é um robô de trading de criptomoedas automatizado e inteligente, projetado para operar no mercado Spot da Binance. Ele combina análise técnica clássica com o poder da Inteligência Artificial (Google Gemini) para tomar decisões de compra e venda mais assertivas.
 
-![Dashboard Preview](https://via.placeholder.com/800x400?text=SpotBot+Pro+Dashboard) *<!-- Substitua por um screenshot real do seu dashboard -->*
+![Dashboard Preview](prints/dashboard_preview.png)
 
 ## ✨ Funcionalidades Principais
 
