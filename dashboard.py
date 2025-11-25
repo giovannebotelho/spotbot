@@ -4,14 +4,17 @@ import main
 import sys
 from datetime import datetime
 
-# Redirect stdout/stderr to capture prints if needed, but we rely on callback
-# main.run_bot accepts a log_callback
+# StreamLogger removed to simplify logging
+# sys.stdout = StreamLogger(sys.stdout) 
 
 log_ui = None
 status_ui = None
 bot_task = None
 
 def log_handler(message):
+    # Print to terminal
+    print(message)
+    # Push to UI
     if log_ui:
         clean_msg = remove_ansi_codes(message)
         log_ui.push(clean_msg)
@@ -67,7 +70,7 @@ async def start_bot():
         ui.notify('Bot parado pelo usuário.', type='info')
     except Exception as e:
         ui.notify(f'Erro no bot: {e}', type='negative')
-        log_handler(f"Erro crítico: {e}")
+        print(f"Erro crítico: {e}")
 
 def stop_bot():
     global bot_task

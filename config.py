@@ -89,7 +89,15 @@ OCO_CONFIG = {
 ATR_CONFIG = {
     "period": 14,
     "sl_multiplier": 2.0,
-    "tp_multiplier": 3.0
+    "tp_multiplier": 3.0,
+    "use_atr_stop": True
+}
+
+# Trailing Stop Configuration
+TRAILING_STOP_CONFIG = {
+    "enabled": True,
+    "activation_percent": 0.015, # 1.5% profit to activate
+    "callback_percent": 0.005    # 0.5% drop from peak triggers stop
 }
 
 # Backward compatibility (to be removed after refactoring other files)

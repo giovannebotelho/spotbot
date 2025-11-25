@@ -196,21 +196,18 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
         "Resposta do Gemini": gemini_response if gemini_response is not None else "N/A", # Adiciona a resposta do Gemini à linha de dados
     }
 
+from database import DatabaseManager
+
 def save_to_csv(data_row):
     """
-    Salva os resultados das transações em um arquivo CSV para futura referência.
-    Args:
-        data_row (dict): Dados da transação a serem salvos.
+    Salva os resultados das transações no banco de dados SQLite.
+    Mantém o nome da função para compatibilidade, mas agora usa o DB.
     """
-    filename = "results.csv"
-    filepath = Path(__file__).parent / filename  # Salva na mesma pasta do script
-
-    # Cria um DataFrame a partir do dicionário data_row
-    new_row_df = pd.DataFrame([data_row])
-
-    if filepath.exists():
-        # Se o arquivo já existe, adiciona sem cabeçalho
-        new_row_df.to_csv(filepath, mode='a', header=False, index=False)
-    else:
-        # Se o arquivo não existe, cria com cabeçalho
-        new_row_df.to_csv(filepath, mode='w', header=True, index=False)
+    try:
+        db = DatabaseManager()
+        db.add_trade(data_row)
+        print("✅ Dados salvos no banco de dados SQLite.")
+    except Exception as e:
+        print(f"❌ Erro ao salvar no banco de dados: {e}")
+        # Fallback to CSV if DB fails? No, let's trust the DB or log the error.
+        # We could implement a fallback here if critical.

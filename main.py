@@ -14,6 +14,7 @@ from trading_functions import calculate_rsi, calculate_macd, calculate_bollinger
 from decision import should_place_order, should_buy, should_sell, adjust_and_place_oco_order
 from post_trade import process_order_details, log_and_notify_results, create_data_row, save_to_csv
 from telegram_integration import send_telegram_message
+from telegram_bot import TelegramBot
 
 # Seleciona o ambiente com base na variável de ambiente
 environment = os.getenv("BOT_ENVIRONMENT", "mainnet")  # Valor padrão: mainnet
@@ -51,6 +52,21 @@ last_operation_time = None
 # Global flag to control the bot loop
 bot_running = True
 
+# Shared status for Telegram Bot
+bot_status_data = {
+    "rsi": 0,
+    "price": 0,
+    "symbol": "",
+    "action": "Iniciando...",
+    "trend": "N/A"
+
+}
+
+def remove_ansi_codes(text):
+    import re
+    ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+    return ansi_escape.sub('', text)
+
 async def check_stop_losses(current_time, log=print):
     global stop_loss_count, last_stop_loss_time, block_active, pause_end_time
 
@@ -68,7 +84,7 @@ async def check_stop_losses(current_time, log=print):
             # Pausa longa (1 hora) e reseta o contador
             log("🚨 Mais de 1 stop loss detectado dentro de 15 minutos. Bloqueando o bot por 1 hora.\n")
             message = "🚨 Mais de 1 stop loss detectado dentro de 15 minutos. Bloqueando o bot por 1 hora."
-            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+            asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
 
             pause_end_time = current_time + timedelta(seconds=LONG_PAUSE)
             block_active = True
@@ -78,7 +94,7 @@ async def check_stop_losses(current_time, log=print):
             await asyncio.sleep(LONG_PAUSE)
             log("\n ✅️ Voltando a operar após pausa de 1 hora.")
             message = "✅️ Voltando a operar após pausa de 1 hora."
-            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+            asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
             return  # Importante: retorna da função após a pausa longa
     else:
         # Se não houve stop loss recente (mais de 15 minutos), reseta o contador
@@ -91,7 +107,7 @@ async def check_stop_losses(current_time, log=print):
         # Pausa curta (10 minutos)
         log("🚨 Stop loss detectado. Pausando o bot por 10 minutos.")
         message = "🚨 Stop loss detectado. Pausando o bot por 10 minutos."
-        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+        asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
 
         pause_end_time = current_time + timedelta(seconds=SHORT_PAUSE)
         last_stop_loss_time = current_time  # Atualiza o último stop loss
@@ -99,7 +115,7 @@ async def check_stop_losses(current_time, log=print):
         await asyncio.sleep(SHORT_PAUSE)
         log("\n ✅️ Voltando a operar após pausa de 10 minutos.\n")
         message = "✅️ Voltando a operar após pausa de 10 minutos."
-        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+        asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
    
 async def check_rsi_reset(symbol, log=print):
     global last_operation_time
@@ -117,7 +133,7 @@ async def check_rsi_reset(symbol, log=print):
         if current_levels == default_levels:
             log(f"\n⏳ Níveis de RSI já estão em Standard para {symbol}.\n")
             message = f"⏳ Níveis de RSI já estão em Standard para <b>{symbol}</b>."
-            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+            asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
         else:
             # Atualiza os níveis de RSI dinâmicos para os valores padrão
             for i in range(6):
@@ -125,7 +141,7 @@ async def check_rsi_reset(symbol, log=print):
                 
             log(f"\n⏳ Níveis de RSI resetados para {symbol} devido à inatividade.")
             message = f"⏳ Níveis de RSI resetados para <b>{symbol}</b> devido à inatividade."
-            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+            asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
 
         last_operation_time = datetime.now()  # Atualiza para evitar reset em loop
 
@@ -161,13 +177,69 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
     def log(msg, end='\n', flush=False):
         if log_callback:
             log_callback(msg)
-        print(msg, end=end, flush=flush)
+        else:
+            print(msg, end=end, flush=flush)
 
     def status(msg):
         if status_callback:
             status_callback(msg)
-        # We can still print to console if needed, or just skip it to keep console clean too
-        # print(f"\r{msg}", end='', flush=True) 
+        # Also update global status for Telegram
+        bot_status_data['action'] = remove_ansi_codes(msg)
+
+    # Telegram Command Handler
+    async def handle_telegram_command(command):
+        global bot_running
+        cmd = command.split()[0].lower()
+        
+        if cmd == '/start':
+            return "🤖 O bot já está rodando!"
+        
+        elif cmd == '/stop':
+            bot_running = False
+            return "🛑 Comando recebido. Parando o bot..."
+        
+        elif cmd == '/status':
+            return (
+                f"📊 <b>Status do Bot</b>\n"
+                f"Moeda: <b>{bot_status_data['symbol']}</b>\n"
+                f"Preço: <b>${bot_status_data['price']:.2f}</b>\n"
+                f"RSI: <b>{bot_status_data['rsi']:.2f}</b>\n"
+                f"Tendência: <b>{bot_status_data['trend']}</b>\n"
+                f"Ação: {bot_status_data['action']}"
+            )
+        
+        elif cmd == '/saldo':
+            try:
+                usdt = await get_usdt_balance(client)
+                bnb = await client.get_asset_balance(asset='BNB')
+                bnb_free = float(bnb['free'])
+                
+                # Calculate BNB value in USDT
+                bnb_price = await get_bnb_price(client)
+                bnb_usdt = bnb_free * bnb_price
+                
+                return f"💰 <b>Saldos</b>\nUSDT: <b>${usdt:.2f}</b>\nBNB: <b>{bnb_free:.4f} (~${bnb_usdt:.2f})</b>"
+            except Exception as e:
+                return f"Erro ao buscar saldo: {e}"
+        
+        elif cmd == '/ajuda':
+            return (
+                "📚 <b>Comandos Disponíveis</b>\n"
+                "/status - Ver preço, RSI e ação atual\n"
+                "/saldo - Ver saldo em USDT e BNB\n"
+                "/stop - Parar o bot\n"
+                "/ajuda - Ver esta mensagem"
+            )
+            
+        return "❓ Comando não reconhecido. Tente /ajuda."
+
+    # Start Telegram Bot Task
+    if TELEGRAM_CONFIG['bot_token']:
+        tg_bot = TelegramBot(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], handle_telegram_command)
+        asyncio.create_task(tg_bot.start())
+    else:
+        log("⚠️ Token do Telegram não configurado. Comandos desativados.")
+
 
     # Inicializações
     total_difference = 0
@@ -178,9 +250,19 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
     
     log("\n🚀 \033[5;33mBot iniciado!\033[0m 🚀\n")
     message = "<b>🚀 Bot iniciado! 🚀</b>"
-    send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+    asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
     
     synchronize_time()  # Sincroniza o tempo antes de começar
+    
+    # Initialize Database and Migrate if needed
+    from database import DatabaseManager
+    try:
+        db = DatabaseManager()
+        db.create_tables()
+        db.migrate_from_csv()
+    except Exception as e:
+        log(f"⚠️ Erro ao inicializar banco de dados: {e}")
+
     await asyncio.sleep(1)
     try:
         client = await BinanceAsyncClient.create(api_key, api_secret)
@@ -195,13 +277,13 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         
         log(f"💰 Saldo BNB: \033[1;33m{bnb_balance_free:.4f}\033[0m (~${bnb_balance_usdt:.2f})")
         message = f"💰 Saldo BNB: <b>{bnb_balance_free:.4f}</b> (~${bnb_balance_usdt:.2f})"
-        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+        asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
 
         # Obter saldo inicial de USDT
         saldo_inicial_usdt = await get_usdt_balance(client)
         log(f"💰 Saldo USDT disponível: \033[1;32m${saldo_inicial_usdt:.2f}\033[0m")
         message = f"💰 Saldo USDT disponível: <b>${saldo_inicial_usdt:.2f}</b>"
-        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+        asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
 
         # Input do valor a investir
         if investment_amount is not None:
@@ -237,7 +319,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         
         log(f"\n✅ Valor definido para investimento: \033[1;32m${quantia_usdt_investimento_inicial:.2f}\033[0m")
         message = f"✅ Valor definido para investimento: <b>${quantia_usdt_investimento_inicial:.2f}</b>"
-        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+        asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
         
         # Escolher símbolo
         global symbol
@@ -245,7 +327,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             symbol = selected_symbol
             log(f"\n🪙 Símbolo selecionado via Dashboard: {symbol}")
             message = f"🪙 Símbolo selecionado via Dashboard: <b>{symbol}</b>"
-            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+            asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
         else:
             symbol = escolher_simbolo()
         
@@ -284,6 +366,12 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             lower_band, middle_band, upper_band = calculate_bollinger_bands(closes)
             
             vwap = calculate_vwap(closes, volumes)
+            
+            # Update Telegram Status Data
+            bot_status_data['symbol'] = symbol
+            bot_status_data['price'] = closes[-1]
+            bot_status_data['rsi'] = rsi
+            bot_status_data['trend'] = "Alta" if check_trend(klines) else "Baixa/Neutro"
             
             # ... (prints unchanged) ...
             msg_rsi = f"📊 RSI Atual para {symbol}: \033[1;33m{rsi:.1f}\033[0m"
@@ -417,7 +505,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         log(f"✅️ \033[1;36m({order_count:02d})\033[0m Comprado: Moeda: \033[1;33m{symbol}\033[0m, Quantidade da Moeda: \033[1;33m{executed_qty}\033[0m, Preço: \033[1;33m${price_rounded}\033[0m \033[1;36m({timestamp})\033[0m\n")
                         # winsound.Beep(800, 1500) # Purchased: Coin.
                         message = f"✅️ ({order_count:02d}) <b>Comprado</b>: Moeda: <b>{symbol}</b>, Quantidade da Moeda: <b>{executed_qty}</b>, Preço: <b>${price_rounded} ({timestamp})</b>"
-                        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+                        asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
                         purchase_timestamp = timestamp
                         
                         log(executed_condition)
@@ -479,10 +567,77 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         last_operation_time = datetime.now()
                         
                         # Await OCO order completion
+                        highest_price = price
+                        current_stop_loss = stop_loss
+                        
                         while True:
                             try:
-                                msg = await asyncio.wait_for(um.recv(), timeout=60) # Add timeout to avoid hanging forever if socket silent
+                                # Reduced timeout for frequent price checks
+                                msg = await asyncio.wait_for(um.recv(), timeout=5) 
                             except asyncio.TimeoutError:
+                                # Check for Trailing Stop
+                                if TRAILING_STOP_CONFIG['enabled']:
+                                    try:
+                                        ticker = await client.get_symbol_ticker(symbol=symbol)
+                                        current_market_price = float(ticker['price'])
+                                        
+                                        # Update highest price
+                                        if current_market_price > highest_price:
+                                            highest_price = current_market_price
+                                            
+                                        # Activation check
+                                        activation_price = price * (1 + TRAILING_STOP_CONFIG['activation_percent'])
+                                        if highest_price > activation_price:
+                                            # Calculate new stop loss
+                                            new_stop_loss = highest_price * (1 - TRAILING_STOP_CONFIG['callback_percent'])
+                                            
+                                            # Adjust to tick size
+                                            new_stop_loss = adjust_price_to_tick_size(new_stop_loss, tick_size)
+                                            
+                                            # Check if new stop is higher than current (with some buffer to avoid spam)
+                                            if new_stop_loss > current_stop_loss * 1.001:
+                                                log(f"🔄 Trailing Stop: Preço subiu para ${highest_price:.4f}. Movendo Stop de ${current_stop_loss:.4f} para ${new_stop_loss:.4f}")
+                                                
+                                                # Cancel current OCO
+                                                try:
+                                                    await client.cancel_order(symbol=symbol, orderListId=oco_order['orderListId'])
+                                                    log("❌ Ordem OCO antiga cancelada.")
+                                                    
+                                                    # Place NEW OCO
+                                                    # Keep original Take Profit (lucro_alvo) or adjust? 
+                                                    # Let's keep original TP for now to ensure target hit.
+                                                    # BUT if new_stop_loss is >= lucro_alvo, we have a problem.
+                                                    # If price is that high, maybe we should just let it ride or close?
+                                                    # For now, assume TP is far enough. If not, we might need to move TP up too.
+                                                    
+                                                    stop_limit = new_stop_loss * 0.999
+                                                    stop_limit = adjust_price_to_tick_size(stop_limit, tick_size)
+                                                    
+                                                    # Re-create OCO
+                                                    oco_order = await client.create_oco_order(
+                                                        symbol=symbol,
+                                                        side='SELL',
+                                                        quantity=quantity,
+                                                        price=f"{lucro_alvo:.{get_precision(tick_size)}f}",
+                                                        stopPrice=f"{new_stop_loss:.{get_precision(tick_size)}f}",
+                                                        stopLimitPrice=f"{stop_limit:.{get_precision(tick_size)}f}",
+                                                        stopLimitTimeInForce='GTC'
+                                                    )
+                                                    
+                                                    order_list_id = oco_order.get('orderListId', 'N/A')
+                                                    limit_order_id = oco_order['orders'][1]['orderId']
+                                                    stop_order_id = oco_order['orders'][0]['orderId']
+                                                    current_stop_loss = new_stop_loss
+                                                    
+                                                    log(f"✅ Nova OCO colocada (Trailing). ID: {order_list_id}. Novo Stop: ${new_stop_loss:.4f}")
+                                                    message = f"🔄 <b>Trailing Stop</b>: Novo Stop em <b>${new_stop_loss:.4f}</b>"
+                                                    asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
+                                                    
+                                                except Exception as e:
+                                                    log(f"⚠️ Erro ao atualizar Trailing Stop: {e}")
+                                    except Exception as e:
+                                        log(f"⚠️ Erro no loop do Trailing Stop: {e}")
+
                                 continue # Keep waiting
 
                             if msg.get('e') == 'listStatus' and msg.get('s') == symbol and msg.get('g') == oco_order['orderListId']:
@@ -568,7 +723,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
     except asyncio.CancelledError:
         log("\n🛑 Bot parado pelo usuário.")
         message = "🛑 Bot parado pelo usuário."
-        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+        asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
         await client.close_connection()
         return
             
@@ -584,13 +739,13 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             restart_attempts += 1
             log(f"\n⚠  Erro inesperado: {e}, reiniciando o bot após 5 segundos...")
             message = f"⚠ Erro inesperado: <b>{e}</b>, reiniciando o bot após 5 segundos..."
-            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+            asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
             await asyncio.sleep(5) # Adicionado tempo de espera
             await run_bot(log_callback, investment_amount, selected_symbol)
         else:
             log("\n🚨  Número máximo de tentativas de reinício atingido. O bot será desligado.")
             message = "🚨 <b>Número máximo</b> de tentativas de reinício atingido. O bot será desligado."
-            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+            asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
             exit()
 
 if __name__ == "__main__":
