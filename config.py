@@ -1,85 +1,97 @@
 import os
 from dotenv import load_dotenv
 
-load_dotenv()  # Carrega as variáveis do arquivo .env
+load_dotenv()
 
-# Binance API Keys for different environments
+# API Keys
+API_KEYS = {
+    "testnet_spot": {
+        "key": os.getenv("testnetspot_api_key"),
+        "secret": os.getenv("testnetspot_secret_key")
+    },
+    "testnet_futures": {
+        "key": os.getenv("testnetfut_api_key"),
+        "secret": os.getenv("testnetfut_secret_key")
+    },
+    "mainnet": {
+        "key": os.getenv("mainnet_api_key"),
+        "secret": os.getenv("mainnet_secret_key")
+    },
+    "gemini": os.getenv("gemini_api")
+}
 
-# Testnet Spot - Chaves de API para a versão de teste de negociação spot em Binance.
-testnetspot_api_key = os.getenv("testnetspot_api_key")
-testnetspot_secret_key = os.getenv("testnetspot_secret_key")
+# Telegram Config
+TELEGRAM_CONFIG = {
+    "bot_token": os.getenv("bot_token"),
+    "chat_id": os.getenv("chat_id")
+}
 
-# Testnet Futures - Chaves de API para a versão de teste de negociação de futuros em Binance.
-testnetfut_api_key = os.getenv("testnetfut_api_key")
-testnetfut_secret_key = os.getenv("testnetfut_secret_key")
+# General Trading Configuration
+TRADING_CONFIG = {
+    "symbol": 'BTCUSDT',
+    "interval": '1h',
+    "period": 20,
+    "num_std": 2,
+    "short_period": 12,
+    "long_period": 26,
+    "limit": 300,
+    "depth": 20,
+    "maxlen": 20,
+    "volume_avg": 50,
+    "sell_pressure_threshold": 0.65,
+    "macd_fast": 12,
+    "macd_slow": 26,
+    "macd_signal": 9
+}
 
-# Mainnet - Chaves de API para a versão principal de negociação em Binance.
-mainnet_api_key = os.getenv("mainnet_api_key")
-mainnet_secret_key = os.getenv("mainnet_secret_key")
+# RSI Configuration
+RSI_CONFIG = {
+    "levels": {
+        0: 20,
+        1: 25,
+        2: 30,
+        3: 35,
+        4: 40,
+        5: 45
+    },
+    "high": 70,
+    "dynamic_low": {
+        0: 20,
+        1: 25,
+        2: 30,
+        3: 35,
+        4: 40,
+        5: 45
+    },
+    "min": {
+        0: 14, # 20 - 6
+        1: 19, # 25 - 6
+        2: 24, # 30 - 6
+        3: 29, # 35 - 6
+        4: 34, # 40 - 6
+        5: 39  # 45 - 6
+    }
+}
 
-# Telegram - Configurações para integração com o bot do Telegram para notificações.
-bot_token = os.getenv("bot_token")
-chat_id = os.getenv("chat_id")
+# OCO Order Configuration
+OCO_CONFIG = {
+    "price_under_1": {
+        "profit_multiplier": 1.008,
+        "stop_loss_multiplier": 0.99
+    },
+    "price_over_1": {
+        "profit_multiplier": 1.005,
+        "stop_loss_multiplier": 0.990
+    }
+}
 
-# Interval, period and depth configs - Configurações gerais para busca de dados e cálculos.
-interval = '1h'   # Intervalo de tempo para buscar dados de velas (candles).
-period = 20       # Período utilizado para cálculos que envolvem médias móveis ou outros indicadores.
-num_std = 2       # Número de desvios padrões para cálculo das Bandas de Bollinger.
-short_period = 12 # Período curto para cálculos de média móvel em comparações de tendência.
-long_period = 26  # Período longo para cálculos de média móvel em comparações de tendência.
-limit = 70        # Limite de dados históricos (por exemplo, velas) para recuperar de uma vez.
-depth = 20        # Profundidade do livro de ofertas para recuperar em consultas ao order book.
-maxlen = 20       # Tamanho máximo para deque usados em médias móveis de pressão de venda.
+# ATR Configuration
+ATR_CONFIG = {
+    "period": 14,
+    "sl_multiplier": 2.0,
+    "tp_multiplier": 3.0
+}
 
-# Configurações do MACD
-macd_fast = 12 # Agora usa o mesmo valor de short_period
-macd_slow = 26 # Agora usa o mesmo valor de long_period
-macd_signal = 9 # Mantido o valor padrão comum. Pode-se ajustar conforme testes.
+# Backward compatibility (to be removed after refactoring other files)
+# ... (I will NOT add backward compatibility variables here to force myself to update other files)
 
-# Should buy configs - Configurações para a lógica de decisão de compra.
-SELL_PRESSURE_THRESHOLD_1 = 0.65  # Limiar de pressão de venda para decidir sobre colocar uma ordem de compra.
-
-# Configuração inicial de um limiar de volume que pode ser ajustada conforme necessário.
-# Verificação condicional que compara o último volume coletado com a média móvel ajustada por um percentual específico (volume_avg).
-volume_avg = 45 # 45%
-
-# Configurações de níveis de RSI
-lvl0 = 15 # (apenas RSI)
-lvl1 = 25 # (RSI+VWAP)
-lvl2 = 30 # (RSI+CANDLE)
-lvl3 = 35 # (RSI+TREND+VWAP)
-lvl4 = 40 # (RSI+TREND+VWAP+MACD)
-lvl5 = 50 # (Gemini)
-
-rsi_low_level_0 = lvl0 # Limiar para o RSI considerado muito baixo.
-rsi_low_level_1 = lvl1 # Limiar para o RSI considerado baixo e considerando o indicador VWAP.
-rsi_low_level_2 = lvl2 # Limiar para o RSI considerado médio e considerando padrões de Candle.
-rsi_low_level_3 = lvl3 # Limiar para o RSI considerado médio-alto considerando tendências de alta e o indicador VWAP.
-rsi_low_level_4 = lvl4 # Limiar para o RSI considerado alto considerando tendências de alta, indicador VWAP e MACD.
-rsi_low_level_5 = lvl5 # Limiar para o RSI considerado muito alto considerando análise da inteligência artificial Gemini.
-
-rsi_min_level_0 = lvl0 - 6
-rsi_min_level_1 = lvl1 - 6
-rsi_min_level_2 = lvl2 - 6
-rsi_min_level_3 = lvl3 - 6
-rsi_min_level_4 = lvl4 - 6
-rsi_min_level_5 = lvl5 - 6
-
-
-# Configurações dinâmicas de RSI
-dynamic_rsi_low_0 = rsi_low_level_0
-dynamic_rsi_low_1 = rsi_low_level_1
-dynamic_rsi_low_2 = rsi_low_level_2
-dynamic_rsi_low_3 = rsi_low_level_3
-dynamic_rsi_low_4 = rsi_low_level_4
-dynamic_rsi_low_5 = rsi_low_level_5
-
-rsi_high_0 = 70 # Limiar para o RSI considerado alto para decisões de venda.
-
-# Lucro and Stop Loss - Configurações para cálculos de ordens OCO.
-# if current_price < 1:
-lucro_multiplier_1 = 1.008  # Multiplicador de lucro para preços menores que 1.
-stop_loss_multiplier_1 = 0.99  # Multiplicador de stop loss para preços menores que 1.
-#else:
-lucro_multiplier_2 = 1.0045  # Multiplicador de lucro para preços maiores ou iguais a 1.
-stop_loss_multiplier_2 = 0.992  # Multiplicador de stop loss para preços maiores ou iguais a 1.

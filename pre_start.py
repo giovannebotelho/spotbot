@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from binance.exceptions import BinanceAPIException
 
 from telegram_integration import send_telegram_message
-from config import bot_token, chat_id
+from config import TELEGRAM_CONFIG
 
 sync_file_path = 'last_sync_time.txt'
 
@@ -40,12 +40,12 @@ def synchronize_time():
             subprocess.run(['w32tm', '/resync'], check=True)
             print("✅️ Relógio do sistema sincronizado com sucesso.")
             message = "✅️ Relógio do sistema sincronizado com sucesso."
-            send_telegram_message(bot_token, chat_id, message)
+            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
             write_last_sync_time()  # Atualiza a última data de sincronização no arquivo
         except subprocess.CalledProcessError:
             print("🚨 Falha ao sincronizar o relógio do sistema.")
             message = "🚨 Falha ao sincronizar o relógio do sistema."
-            send_telegram_message(bot_token, chat_id, message)
+            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
     else:
         print("🟡 Sincronização de relógio não necessária. Última feita há menos de 3 dias.")
 
@@ -72,9 +72,16 @@ async def cancel_all_oco_orders(client, symbol):
 def escolher_simbolo():
     """
     Permite ao usuário escolher um símbolo de trading através de uma interface interativa no console.
+    Se um símbolo estiver definido em TRADING_CONFIG, ele será usado automaticamente.
     Returns:
         str: Símbolo escolhido pelo usuário para trading.
     """
+    from config import TRADING_CONFIG
+    
+    if "symbol" in TRADING_CONFIG and TRADING_CONFIG["symbol"]:
+        print(f"\n🪙 Símbolo definido na configuração: {TRADING_CONFIG['symbol']}")
+        return TRADING_CONFIG["symbol"]
+
     while True:
         print("\n🪙 Escolha o símbolo preferido ou digite manualmente:")
         print('1 - BTC/USDT')

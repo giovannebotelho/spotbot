@@ -1,5 +1,5 @@
 import asyncio
-import winsound
+# import winsound
 import os
 import pandas as pd
 from datetime import datetime, timedelta
@@ -7,25 +7,23 @@ from binance import BinanceSocketManager
 from binance import AsyncClient as BinanceAsyncClient
 from binance.exceptions import BinanceAPIException
 
-from config import bot_token, chat_id, mainnet_api_key, mainnet_secret_key, testnetspot_api_key, testnetspot_secret_key
-from config import volume_avg, dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4, dynamic_rsi_low_5
-from config import interval, limit
+from config import API_KEYS, TELEGRAM_CONFIG, TRADING_CONFIG, RSI_CONFIG
 from pre_start import synchronize_time, escolher_simbolo, cancel_all_oco_orders
-from binance_api import get_closes, get_usdt_balance, get_volumes, get_order_details, get_klines, get_bnb_price
+from binance_api import extract_closes, extract_volumes, get_usdt_balance, get_order_details, get_klines, get_bnb_price
 from trading_functions import calculate_rsi, calculate_macd, calculate_bollinger_bands, check_trend, check_candle_patterns, calculate_vwap, get_candle_details, calculate_ema, is_market_downward
 from decision import should_place_order, should_buy, should_sell, adjust_and_place_oco_order
-from post_trade import process_order_details, log_and_notify_results, create_data_row, save_to_excel
+from post_trade import process_order_details, log_and_notify_results, create_data_row, save_to_csv
 from telegram_integration import send_telegram_message
 
 # Seleciona o ambiente com base na variável de ambiente
 environment = os.getenv("BOT_ENVIRONMENT", "mainnet")  # Valor padrão: mainnet
 
 if environment == "mainnet":
-    api_key = mainnet_api_key
-    api_secret = mainnet_secret_key
+    api_key = API_KEYS['mainnet']['key']
+    api_secret = API_KEYS['mainnet']['secret']
 elif environment == "testnet":
-    api_key = testnetspot_api_key
-    api_secret = testnetspot_secret_key
+    api_key = API_KEYS['testnet_spot']['key']
+    api_secret = API_KEYS['testnet_spot']['secret']
 else:
     raise ValueError(f"Ambiente inválido: {environment}")
 
@@ -50,7 +48,10 @@ restart_attempts = 0
 # Adicionando a variável global para o tempo da última operação
 last_operation_time = None
 
-async def check_stop_losses(current_time):
+# Global flag to control the bot loop
+bot_running = True
+
+async def check_stop_losses(current_time, log=print):
     global stop_loss_count, last_stop_loss_time, block_active, pause_end_time
 
     # Se houver uma pausa longa ativa e chegamos ao tempo de fim da pausa
@@ -65,9 +66,9 @@ async def check_stop_losses(current_time):
         # temos 2 ou mais stop losses em menos de 15 minutos
         if stop_loss_count > 1:
             # Pausa longa (1 hora) e reseta o contador
-            print("🚨 Mais de 1 stop loss detectado dentro de 15 minutos. Bloqueando o bot por 1 hora.\n")
+            log("🚨 Mais de 1 stop loss detectado dentro de 15 minutos. Bloqueando o bot por 1 hora.\n")
             message = "🚨 Mais de 1 stop loss detectado dentro de 15 minutos. Bloqueando o bot por 1 hora."
-            send_telegram_message(bot_token, chat_id, message)
+            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
 
             pause_end_time = current_time + timedelta(seconds=LONG_PAUSE)
             block_active = True
@@ -75,9 +76,9 @@ async def check_stop_losses(current_time):
             last_stop_loss_time = current_time  # Atualiza o último stop loss
 
             await asyncio.sleep(LONG_PAUSE)
-            print("\n ✅️ Voltando a operar após pausa de 1 hora.")
+            log("\n ✅️ Voltando a operar após pausa de 1 hora.")
             message = "✅️ Voltando a operar após pausa de 1 hora."
-            send_telegram_message(bot_token, chat_id, message)
+            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
             return  # Importante: retorna da função após a pausa longa
     else:
         # Se não houve stop loss recente (mais de 15 minutos), reseta o contador
@@ -88,284 +89,282 @@ async def check_stop_losses(current_time):
         # Primeiro stop loss, então incrementa o contador
         stop_loss_count += 1
         # Pausa curta (10 minutos)
-        print("🚨 Stop loss detectado. Pausando o bot por 10 minutos.")
+        log("🚨 Stop loss detectado. Pausando o bot por 10 minutos.")
         message = "🚨 Stop loss detectado. Pausando o bot por 10 minutos."
-        send_telegram_message(bot_token, chat_id, message)
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
 
         pause_end_time = current_time + timedelta(seconds=SHORT_PAUSE)
         last_stop_loss_time = current_time  # Atualiza o último stop loss
 
         await asyncio.sleep(SHORT_PAUSE)
-        print("\n ✅️ Voltando a operar após pausa de 10 minutos.\n")
+        log("\n ✅️ Voltando a operar após pausa de 10 minutos.\n")
         message = "✅️ Voltando a operar após pausa de 10 minutos."
-        send_telegram_message(bot_token, chat_id, message)
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
    
-async def check_rsi_reset(symbol):
+async def check_rsi_reset(symbol, log=print):
     global last_operation_time
     
-    # Removendo a importação das variáveis locais e importanto as globais
-    global dynamic_rsi_low_0, dynamic_rsi_low_1, dynamic_rsi_low_2, dynamic_rsi_low_3, dynamic_rsi_low_4, dynamic_rsi_low_5
-    from config import rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_low_level_4, rsi_low_level_5
-
+    # Using RSI_CONFIG dictionary directly
+    
     if last_operation_time and (datetime.now() - last_operation_time) > timedelta(seconds=6*60*60):
         # Verifica se os níveis de RSI dinâmicos são iguais aos níveis padrão
-        if dynamic_rsi_low_0 == rsi_low_level_0 and \
-           dynamic_rsi_low_1 == rsi_low_level_1 and \
-           dynamic_rsi_low_2 == rsi_low_level_2 and \
-           dynamic_rsi_low_3 == rsi_low_level_3 and \
-           dynamic_rsi_low_4 == rsi_low_level_4 and \
-           dynamic_rsi_low_5 == rsi_low_level_5:
-            print(f"\n⏳ Níveis de RSI já estão em Standard para {symbol}.\n")
+        current_levels = [RSI_CONFIG['dynamic_low'][i] for i in range(6)]
+        default_levels = [RSI_CONFIG['levels'][i] for i in range(6)] # Assuming 'levels' holds the defaults (rsi_low_level_X)
+        
+        # Wait, in config.py 'levels' holds rsi_low_level_0...5
+        # So we compare dynamic_low with levels
+        
+        if current_levels == default_levels:
+            log(f"\n⏳ Níveis de RSI já estão em Standard para {symbol}.\n")
             message = f"⏳ Níveis de RSI já estão em Standard para <b>{symbol}</b>."
-            send_telegram_message(bot_token, chat_id, message)
+            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
         else:
             # Atualiza os níveis de RSI dinâmicos para os valores padrão
-            dynamic_rsi_low_0 = rsi_low_level_0
-            dynamic_rsi_low_1 = rsi_low_level_1
-            dynamic_rsi_low_2 = rsi_low_level_2
-            dynamic_rsi_low_3 = rsi_low_level_3
-            dynamic_rsi_low_4 = rsi_low_level_4
-            dynamic_rsi_low_5 = rsi_low_level_5
-            print(f"\n⏳ Níveis de RSI resetados para {symbol} devido à inatividade.")
+            for i in range(6):
+                RSI_CONFIG['dynamic_low'][i] = RSI_CONFIG['levels'][i]
+                
+            log(f"\n⏳ Níveis de RSI resetados para {symbol} devido à inatividade.")
             message = f"⏳ Níveis de RSI resetados para <b>{symbol}</b> devido à inatividade."
-            send_telegram_message(bot_token, chat_id, message)
+            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
 
         last_operation_time = datetime.now()  # Atualiza para evitar reset em loop
 
-async def run_bot():
+async def get_account_balances():
+    """Fetches BNB and USDT balances for the UI."""
+    try:
+        client = await BinanceAsyncClient.create(api_key, api_secret)
+        bnb_balance = await client.get_asset_balance(asset='BNB')
+        bnb_balance_free = float(bnb_balance['free'])
+        bnb_price_usdt = await get_bnb_price(client)
+        bnb_balance_usdt = bnb_balance_free * bnb_price_usdt
+        
+        usdt_balance = await get_usdt_balance(client)
+        
+        await client.close_connection()
+        return {
+            'bnb': bnb_balance_free,
+            'bnb_usdt': bnb_balance_usdt,
+            'usdt': usdt_balance
+        }
+    except Exception as e:
+        print(f"Erro ao buscar saldos: {e}")
+        return None
+
+async def run_bot(log_callback=None, investment_amount=None, selected_symbol=None, status_callback=None):
     global restart_attempts, quantia_usdt_investimento_inicial
     global limit_order_id, stop_order_id
     global stop_loss_count, last_stop_loss_time, block_active, pause_end_time
-    global last_operation_time
+    global last_operation_time, bot_running
     
+    bot_running = True
+
+    def log(msg, end='\n', flush=False):
+        if log_callback:
+            log_callback(msg)
+        print(msg, end=end, flush=flush)
+
+    def status(msg):
+        if status_callback:
+            status_callback(msg)
+        # We can still print to console if needed, or just skip it to keep console clean too
+        # print(f"\r{msg}", end='', flush=True) 
+
     # Inicializações
     total_difference = 0
     total_difference_liquid = 0
     gemini_response = None
+    order_count = 0
+    saldo_inicial_usdt = 0 # Initialize
     
-    print("\n🚀 \033[5;33mBot iniciado!\033[0m 🚀\n")
+    log("\n🚀 \033[5;33mBot iniciado!\033[0m 🚀\n")
     message = "<b>🚀 Bot iniciado! 🚀</b>"
-    send_telegram_message(bot_token, chat_id, message)
+    send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
     
     synchronize_time()  # Sincroniza o tempo antes de começar
     await asyncio.sleep(1)
     try:
         client = await BinanceAsyncClient.create(api_key, api_secret)
+        # Inicializa o BSM fora do loop, mas não abre o socket ainda
         bsm = BinanceSocketManager(client)
         
-        print("\n💸 \033[1;4;34mSeja bem-vindo(a) ao Gio Binance Bot - Spot Trading\033[0m 🤖")
-        message = "<b><u>💸 Seja bem-vindo(a) ao Gio Binance Bot - Spot Trading🤖</u></b>"
-        send_telegram_message(bot_token, chat_id, message)
+        # Obter e mostrar saldo de BNB
+        bnb_balance = await client.get_asset_balance(asset='BNB')
+        bnb_balance_free = float(bnb_balance['free'])
+        bnb_price_usdt = await get_bnb_price(client)
+        bnb_balance_usdt = bnb_balance_free * bnb_price_usdt
         
+        log(f"💰 Saldo BNB: \033[1;33m{bnb_balance_free:.4f}\033[0m (~${bnb_balance_usdt:.2f})")
+        message = f"💰 Saldo BNB: <b>{bnb_balance_free:.4f}</b> (~${bnb_balance_usdt:.2f})"
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+
+        # Obter saldo inicial de USDT
+        saldo_inicial_usdt = await get_usdt_balance(client)
+        log(f"💰 Saldo USDT disponível: \033[1;32m${saldo_inicial_usdt:.2f}\033[0m")
+        message = f"💰 Saldo USDT disponível: <b>${saldo_inicial_usdt:.2f}</b>"
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+
+        # Input do valor a investir
+        if investment_amount is not None:
+             if str(investment_amount).strip() == '100%':
+                 quantia_usdt_investimento_inicial = saldo_inicial_usdt
+             else:
+                 try:
+                     quantia_usdt_investimento_inicial = float(investment_amount)
+                     if quantia_usdt_investimento_inicial > saldo_inicial_usdt:
+                         log(f"⚠️ Valor solicitado maior que o saldo. Ajustando para o saldo total: ${saldo_inicial_usdt:.2f}")
+                         quantia_usdt_investimento_inicial = saldo_inicial_usdt
+                 except ValueError:
+                     log("❌ Valor de investimento inválido. Usando saldo total.")
+                     quantia_usdt_investimento_inicial = saldo_inicial_usdt
+        else:
+            while True:
+                print("\nQuanto você quer investir em USDT? (Digite o valor ou '100%' para tudo)")
+                user_input = input("Valor: ").strip()
+                
+                if user_input == '100%':
+                    quantia_usdt_investimento_inicial = saldo_inicial_usdt
+                    break
+                else:
+                    try:
+                        amount = float(user_input)
+                        if 0 < amount <= saldo_inicial_usdt:
+                            quantia_usdt_investimento_inicial = amount
+                            break
+                        else:
+                            print(f"❌ Valor inválido. Digite um valor entre 0 e {saldo_inicial_usdt:.2f}")
+                    except ValueError:
+                        print("❌ Entrada inválida. Digite um número ou '100%'.")
+        
+        log(f"\n✅ Valor definido para investimento: \033[1;32m${quantia_usdt_investimento_inicial:.2f}\033[0m")
+        message = f"✅ Valor definido para investimento: <b>${quantia_usdt_investimento_inicial:.2f}</b>"
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+        
+        # Escolher símbolo
         global symbol
-        if symbol is None:
+        if selected_symbol:
+            symbol = selected_symbol
+            log(f"\n🪙 Símbolo selecionado via Dashboard: {symbol}")
+            message = f"🪙 Símbolo selecionado via Dashboard: <b>{symbol}</b>"
+            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+        else:
             symbol = escolher_simbolo()
-            closes = await get_closes(client, symbol)
-            print(f"\nVocê escolheu: 🪙 \033[1;33m{symbol}\033[0m")
-            message = f"Você escolheu: 🪙 <b>${symbol}</b>"
-            send_telegram_message(bot_token, chat_id, message)
-        else:
-            symbol = symbol  # Aqui, garantimos que o valor global seja usado
-            closes = await get_closes(client, symbol)
-            print(f"\nUsando símbolo salvo: 🪙 \033[1;33m{symbol}\033[0m")
-            message = f"Usando símbolo salvo: 🪙 <b>{symbol}</b>"
-            send_telegram_message(bot_token, chat_id, message)
         
-        ticker = await client.get_symbol_ticker(symbol=symbol)
-        current_price = float(ticker['price'])
-        if current_price < 1:
-            print(f"\nPreço Atual: 📈 \033[1;33m${current_price:.4f}\033[0m")
-            message = f"Preço Atual: 📈 <b>${current_price:.4f}</b>"
-        else:
-            print(f"\nPreço Atual: 📈 \033[1;33m${current_price:.2f}\033[0m")
-            message = f"Preço Atual: 📈 <b>${current_price:.2f}</b>"
-        
-        send_telegram_message(bot_token, chat_id, message)
-        
-        rsi = calculate_rsi(closes)
-        
-        print(f"\n📊 RSI Inicial para {symbol}: \033[1;33m{rsi:.1f}\033[0m")
-        
-        symbol_info = await client.get_symbol_info(symbol)
-        quote_precision = int(symbol_info['baseAssetPrecision'])
-        
-        tick_size = float([f['tickSize'] for f in symbol_info['filters'] if f['filterType'] == 'PRICE_FILTER'][0])
-        min_price_move = float([f['minPrice'] for f in symbol_info['filters'] if f['filterType'] == 'PRICE_FILTER'][0])
-
-        order_count = 0
-
+        # Cancelar ordens abertas
         await cancel_all_oco_orders(client, symbol)
         
-        saldo_inicial_usdt = await get_usdt_balance(client)
-        saldo_atual_usdt = saldo_inicial_usdt  # Começa com o saldo inicial
-        print(f"\nSaldo Inicial em USDT: 💰 \033[1;36m${saldo_inicial_usdt:.2f}\033[0m")
-        message = f"\nSaldo Inicial em USDT: 💰 <b>${saldo_inicial_usdt:.2f}</b>"
-        send_telegram_message(bot_token, chat_id, message)
-        
-        last_operation_time = datetime.now() # Inicializa o tempo da última operação
-        
-        while True:            
-            if quantia_usdt_investimento_inicial is None:
-                try:
-                    quantia_usdt_investimento_inicial = float(input("Digite o valor inicial em USDT: 💰\033[1;36m $"))
-                    print("\033[0m")
-                except ValueError:
-                    print("\033[0m")
-                    print("🚫 Entrada inválida. Por favor, insira um número válido.\n")
-                    continue  # Solicita novamente se a entrada não for um número
-                if quantia_usdt_investimento_inicial > saldo_inicial_usdt:
-                        print("🚫 Saldo insuficiente para o investimento atual.\n")
-                        quantia_usdt_investimento_inicial = None
-                        continue
-                else:
-                    message = f"Quantia inicial de USDT investida: 💰 <b>${quantia_usdt_investimento_inicial:.2f}</b>"
-                    send_telegram_message(bot_token, chat_id, message)
-                    break
-            else:
-                print(f"\nUsando o valor inicial de USDT salvo: 💰 \033[1;36m${quantia_usdt_investimento_inicial:.2f}\033[0m\n")
-                message = f"Usando o valor inicial de USDT salvo: 💰 <b>${quantia_usdt_investimento_inicial:.2f}</b>"
-                send_telegram_message(bot_token, chat_id, message)
-                break
-            
-        async with bsm.user_socket() as um:
-            macd_current = 0
-            signal_line_current = 0
-            lower_band = 0
-            middle_band = 0
-            upper_band = 0
-            vwap = 0
-            candle_open = 0
-            candle_high = 0
-            candle_low = 0
-            candle_close = 0
-            candle_volume = 0
-            variation_24h = 0
-            candle_variation = 0
-            ema7 = 0
-            ema15 = 0
-            ema25 = 0
-            ema50 = 0
-            ema100 = 0
-            ema200 = 0
-            
-            while True:
-                closes = await get_closes(client, symbol)
-                volumes = await get_volumes(client, symbol) # Pega os volumes das velas
-                
-                rsi = calculate_rsi(closes)
-                
-                volumes_series = pd.Series(volumes)  # Converte diretamente para uma Series do Pandas
-                volume_ma = volumes_series.dropna().rolling(window=8).mean().iloc[-1]
-                
-                macd_current, signal_line_current = calculate_macd(closes)
-                lower_band, middle_band, upper_band = calculate_bollinger_bands(closes)
-                
-                #Novo indicador
-                vwap = calculate_vwap(closes, volumes)
-                
-                msg_rsi = f"📊 RSI Atual para {symbol}: \033[1;33m{rsi:.1f}\033[0m"
-                print(f"\r{msg_rsi}", end='', flush=True)
-                await asyncio.sleep(0.6)
-                print("\033[2K\r", end='')
-                
-                await asyncio.sleep(0.15)
-                
-                if symbol == "ADAUSDT" or symbol == "DOGEUSDT":
-                    msg_macd = f"📊 MACD Atual para {symbol}: \033[1;33m{macd_current:.4f}\033[0m, Linha de sinal: \033[1;33m{signal_line_current:.4f}\033[0m"
-                else:
-                    msg_macd = f"📊 MACD Atual para {symbol}: \033[1;33m{macd_current:.2f}\033[0m, Linha de sinal: \033[1;33m{signal_line_current:.2f}\033[0m"
-                print(f"\r{msg_macd}", end='', flush=True)
-                await asyncio.sleep(0.6)
-                print("\033[2K\r", end='')
-                
-                await asyncio.sleep(0.15)
-                
-                if symbol == "ADAUSDT" or symbol == "DOGEUSDT":
-                    msg_bb = f"📊 Bandas de Bollinger para {symbol}: Inferior: \033[1;31m${lower_band:.4f}\033[0m, Média: \033[1;33m${middle_band:.4f}\033[0m, Superior: \033[1;32m${upper_band:.4f}\033[0m"
-                else:
-                   msg_bb = f"📊 Bandas de Bollinger para {symbol}: Inferior: \033[1;31m${lower_band:.2f}\033[0m, Média: \033[1;33m${middle_band:.2f}\033[0m, Superior: \033[1;32m${upper_band:.2f}\033[0m"
-                print(f"\r{msg_bb}", end='', flush=True)
-                await asyncio.sleep(0.6)
-                print("\033[2K\r", end='')
-                
-                await asyncio.sleep(0.15)
-                
-                msg_vwap = f"📊 VWAP Atual para {symbol}: \033[1;33m{vwap:.2f}\033[0m"
-                print(f"\r{msg_vwap}", end='', flush=True)
-                await asyncio.sleep(0.6)
-                print("\033[2K\r", end='')
-                
-                await asyncio.sleep(0.15)
+        # Obter precisão do símbolo
+        symbol_info = await client.get_symbol_info(symbol)
+        tick_size = float(next(filter for filter in symbol_info['filters'] if filter['filterType'] == 'PRICE_FILTER')['tickSize'])
+        min_price_move = tick_size # Assuming min_price_move is tick_size
+        quote_precision = int(symbol_info['quoteAssetPrecision'])
 
-                if volumes_series.iloc[-1] > volume_ma * (1 + volume_avg / 100):
-                    msg = f"⚠️ Alto volume detectado, possível \033[1;33mvolatilidade de mercado\033[0m. Operação suspensa."
-                    # Imprime a nova mensagem
-                    print(f"\r{msg}", end='', flush=True)
-                    # Espera um breve momento antes de limpar a linha novamente
-                    await asyncio.sleep(0.6)
-                    # Limpa a linha anterior
-                    print("\033[2K\r", end='')
-                    await asyncio.sleep(0.15)
+        # Loop principal
+        while bot_running:
+            # Fetch klines once per iteration
+            try:
+                klines = await get_klines(client, symbol, TRADING_CONFIG['interval'], TRADING_CONFIG['limit'])
+                if not klines:
+                    log("Erro ao obter klines, tentando novamente...")
+                    await asyncio.sleep(5)
                     continue
+            except Exception as e:
+                log(f"Erro ao obter klines: {e}")
+                await asyncio.sleep(5)
+                continue
+
+            closes = extract_closes(klines)
+            volumes = extract_volumes(klines)
+            
+            rsi = calculate_rsi(closes)
+            
+            volumes_series = pd.Series(volumes)
+            volume_ma = volumes_series.dropna().rolling(window=8).mean().iloc[-1]
+            
+            macd_current, signal_line_current = calculate_macd(closes)
+            lower_band, middle_band, upper_band = calculate_bollinger_bands(closes)
+            
+            vwap = calculate_vwap(closes, volumes)
+            
+            # ... (prints unchanged) ...
+            msg_rsi = f"📊 RSI Atual para {symbol}: \033[1;33m{rsi:.1f}\033[0m"
+            status(msg_rsi)
+            await asyncio.sleep(0.6)
+            # log("\033[2K\r", end='') # Avoid clearing line in logs for now, or handle differently
+            await asyncio.sleep(0.15)
+            
+            if symbol == "ADAUSDT" or symbol == "DOGEUSDT":
+                msg_macd = f"📊 MACD Atual para {symbol}: \033[1;33m{macd_current:.4f}\033[0m, Linha de sinal: \033[1;33m{signal_line_current:.4f}\033[0m"
+            else:
+                msg_macd = f"📊 MACD Atual para {symbol}: \033[1;33m{macd_current:.2f}\033[0m, Linha de sinal: \033[1;33m{signal_line_current:.2f}\033[0m"
+            status(msg_macd)
+            await asyncio.sleep(0.6)
+            # log("\033[2K\r", end='')
+            await asyncio.sleep(0.15)
+            
+            if symbol == "ADAUSDT" or symbol == "DOGEUSDT":
+                msg_bb = f"📊 Bandas de Bollinger para {symbol}: Inferior: \033[1;31m${lower_band:.4f}\033[0m, Média: \033[1;33m${middle_band:.4f}\033[0m, Superior: \033[1;32m${upper_band:.4f}\033[0m"
+            else:
+               msg_bb = f"📊 Bandas de Bollinger para {symbol}: Inferior: \033[1;31m${lower_band:.2f}\033[0m, Média: \033[1;33m${middle_band:.2f}\033[0m, Superior: \033[1;32m${upper_band:.2f}\033[0m"
+            status(msg_bb)
+            await asyncio.sleep(0.6)
+            # log("\033[2K\r", end='')
+            await asyncio.sleep(0.15)
+            
+            msg_vwap = f"📊 VWAP Atual para {symbol}: \033[1;33m{vwap:.2f}\033[0m"
+            status(msg_vwap)
+            await asyncio.sleep(0.6)
+            # log("\033[2K\r", end='')
+            await asyncio.sleep(0.15)
+
+            if volumes_series.iloc[-1] > volume_ma * (1 + TRADING_CONFIG['volume_avg'] / 100):
+                msg = f"⚠️ Alto volume detectado, possível \033[1;33mvolatilidade de mercado\033[0m. Operação suspensa."
+                status(msg)
+                await asyncio.sleep(0.6)
+                # log("\033[2K\r", end='')
+                await asyncio.sleep(0.15)
+                continue
+                
+            # Pass klines to functions
+            trend_is_up = check_trend(klines) # Sync call now
+            candle_patterns = check_candle_patterns(klines) # Sync call now
+            
+            market_downward = is_market_downward(klines) # Sync call now
+            
+            await check_rsi_reset(symbol, log=log)
+            
+            # Pass klines to should_buy
+            if await should_place_order(client, symbol, status_callback=status) and not market_downward:
+                
+                candle_details = get_candle_details(klines) # Sync call now
+                if candle_details:
+                    candle_open = candle_details['open']
+                    candle_high = candle_details['high']
+                    candle_low = candle_details['low']
+                    candle_close = candle_details['close']
+                    candle_volume = candle_details['volume']
+                    amplitude = ((candle_high - candle_low) / candle_open) * 100 if candle_open !=0 else 0
+                else:
+                    candle_open = 0
+                    candle_high = 0
+                    candle_low = 0
+                    candle_close = 0
+                    candle_volume = 0
+                    amplitude = 0
                     
-                trend_is_up = await check_trend(client, symbol)
-                candle_patterns = await check_candle_patterns(client, symbol, interval, limit)  # Chamada da função de padrões de candle
-                
-                # Verifica se o mercado está em tendência de baixa
-                market_downward = await is_market_downward(client, symbol, interval)
-                
-                #Verifica o tempo desde a ultima operação
-                await check_rsi_reset(symbol)
-                
-                if await should_place_order(client, symbol) and not market_downward:
-                    
-                    # Busca detalhes da candle da operação para registro em planilha e para ter detalhes das operações
-                    candle_details = await get_candle_details(client, symbol, interval, limit)
-                    if candle_details:
-                        candle_open = candle_details['open']
-                        candle_high = candle_details['high']
-                        candle_low = candle_details['low']
-                        candle_close = candle_details['close']
-                        candle_volume = candle_details['volume']
-                        # Calcula amplitude
-                        amplitude = ((candle_high - candle_low) / candle_open) * 100 if candle_open !=0 else 0
-                    else: # Pega esses valores caso a API de erro, pra garantir que o bot não quebre
-                        candle_open = 0
-                        candle_high = 0
-                        candle_low = 0
-                        candle_close = 0
-                        candle_volume = 0
-                        amplitude = 0
+                # Calculate variation 24h
+                try:
+                    if len(klines) >= 25:
+                        price_24h_ago = float(klines[-25][4])
+                        candle_variation = ((candle_close - candle_open) / candle_open) * 100 if candle_open != 0 else 0
                         
-                    # Pega o preço do candle de 24h atrás para usar na variação
-                    try:
-                        klines_24h = await get_klines(client, symbol, interval, 24) #pega o preço de fechamento do candle de 24h atras em ms, e o atual
-                        if klines_24h and len(klines_24h) >= 24:  # Para evitar erros do codigo caso ele nao consiga pegar os dados
-                            price_24h_ago = float(klines_24h[0][4]) if klines_24h else 0  # o valor que queremos para usar no calculo é o candle anterior ao atual
-                            candle_variation = ((candle_close - candle_open) / candle_open) * 100 if candle_open != 0 else 0 # calculo variacao percentual de preço da vela
-                            
-                            ema7 = calculate_ema(closes, 7)
-                            ema15 = calculate_ema(closes, 15)
-                            ema25 = calculate_ema(closes, 25)
-                            ema50 = calculate_ema(closes, 50)
-                            ema100 = calculate_ema(closes, 100)
-                            ema200 = calculate_ema(closes, 200)
-                        else:
-                            price_24h_ago = 0  # Caso a api de problema ou algo de errado, seta para 0
-                            candle_variation = 0
-                            ema7 = 0
-                            ema15 = 0
-                            ema25 = 0
-                            ema50 = 0
-                            ema100 = 0
-                            ema200 = 0
-                        # Garante que price_now seja definido mesmo se klines_24h não atender à condição
-                        price_now = closes[-1] if closes else 0
-                        variation_24h = ((price_now - price_24h_ago) / price_24h_ago) * 100 if price_24h_ago != 0 else 0
-                    
-                    except Exception as e: # caso de algum erro, os valores devem continuar como 0 pra que o programa não quebre
+                        ema7 = calculate_ema(closes, 7)
+                        ema15 = calculate_ema(closes, 15)
+                        ema25 = calculate_ema(closes, 25)
+                        ema50 = calculate_ema(closes, 50)
+                        ema100 = calculate_ema(closes, 100)
+                        ema200 = calculate_ema(closes, 200)
+                    else:
                         price_24h_ago = 0
-                        variation_24h = 0
                         candle_variation = 0
                         ema7 = 0
                         ema15 = 0
@@ -373,23 +372,40 @@ async def run_bot():
                         ema50 = 0
                         ema100 = 0
                         ema200 = 0
-                        print(f"\nErro ao buscar dados para variação de 24h: {e}")
                     
-                    # Dentro do loop principal em main.py
-                    buy_result = await should_buy(rsi, trend_is_up, macd_current, signal_line_current, closes[-1], lower_band, middle_band, upper_band, vwap, candle_patterns, candle_open, candle_high, 
-                                                  candle_low, candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, symbol)
-                    if buy_result["buy"]:  # Verifica as condições de compra
-                        executed_condition = buy_result["message"]  # Atribui a mensagem da condição atendida
-                        
-                        print("### ------------------------- ###")
-                        print(f"🟢 RSI: \033[1;32m{rsi:.1f}\033[0m, \033[1;32msinal de compra\033[0m encontrado!")
-                        ticker = await client.get_symbol_ticker(symbol=symbol)
-                        current_price = float(ticker['price'])
-                        if current_price < 1:
-                            print(f"\nPreço Atual: 📈 \033[1;33m${current_price:.4f}\033[0m\n")
-                        else:
-                            print(f"\nPreço Atual: 📈 \033[1;33m${current_price:.2f}\033[0m\n")
-                        
+                    price_now = closes[-1] if closes else 0
+                    variation_24h = ((price_now - price_24h_ago) / price_24h_ago) * 100 if price_24h_ago != 0 else 0
+                
+                except Exception as e:
+                    price_24h_ago = 0
+                    variation_24h = 0
+                    candle_variation = 0
+                    ema7 = 0
+                    ema15 = 0
+                    ema25 = 0
+                    ema50 = 0
+                    ema100 = 0
+                    ema200 = 0
+                    log(f"\nErro ao calcular variação de 24h: {e}")
+                
+                # Pass klines to should_buy
+                buy_result = await should_buy(rsi, trend_is_up, macd_current, signal_line_current, closes[-1], lower_band, middle_band, upper_band, vwap, candle_patterns, candle_open, candle_high, 
+                                              candle_low, candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, symbol, klines)
+                
+                if buy_result["buy"]:
+                    executed_condition = buy_result["message"]
+                    
+                    log("### ------------------------- ###")
+                    log(f"🟢 RSI: \033[1;32m{rsi:.1f}\033[0m, \033[1;32msinal de compra\033[0m encontrado!")
+                    ticker = await client.get_symbol_ticker(symbol=symbol)
+                    current_price = float(ticker['price'])
+                    if current_price < 1:
+                        log(f"\nPreço Atual: 📈 \033[1;33m${current_price:.4f}\033[0m\n")
+                    else:
+                        log(f"\nPreço Atual: 📈 \033[1;33m${current_price:.2f}\033[0m\n")
+                    
+                    # Start socket context ONLY when buying
+                    async with bsm.user_socket() as um:
                         order_count += 1
                         
                         compra = await client.order_market_buy(symbol=symbol, quoteOrderQty=round(quantia_usdt_investimento_inicial, quote_precision))
@@ -398,33 +414,32 @@ async def run_bot():
                         timestamp = datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
                         price_rounded = round(price, 4) if price < 1 else round(price, 2)
                         
-                        print(f"✅️ \033[1;36m({order_count:02d})\033[0m Comprado: Moeda: \033[1;33m{symbol}\033[0m, Quantidade da Moeda: \033[1;33m{executed_qty}\033[0m, Preço: \033[1;33m${price_rounded}\033[0m \033[1;36m({timestamp})\033[0m\n")
-                        winsound.Beep(800, 1500) # Purchased: Coin.
+                        log(f"✅️ \033[1;36m({order_count:02d})\033[0m Comprado: Moeda: \033[1;33m{symbol}\033[0m, Quantidade da Moeda: \033[1;33m{executed_qty}\033[0m, Preço: \033[1;33m${price_rounded}\033[0m \033[1;36m({timestamp})\033[0m\n")
+                        # winsound.Beep(800, 1500) # Purchased: Coin.
                         message = f"✅️ ({order_count:02d}) <b>Comprado</b>: Moeda: <b>{symbol}</b>, Quantidade da Moeda: <b>{executed_qty}</b>, Preço: <b>${price_rounded} ({timestamp})</b>"
-                        send_telegram_message(bot_token, chat_id, message)
+                        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
                         purchase_timestamp = timestamp
                         
-                        print(executed_condition)
+                        log(executed_condition)
                         
-                        if candle_patterns:  # Verifica se a lista não está vazia
+                        if candle_patterns:
                             if len(candle_patterns) == 1:
-                                print(f"\nPadrões de candle: {candle_patterns[0]}")  # Imprime apenas o elemento
+                                log(f"\nPadrões de candle: {candle_patterns[0]}")
                             else:
-                                print(f"\nPadrões de candle: {', '.join(candle_patterns)}")  # Imprime a lista com elementos separados por vírgula
+                                log(f"\nPadrões de candle: {', '.join(candle_patterns)}")
                         else:
-                            print("\nPadrões de candle: Nenhum encontrado")
+                            log("\nPadrões de candle: Nenhum encontrado")
                             
-                        # Busca detalhes da candle da operação para registro em planilha e para ter detalhes das operações
-                        candle_details = await get_candle_details(client, symbol, interval, limit)
+                        # Recalculate details for log (using same klines is fine, or fetch new? Using same is safer/faster)
+                        candle_details = get_candle_details(klines)
                         if candle_details:
                             candle_open = candle_details['open']
                             candle_high = candle_details['high']
                             candle_low = candle_details['low']
                             candle_close = candle_details['close']
                             candle_volume = candle_details['volume']
-                            # Calcula amplitude
                             amplitude = ((candle_high - candle_low) / candle_open) * 100 if candle_open !=0 else 0
-                        else: # Pega esses valores caso a API de erro, pra garantir que o bot não quebre
+                        else:
                             candle_open = 0
                             candle_high = 0
                             candle_low = 0
@@ -432,22 +447,18 @@ async def run_bot():
                             candle_volume = 0
                             amplitude = 0
                             
-                        # Pega o preço do candle de 24h atrás para usar na variação
+                        # Variation 24h (using klines)
                         try:
-                            klines_24h = await get_klines(client, symbol, interval, 2) #pega o preço de fechamento do candle de 24h atras em ms, e o atual
-                            if klines_24h and len(klines_24h) >= 2:  # Para evitar erros do codigo caso ele nao consiga pegar os dados
-                                price_24h = float(klines_24h[-2][4]) if klines_24h else 0  # o valor que queremos para usar no calculo é o candle anterior ao atual
-                                variation_24h = ((current_price - price_24h) / price_24h) * 100 # calcula variacao percentual de preço nas ultimas 24 horas
+                            if len(klines) >= 25:
+                                price_24h = float(klines[-25][4])
+                                variation_24h = ((current_price - price_24h) / price_24h) * 100
                             else:
-                                price_24h = 0  # Caso a api de problema ou algo de errado, seta para 0
-                                variation_24h = 0 # seta como zero também
-                        
-                        except Exception as e: # caso de algum erro, os valores devem continuar como 0 pra que o programa não quebre
+                                price_24h = 0
+                                variation_24h = 0
+                        except Exception as e:
                             price_24h = 0
                             variation_24h = 0
-                            print(f"\nErro ao buscar dados para variação de 24h: {e}")
-
-                        # Calculo das EMAS que queremos que o bot calcule e tenha nos relatorios
+                            log(f"\nErro ao buscar dados para variação de 24h: {e}")
 
                         ema7 = calculate_ema(closes, 7)
                         ema15 = calculate_ema(closes, 15)
@@ -456,153 +467,130 @@ async def run_bot():
                         ema100 = calculate_ema(closes, 100)
                         ema200 = calculate_ema(closes, 200)
                         
-                        candle_variation = ((candle_close - candle_open) / candle_open) * 100 if candle_open != 0 else 0 # calculo variacao percentual de preço da vela
+                        candle_variation = ((candle_close - candle_open) / candle_open) * 100 if candle_open != 0 else 0
                         
-                        # Calcula os valores de MACD e Bollinger
                         macd_current, signal_line_current = calculate_macd(closes)
                         lower_band, middle_band, upper_band = calculate_bollinger_bands(closes)
                         
-                        # Obter a resposta do Gemini do resultado da função should_buy
                         gemini_response = buy_result["gemini_response"]
-                                 
-                        oco_order, limit_order_id, stop_order_id, lucro_alvo, stop_loss, stop_limit = await adjust_and_place_oco_order(client, symbol, executed_qty, tick_size, min_price_move)
+                                    
+                        oco_order, limit_order_id, stop_order_id, lucro_alvo, stop_loss, stop_limit = await adjust_and_place_oco_order(client, symbol, executed_qty, tick_size, min_price_move, klines)
                         
-                        # Atualiza o tempo da última operação
                         last_operation_time = datetime.now()
                         
                         # Await OCO order completion
                         while True:
-                            msg = await um.recv()
+                            try:
+                                msg = await asyncio.wait_for(um.recv(), timeout=60) # Add timeout to avoid hanging forever if socket silent
+                            except asyncio.TimeoutError:
+                                continue # Keep waiting
+
                             if msg.get('e') == 'listStatus' and msg.get('s') == symbol and msg.get('g') == oco_order['orderListId']:
                                 if 'ALL_DONE' in msg.get('l'):
-                                    # Busca os detalhes das ordens executadas
                                     limit_order_details = await get_order_details(client, symbol, limit_order_id)
                                     stop_order_details = await get_order_details(client, symbol, stop_order_id)
 
-                                    # Atualize total_difference depois de chamar process_order_details
-                                    # Posição correta dos argumentos (symbol como primeiro argumento)
                                     symbol, order_result, trade_result, novo_saldo_usdt, oco_timestamp, fee, trade_result_liquid = await process_order_details(symbol, client, limit_order_details, 
-                                                                                                                                                               stop_order_details, price, executed_qty, 
-                                                                                                                                                               quantia_usdt_investimento_inicial)
+                                                                                                                                                                stop_order_details, price, executed_qty, 
+                                                                                                                                                                quantia_usdt_investimento_inicial)
 
-                                    # Atualiza o saldo atual e a diferença total
                                     saldo_atual_usdt = novo_saldo_usdt
-                                    total_difference += trade_result  # Acumula os resultados ao total (usando trade_result bruto)
-                                    total_difference_liquid += trade_result_liquid  # Acumula os resultados líquidos ao total
-                                    quantia_usdt_investimento_inicial = saldo_atual_usdt  # Atualiza o montante para reinvestimento (usando novo_saldo_usdt, que considera o resultado bruto)
+                                    total_difference += trade_result
+                                    total_difference_liquid += trade_result_liquid
+                                    quantia_usdt_investimento_inicial = saldo_atual_usdt
                                     
-                                    # Obter saldo de BNB e converter para USDT
                                     bnb_balance = await client.get_asset_balance(asset='BNB')
                                     bnb_balance = float(bnb_balance['free'])
-                                    bnb_price_usdt = await get_bnb_price(client) # Utilize a nova função para obter o preço do BNB
+                                    bnb_price_usdt = await get_bnb_price(client)
                                     bnb_balance_usdt = bnb_balance * bnb_price_usdt
                                     
                                     if order_result:
-                                        # Registra os resultados no log e envia mensagens
                                         log_and_notify_results(order_result, symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_usdt)
                                         
-                                        # Salva resultados na planilha Excel
                                         data_row = create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_inicial, symbol,
                                                                     executed_qty, price_rounded, purchase_timestamp, lucro_alvo, stop_loss, stop_limit,
                                                                     order_result, oco_timestamp, trade_result, total_difference, saldo_atual_usdt,
                                                                     rsi, executed_condition, vwap, candle_open, candle_high, candle_low, candle_close, candle_volume, 
-                                                                    variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, volume_avg, 
+                                                                    variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, TRADING_CONFIG['volume_avg'], 
                                                                     amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid,
                                                                     total_difference_liquid, gemini_response, bnb_balance_usdt)
-                                        save_to_excel(data_row)
+                                        save_to_csv(data_row)
                                     
-                                        print(f"Saldo atual investido em USDT: \033[1;36m${quantia_usdt_investimento_inicial:.2f}\033[0m\n")
+                                        log(f"Saldo atual investido em USDT: \033[1;36m${quantia_usdt_investimento_inicial:.2f}\033[0m\n")
                                         message_2 = f'Saldo atual investido em USDT: <b>${quantia_usdt_investimento_inicial:.2f}</b>'
-                                        send_telegram_message(bot_token, chat_id, message_2)
+                                        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message_2)
                                         
                                         last_operation_time = datetime.now()
                                         
                                         await asyncio.sleep(0.2)
                                         
-                                        # Verifica o status das ordens para atualizar contadores e gerenciar pausas
                                         if stop_order_details['status'] == 'FILLED':
                                             stop_loss_count += 1
                                             last_stop_loss_time = datetime.now()
-                                            await check_stop_losses(last_stop_loss_time)  # Passa o tempo atual para a função de pausa
+                                            await check_stop_losses(last_stop_loss_time, log=log)
                                         elif limit_order_details['status'] == 'FILLED':
-                                            # Reseta o contador de stop losses se uma ordem de lucro for executada
                                             stop_loss_count = 0
                                             last_stop_loss_time = None
 
-                                        break # Sai do loop após processar os detalhes da ordem
-                                
-                    elif should_sell(rsi, trend_is_up, macd_current, signal_line_current, closes[-1], lower_band, vwap):
-                        ticker = await client.get_symbol_ticker(symbol=symbol)
-                        current_price = float(ticker['price'])
-                        if current_price < 1:
-                            current_price = round(current_price, 4)
-                        else:
-                            current_price = round(current_price, 2)
-                        msg = f"🔴 Os sinais indicam condições potenciais de \033[1;31mvenda\033[0m para {symbol}. RSI: \033[1;31m{rsi:.1f}\033[0m, Preço Atual: \033[1;33m${current_price}\033[0m"
-                        # Imprime a nova mensagem
-                        print(f"\r{msg}", end='', flush=True)
-                        # Espera um breve momento antes de limpar a linha novamente
-                        await asyncio.sleep(0.6)
-                        # Limpa a linha anterior
-                        print("\033[2K\r", end='')
-                        await asyncio.sleep(0.15)
-                        continue
+                                        break
+                            
+                elif should_sell(rsi, trend_is_up, macd_current, signal_line_current, closes[-1], lower_band, vwap):
+                    ticker = await client.get_symbol_ticker(symbol=symbol)
+                    current_price = float(ticker['price'])
+                    if current_price < 1:
+                        current_price = round(current_price, 4)
                     else:
-                        ticker = await client.get_symbol_ticker(symbol=symbol)
-                        current_price = float(ticker['price'])
-                        if current_price < 1:
-                            current_price = round(current_price, 4)
-                        else:
-                            current_price = round(current_price, 2)
-                        msg = f"🟡 \033[1;33mSem sinais claros de compra ou venda\033[0m para {symbol}. RSI: \033[1;33m{rsi:.1f}\033[0m, Preço Atual: \033[1;33m${current_price}\033[0m"
-                        # Imprime a nova mensagem
-                        print(f"\r{msg}", end='', flush=True)
-                        # Espera um breve momento antes de limpar a linha novamente
-                        await asyncio.sleep(0.6)
-                        # Limpa a linha anterior
-                        print("\033[2K\r", end='')
-                        await asyncio.sleep(0.15)
-                        continue
+                        current_price = round(current_price, 2)
+                    msg = f"🔴 Os sinais indicam condições potenciais de \033[1;31mvenda\033[0m para {symbol}. RSI: \033[1;31m{rsi:.1f}\033[0m, Preço Atual: \033[1;33m${current_price}\033[0m"
+                    status(msg)
+                    await asyncio.sleep(0.6)
+                    # log("\033[2K\r", end='')
+                    await asyncio.sleep(0.15)
+                    continue
+                else:
+                    ticker = await client.get_symbol_ticker(symbol=symbol)
+                    current_price = float(ticker['price'])
+                    if current_price < 1:
+                        current_price = round(current_price, 4)
+                    else:
+                        current_price = round(current_price, 2)
+                    msg = f"🟡 \033[1;33mSem sinais claros de compra ou venda\033[0m para {symbol}. RSI: \033[1;33m{rsi:.1f}\033[0m, Preço Atual: \033[1;33m${current_price}\033[0m"
+                    status(msg)
+                    await asyncio.sleep(0.6)
+                    # log("\033[2K\r", end='')
+                    await asyncio.sleep(0.15)
+                    continue
 
-                await asyncio.sleep(0.5)  # Short pause before checking for new orders or balance updates
+            await asyncio.sleep(0.5)
 
         await client.close_connection()
+
+    except asyncio.CancelledError:
+        log("\n🛑 Bot parado pelo usuário.")
+        message = "🛑 Bot parado pelo usuário."
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+        await client.close_connection()
+        return
             
     except BinanceAPIException as e:
-        if restart_attempts < MAX_RESTARTS:
-            restart_attempts += 1
-            if e.code == -1021:  # Código de erro para timestamp incorreto
-                print("\n⚠  Erro de timestamp detectado, tentando reiniciar o bot...")
-                message = '⚠ Erro de <b>timestamp</b> detectado, tentando reiniciar o bot...'
-                send_telegram_message(bot_token, chat_id, message)
-            else:
-                print(f"\n⚠  Erro detectado: {e}")
-                message = f'⚠ Erro detectado: <b>{e}</b>'
-                send_telegram_message(bot_token, chat_id, message)
-            print("⏱  Aguardando 5 segundos antes de reiniciar...")
-            await asyncio.sleep(2)
-            print("♻  Reiniciando o bot...")
-            message = "♻ Reiniciando o bot..."
-            send_telegram_message(bot_token, chat_id, message)
-            await run_bot()  # Tenta reiniciar o bot automaticamente
-        else:
-            print("\n🚨  Número máximo de tentativas de reinício atingido. O bot será desligado.")
-            message = "🚨 <b>Número máximo</b> de tentativas de reinício atingido. O bot será desligado."
-            send_telegram_message(bot_token, chat_id, message)
+            log(f"Erro BinanceAPI: {e}")
             exit()
         
     except Exception as e:
+        if not bot_running: # If stopped, don't restart
+            return
+
         if restart_attempts < MAX_RESTARTS:
             restart_attempts += 1
-            print(f"\n⚠  Erro inesperado: {e}, reiniciando o bot após 5 segundos...")
+            log(f"\n⚠  Erro inesperado: {e}, reiniciando o bot após 5 segundos...")
             message = f"⚠ Erro inesperado: <b>{e}</b>, reiniciando o bot após 5 segundos..."
-            send_telegram_message(bot_token, chat_id, message)
+            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
             await asyncio.sleep(5) # Adicionado tempo de espera
-            await run_bot()
+            await run_bot(log_callback, investment_amount, selected_symbol)
         else:
-            print("\n🚨  Número máximo de tentativas de reinício atingido. O bot será desligado.")
+            log("\n🚨  Número máximo de tentativas de reinício atingido. O bot será desligado.")
             message = "🚨 <b>Número máximo</b> de tentativas de reinício atingido. O bot será desligado."
-            send_telegram_message(bot_token, chat_id, message)
+            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
             exit()
 
 if __name__ == "__main__":

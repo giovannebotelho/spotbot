@@ -1,4 +1,4 @@
-from config import interval, depth, limit
+from config import TRADING_CONFIG
 
 async def get_usdt_balance(client):
     """
@@ -11,7 +11,7 @@ async def get_usdt_balance(client):
     balance = await client.get_asset_balance(asset='USDT')
     return float(balance['free'])
 
-async def get_order_book(client, symbol, depth=depth):
+async def get_order_book(client, symbol, depth=None):
     """
     Recupera o livro de ofertas (order book) para um símbolo específico com a profundidade definida.
     Args:
@@ -21,6 +21,8 @@ async def get_order_book(client, symbol, depth=depth):
     Returns:
         dict: O livro de ofertas contendo 'asks' e 'bids'.
     """
+    if depth is None:
+        depth = TRADING_CONFIG['depth']
     order_book = await client.get_order_book(symbol=symbol, limit=depth)
     return order_book
 
@@ -37,35 +39,25 @@ async def get_order_details(client, symbol, order_id):
     order_details = await client.get_order(symbol=symbol, orderId=order_id)
     return order_details
 
-async def get_closes(client, symbol, interval=interval, limit=limit):
+def extract_closes(klines):
     """
-    Obtém os preços de fechamento de velas para um símbolo específico.
+    Extrai os preços de fechamento de uma lista de velas.
     Args:
-        client (BinanceAsyncClient): O cliente conectado à API da Binance.
-        symbol (str): O símbolo de trading.
-        interval (str): O intervalo das velas (ex.: '15m').
-        limit (int): O número de velas a ser recuperado.
+        klines (list): Lista de velas (klines).
     Returns:
         list: Uma lista dos preços de fechamento das velas.
     """
-    klines = await client.get_klines(symbol=symbol, interval=interval, limit=limit)
-    closes = [float(kline[4]) for kline in klines]
-    return closes
+    return [float(kline[4]) for kline in klines]
 
-async def get_volumes(client, symbol, interval=interval, limit=limit):
+def extract_volumes(klines):
     """
-    Obtém os volumes de trading de velas para um símbolo específico.
+    Extrai os volumes de uma lista de velas.
     Args:
-        client (BinanceAsyncClient): O cliente conectado à API da Binance.
-        symbol (str): O símbolo de trading.
-        interval (str): O intervalo das velas.
-        limit (int): O número de velas a ser recuperado.
+        klines (list): Lista de velas (klines).
     Returns:
         list: Uma lista dos volumes de cada vela.
     """
-    klines = await client.get_klines(symbol=symbol, interval=interval, limit=limit)
-    volumes = [float(kline[5]) for kline in klines]  # Volume está na 6ª posição
-    return volumes
+    return [float(kline[5]) for kline in klines]
 
 async def get_klines(client, symbol, interval, limit):
     """

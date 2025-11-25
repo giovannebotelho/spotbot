@@ -4,7 +4,7 @@ import pandas as pd
 
 from trading_functions import calculate_trade_result, calculate_fee
 from telegram_integration import send_telegram_message
-from config import bot_token, chat_id
+from config import TELEGRAM_CONFIG
 
 from decision import adjust_rsi_levels
 
@@ -74,45 +74,45 @@ def log_and_notify_results(order_result, symbol, trade_result, total_difference,
     elif order_result == 'stop loss':
         print(f"⛔ Ordem OCO concluída em \033[1;31mstop loss\033[0m, Moeda: \033[1;33m{symbol}\033[0m \033[1;36m({timestamp})\033[0m")
         message = f'⛔ Ordem OCO concluída em <b>stop loss</b>, <b>Moeda: {symbol} ({timestamp})</b>'
-    send_telegram_message(bot_token, chat_id, message)
+    send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
 
     # Exibe e envia notificações sobre o resultado financeiro
     if trade_result >= 0:
         result_message = f'\nLucro Parcial Bruto: 🟢 \033[1;32m${trade_result:.2f}\033[0m\nTaxa: 🔴 \033[1;31m${fee:.2f}\033[0m\nLucro Parcial Líquido: 🟢 \033[1;32m${trade_result_liquid:.2f}\033[0m\n'
         telegram_message1 = f'Lucro Parcial Bruto: 🟢 <b>${trade_result:.2f}</b>\nTaxa: 🔴 <b>${fee:.2f}</b>\nLucro Parcial Líquido: 🟢 <b>${trade_result_liquid:.2f}</b>'
-        send_telegram_message(bot_token, chat_id, telegram_message1)
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message1)
     else:
         result_message = f'\nPrejuízo Parcial Bruto: 🔴 \033[1;31m${trade_result:.2f}\033[0m\nTaxa: 🔴 \033[1;31m${fee:.2f}\033[0m\nPrejuízo Parcial Líquido: 🔴 \033[1;31m${trade_result_liquid:.2f}\033[0m\n'
         telegram_message1 = f'Prejuízo Parcial Bruto: 🔴 <b>${trade_result:.2f}</b>\nTaxa: 🔴 <b>${fee:.2f}</b>\nPrejuízo Parcial Líquido: 🔴 <b>${trade_result_liquid:.2f}</b>'
-        send_telegram_message(bot_token, chat_id, telegram_message1)
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message1)
     print(result_message)
 
     # Notifica sobre a diferença total no saldo
     if total_difference >= 0:
         total_balance_message = f'Diferença total bruta no saldo: 🟢 \033[1;32m${total_difference:.2f}\033[0m'
         telegram_message2 = f'Diferença total bruta no saldo: 🟢 <b>${total_difference:.2f}</b>'
-        send_telegram_message(bot_token, chat_id, telegram_message2)
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message2)
     else:
         total_balance_message = f'Diferença total bruta no saldo: 🔴 \033[1;31m${total_difference:.2f}\033[0m'
         telegram_message2 = f'Diferença total bruta no saldo: 🔴 <b>${total_difference:.2f}</b>'
-        send_telegram_message(bot_token, chat_id, telegram_message2)
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message2)
     print(total_balance_message)
     
     # Adiciona a notificação sobre a diferença total líquida
     if total_difference_liquid >= 0:
         total_balance_liquid_message = f'Diferença total líquida no saldo: 🟢 \033[1;32m${total_difference_liquid:.2f}\033[0m\n'
         telegram_message3 = f'Diferença total líquida no saldo: 🟢 <b>${total_difference_liquid:.2f}</b>'
-        send_telegram_message(bot_token, chat_id, telegram_message3)
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message3)
     else:
         total_balance_liquid_message = f'Diferença total líquida no saldo: 🔴 \033[1;31m${total_difference_liquid:.2f}\033[0m\n'
         telegram_message3 = f'Diferença total líquida no saldo: 🔴 <b>${total_difference_liquid:.2f}</b>'
-        send_telegram_message(bot_token, chat_id, telegram_message3)
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message3)
     print(total_balance_liquid_message)
     
     # Exibe o saldo de BNB em USDT
     print(f"💰 Saldo BNB em USDT na carteira: \033[1;34m${bnb_balance_usdt:.2f}\033[0m")
     message = f"💰 Saldo BNB em USDT na carteira: <b>${bnb_balance_usdt:.2f}</b>"
-    send_telegram_message(bot_token, chat_id, message)
+    send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
 
     # print(f'📊 VWAP: {vwap:.2f}') #Adicionado
 
@@ -125,9 +125,7 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
     """
     Atualiza a linha de dados para incluir variáveis de configuração e salva no Excel.
     """
-    from config import rsi_low_level_0, rsi_low_level_1, rsi_low_level_2, rsi_low_level_3, rsi_low_level_4, rsi_low_level_5, rsi_high_0
-    from config import lucro_multiplier_1, lucro_multiplier_2, stop_loss_multiplier_1, stop_loss_multiplier_2
-    from config import SELL_PRESSURE_THRESHOLD_1, interval, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg
+    from config import RSI_CONFIG, OCO_CONFIG, TRADING_CONFIG
 
     return {
         "Índice da Ordem": order_count,
@@ -138,8 +136,8 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
         "Preço de Compra": price_rounded,
         "VWAP": vwap,
         "EMA 7" : ema7,
-	    "EMA 15" : ema15,
-	    "EMA 25" : ema25,
+        "EMA 15" : ema15,
+        "EMA 25" : ema25,
         "EMA 50" : ema50,
         "EMA 100": ema100,
         "EMA 200": ema200,
@@ -157,9 +155,9 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
         "Saldo Final em USDT": round(saldo_atual_usdt, 2),
         "Saldo BNB em USDT": bnb_balance_usdt,
         "RSI da operação": rsi,
-	    "Condição Atendida": executed_condition,
-        "Intervalo de tempo (Candles)": interval,
-	    "Preço de Abertura (Candle)": candle_open,
+        "Condição Atendida": executed_condition,
+        "Intervalo de tempo (Candles)": TRADING_CONFIG['interval'],
+        "Preço de Abertura (Candle)": candle_open,
         "Preço Máximo (Candle)": candle_high,
         "Preço Mínimo (Candle)": candle_low,
         "Preço de Fechamento (Candle)": candle_close,
@@ -175,47 +173,44 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
         "Banda Superior BB": upper_band,
         "Tendência de Alta": trend_is_up,
         # Adicionando variáveis de configuração
-        "RSI Nível 0": rsi_low_level_0,
-        "RSI Nível 1": rsi_low_level_1,
-        "RSI Nível 2": rsi_low_level_2,
-        "RSI Nível 3": rsi_low_level_3,
-        "RSI Nível 4": rsi_low_level_4,
-        "RSI Nível 5": rsi_low_level_5,
-        "RSI Alto Nível 0": rsi_high_0,
-        "Multiplicador de Lucro (Preço < 1)": lucro_multiplier_1,
-        "Multiplicador de Stop Loss (Preço < 1)": stop_loss_multiplier_1,
-        "Multiplicador de Lucro (Preço >= 1)": lucro_multiplier_2,
-        "Multiplicador de Stop Loss (Preço >= 1)": stop_loss_multiplier_2,
-	    "Limiar de pressão de venda": SELL_PRESSURE_THRESHOLD_1,
-	    "Período de cálculo do RSI e médias móveis": period,
-	    "Número desvios padrões Bollinger": num_std,
-	    "Período curto cálculo média móvel <> tendência": short_period,
-	    "Período longo cálculo média móvel <> tendência": long_period,
-	    "Limite dados históricos para recuperar de uma vez": limit,
-	    "Profundidade do livro de ofertas": depth,
-	    "Tamanho máximo para deque": maxlen,
-	    "Condicional volume": volume_avg,
+        "RSI Nível 0": RSI_CONFIG['levels'][0],
+        "RSI Nível 1": RSI_CONFIG['levels'][1],
+        "RSI Nível 2": RSI_CONFIG['levels'][2],
+        "RSI Nível 3": RSI_CONFIG['levels'][3],
+        "RSI Nível 4": RSI_CONFIG['levels'][4],
+        "RSI Nível 5": RSI_CONFIG['levels'][5],
+        "RSI Alto Nível 0": RSI_CONFIG['high'],
+        "Multiplicador de Lucro (Preço < 1)": OCO_CONFIG['price_under_1']['profit_multiplier'],
+        "Multiplicador de Stop Loss (Preço < 1)": OCO_CONFIG['price_under_1']['stop_loss_multiplier'],
+        "Multiplicador de Lucro (Preço >= 1)": OCO_CONFIG['price_over_1']['profit_multiplier'],
+        "Multiplicador de Stop Loss (Preço >= 1)": OCO_CONFIG['price_over_1']['stop_loss_multiplier'],
+        "Limiar de pressão de venda": TRADING_CONFIG['sell_pressure_threshold'],
+        "Período de cálculo do RSI e médias móveis": TRADING_CONFIG['period'],
+        "Número desvios padrões Bollinger": TRADING_CONFIG['num_std'],
+        "Período curto cálculo média móvel <> tendência": TRADING_CONFIG['short_period'],
+        "Período longo cálculo média móvel <> tendência": TRADING_CONFIG['long_period'],
+        "Limite dados históricos para recuperar de uma vez": TRADING_CONFIG['limit'],
+        "Profundidade do livro de ofertas": TRADING_CONFIG['depth'],
+        "Tamanho máximo para deque": TRADING_CONFIG['maxlen'],
+        "Condicional volume": TRADING_CONFIG['volume_avg'],
         "Resposta do Gemini": gemini_response if gemini_response is not None else "N/A", # Adiciona a resposta do Gemini à linha de dados
     }
-  
-def save_to_excel(data_row):
+
+def save_to_csv(data_row):
     """
-    Salva os resultados das transações em uma planilha Excel para futura referência.
+    Salva os resultados das transações em um arquivo CSV para futura referência.
     Args:
         data_row (dict): Dados da transação a serem salvos.
     """
-    filename = "results.xlsx"
+    filename = "results.csv"
     filepath = Path(__file__).parent / filename  # Salva na mesma pasta do script
 
     # Cria um DataFrame a partir do dicionário data_row
     new_row_df = pd.DataFrame([data_row])
 
     if filepath.exists():
-        # Carrega o DataFrame existente
-        df = pd.read_excel(filepath, index_col=0)
-        # Usa concat ao invés de append
-        df = pd.concat([df, new_row_df], ignore_index=True)
+        # Se o arquivo já existe, adiciona sem cabeçalho
+        new_row_df.to_csv(filepath, mode='a', header=False, index=False)
     else:
-        df = new_row_df
-
-    df.to_excel(filepath)
+        # Se o arquivo não existe, cria com cabeçalho
+        new_row_df.to_csv(filepath, mode='w', header=True, index=False)
