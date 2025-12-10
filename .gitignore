@@ -1,17 +1,9 @@
 # Pastas
 __pycache__/
 
-.vscode/
-
-BKPs/
-
-doc/
+prints/
 
 env_spotbot/
-
-ref/
-
-VirtualBox VMs/
 
 # Arquivos de configuração local
 .env
@@ -27,6 +19,3 @@ VirtualBox VMs/
 *.pyc
 *.pyo
 last_sync_time.txt
-
-# Outros/testes
-mouse_position.py
