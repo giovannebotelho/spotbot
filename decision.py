@@ -144,14 +144,14 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
             asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
         return {"buy": True, "message": "RSI_lvl4, tendência, VWAP e MACD", "candle_data": "", "gemini_response": None}
 
-    elif gemini_buy_signal and rsi_low_level5:
+    elif gemini_buy_signal and gemini_buy_signal.get('action') is True and rsi_low_level5:
         if not silent:
             print("\nEntrando na condição 5 de compra: Sinal de COMPRA do Gemini e RSI")
             message = "Entrando na <b>condição 5</b> de compra: <b>Sinal de COMPRA do Gemini e RSI</b>"
             asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
-        return {"buy": True, "message": "Gemini Buy Signal e RSI", "candle_data": "", "gemini_response": gemini_response}
+        return {"buy": True, "message": "Gemini Buy Signal e RSI", "candle_data": "", "gemini_analysis": gemini_buy_signal}
 
-    return {"buy": False, "message": None, "candle_data": "", "gemini_response": gemini_response}
+    return {"buy": False, "message": None, "candle_data": "", "gemini_analysis": gemini_buy_signal}
 
 async def get_gemini_analysis(candle_data, candle_patterns, rsi, macd, bollinger_bands, sell_pressure, order_book, candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation, 
                               ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, historical_trades_data,
@@ -314,15 +314,40 @@ async def adjust_and_place_oco_order(client, symbol, quantity, tick_size, min_pr
                     'orders': [{'orderId': 'SIM_STOP'}, {'orderId': 'SIM_LIMIT'}]
                 }, 'SIM_LIMIT', 'SIM_STOP', lucro_alvo, stop_loss, stop_limit
 
-            oco_order = await client.create_oco_order(
-                symbol=symbol,
-                side='SELL',
-                quantity=quantity,
-                price=f"{lucro_alvo:.{get_precision(tick_size)}f}",
-                stopPrice=f"{stop_loss:.{get_precision(tick_size)}f}",
-                stopLimitPrice=f"{stop_limit:.{get_precision(tick_size)}f}",
-                stopLimitTimeInForce='GTC'
-            )
+            # Retrieve step_size for formatting
+            lot_size_filter = next(filter for filter in symbol_info['filters'] if filter['filterType'] == 'LOT_SIZE')
+            step_size = float(lot_size_filter['stepSize'])
+            qty_str = f"{quantity:.{get_precision(step_size)}f}"
+
+            p_str = f"{lucro_alvo:.{get_precision(tick_size)}f}"
+            sl_str = f"{stop_loss:.{get_precision(tick_size)}f}"
+            
+            sl_limit_str = f"{stop_limit:.{get_precision(tick_size)}f}"
+            
+            # Use explicit parameters as in the old working code
+            # Note: create_oco_order in newer python-binance might not take **kwargs nicely if signatures changed, 
+            # but the error 'Mandatory parameter aboveType' suggests we are interacting with an endpoint/method that expects this raw structure.
+            
+            params = {
+                'symbol': symbol,
+                'side': 'SELL',
+                'quantity': qty_str,
+                'aboveType': 'LIMIT_MAKER',
+                'belowType': 'STOP_LOSS_LIMIT',
+                'abovePrice': p_str,
+                'belowStopPrice': sl_str,
+                'belowPrice': sl_limit_str,
+                'belowTimeInForce': 'GTC',
+                #'timestamp': int(time.time() * 1000) # Library usually handles timestamp, but old code added it. Let's omit first to avoid conflict, or add if fails.
+            }
+            
+            if not silent:
+                print(f"DEBUG: OCO Params (Manual): {params}")
+
+            oco_order = await client.create_oco_order(**params)
+            
+            # Since we removed stopLimit, the response might not have 'stopLimitPrice'.
+            # Adjust return values or usage accordingly if needed.
 
             order_list_id = oco_order.get('orderListId', 'N/A')
             limit_order_id = oco_order['orders'][1]['orderId']

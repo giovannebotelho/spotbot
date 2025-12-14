@@ -209,3 +209,59 @@ class DatabaseManager:
             
         except Exception as e:
             print(f"Error migrating CSV: {e}")
+
+    def get_stats(self):
+        """Calculates total trades, win rate, and total net profit."""
+        self.connect()
+        cursor = self.conn.cursor()
+        
+        try:
+            cursor.execute("SELECT COUNT(*) FROM trades")
+            total_trades = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT COUNT(*) FROM trades WHERE oco_result = 'profit'")
+            wins = cursor.fetchone()[0]
+            
+            cursor.execute("SELECT SUM(trade_result_net) FROM trades")
+            result = cursor.fetchone()[0]
+            total_net_profit = result if result is not None else 0.0
+            
+            win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
+            
+            return {
+                "total_trades": total_trades,
+                "wins": wins,
+                "losses": total_trades - wins,
+                "win_rate": win_rate,
+                "total_net_profit": total_net_profit
+            }
+        except Exception as e:
+            print(f"Error getting stats: {e}")
+            return {
+                "total_trades": 0,
+                "wins": 0,
+                "losses": 0,
+                "win_rate": 0,
+                "total_net_profit": 0.0
+            }
+        finally:
+            self.close()
+
+    def get_equity_data(self):
+        """Returns timestamps and final balances for the equity chart."""
+        self.connect()
+        cursor = self.conn.cursor()
+        try:
+            # We want buy_timestamp and final_balance_usdt
+            # Maybe limit to last 100 to avoid clutter if needed, but let's take all for now
+            cursor.execute("SELECT buy_timestamp, final_balance_usdt FROM trades ORDER BY id ASC")
+            rows = cursor.fetchall()
+            
+            # Helper to clean timestamp if needed, but assuming standard format
+            data = [{"time": row[0], "balance": row[1]} for row in rows]
+            return data
+        except Exception as e:
+            print(f"Error getting equity data: {e}")
+            return []
+        finally:
+            self.close()

@@ -8,7 +8,7 @@ load_dotenv()
 
 def send_data_to_gemini(candle_data, candle_patterns, rsi, macd, bollinger_bands, sell_pressure, order_book, candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation, 
                         ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, historical_trades_data,
-                        api_key, model_name="gemini-flash-latest"):
+                        api_key, model_name="gemini-2.0-flash-lite"):
     """Envia os dados das velas, padrões e indicadores para a API do Gemini usando o SDK."""
     
     from datetime import datetime
@@ -123,16 +123,25 @@ def interpret_gemini_response(response_text):
 
         if sinal == "COMPRA":
             print("🟢 Sinal de \033[1;32mCOMPRA\033[0m recebido do Gemini.\n")
-            time.sleep(1)
-            return True
+            return {
+                'action': True,
+                'signal': 'COMPRA',
+                'justification': justificativa
+            }
         elif sinal == "VENDA":
             print("🔴 Sinal de \033[1;31mVENDA\033[0m recebido do Gemini.\n")
-            time.sleep(55)
-            return False
+            return {
+                'action': False,
+                'signal': 'VENDA',
+                'justification': justificativa
+            }
         else:
             print("🟡 Sinal \033[1;33mNEUTRO\033[0m recebido do Gemini.\n")
-            time.sleep(55)
-            return None
+            return {
+                'action': None,
+                'signal': 'NEUTRO', 
+                'justification': justificativa
+            }
 
     except json.JSONDecodeError:
         print(f"Erro ao decodificar JSON do Gemini: {response_text}")

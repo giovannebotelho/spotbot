@@ -8,10 +8,10 @@ from binance import AsyncClient as BinanceAsyncClient
 from binance.exceptions import BinanceAPIException
 
 from config import API_KEYS, TELEGRAM_CONFIG, TRADING_CONFIG, RSI_CONFIG
-from pre_start import synchronize_time, escolher_simbolo, cancel_all_oco_orders
+from pre_start import escolher_simbolo, cancel_all_oco_orders
 from binance_api import extract_closes, extract_volumes, get_usdt_balance, get_order_details, get_klines, get_bnb_price
 from trading_functions import calculate_rsi, calculate_macd, calculate_bollinger_bands, check_trend, check_candle_patterns, calculate_vwap, get_candle_details, calculate_ema, is_market_downward
-from decision import should_place_order, should_buy, should_sell, adjust_and_place_oco_order
+from decision import should_place_order, should_buy, should_sell, adjust_and_place_oco_order, get_min_notional
 from post_trade import process_order_details, log_and_notify_results, create_data_row, save_to_csv
 from telegram_integration import send_telegram_message
 from telegram_bot import TelegramBot
@@ -60,6 +60,16 @@ bot_status_data = {
     "action": "Iniciando...",
     "trend": "N/A"
 
+}
+
+# New: Shared Market Data for Dashboard (Charts)
+shared_market_data = {
+    "klines": [],     # List of [time, open, close, low, high]
+    "dates": [],      # List of timestamps
+    "bb_upper": [],
+    "bb_lower": [],
+    "bb_middle": [],
+    "ema200": []
 }
 
 def remove_ansi_codes(text):
@@ -252,7 +262,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
     message = "<b>🚀 Bot iniciado! 🚀</b>"
     asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
     
-    synchronize_time()  # Sincroniza o tempo antes de começar
+    # synchronize_time()  # Removed as per user request
     
     # Initialize Database and Migrate if needed
     from database import DatabaseManager
@@ -366,6 +376,36 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             lower_band, middle_band, upper_band = calculate_bollinger_bands(closes)
             
             vwap = calculate_vwap(closes, volumes)
+
+            # --- Populating Shared Data for Dashboard (Moved) ---
+            try:
+                chart_limit = 50
+                if len(klines) > chart_limit:
+                    recent_klines = klines[-chart_limit:]
+                    
+                    shared_market_data['dates'] = [datetime.fromtimestamp(int(k[0])/1000).strftime('%H:%M') for k in recent_klines]
+                    # ECharts Candle: [Open, Close, Low, High]
+                    shared_market_data['klines'] = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in recent_klines]
+                    # Volume: [Value]
+                    shared_market_data['volumes'] = [float(k[5]) for k in recent_klines]
+                    
+                    s_closes = pd.Series(closes)
+                    
+                    r = s_closes.rolling(window=20)
+                    ma = r.mean()
+                    std = r.std()
+                    upper = ma + (2 * std)
+                    lower = ma - (2 * std)
+                    s_ema200 = s_closes.ewm(span=200, adjust=False).mean()
+
+                    shared_market_data['bb_upper'] = upper.tail(chart_limit).fillna(0).tolist()
+                    shared_market_data['bb_middle'] = ma.tail(chart_limit).fillna(0).tolist()
+                    shared_market_data['bb_lower'] = lower.tail(chart_limit).fillna(0).tolist()
+                    shared_market_data['ema200'] = s_ema200.tail(chart_limit).fillna(0).tolist()
+            except Exception as e:
+                pass
+                # print(f"DEBUG: Error updating shared data: {e}")
+            # ---------------------------------------------
             
             # Update Telegram Status Data
             bot_status_data['symbol'] = symbol
@@ -451,6 +491,11 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         ema50 = calculate_ema(closes, 50)
                         ema100 = calculate_ema(closes, 100)
                         ema200 = calculate_ema(closes, 200)
+
+                        # --- Populating Shared Data for Dashboard ---
+                        # MOVED TO MAIN LOOP SCOPE
+                        pass
+                        # ---------------------------------------------
                     else:
                         price_24h_ago = 0
                         candle_variation = 0
@@ -480,6 +525,15 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 buy_result = await should_buy(rsi, trend_is_up, macd_current, signal_line_current, closes[-1], lower_band, middle_band, upper_band, vwap, candle_patterns, candle_open, candle_high, 
                                               candle_low, candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, symbol, klines)
                 
+                # Update shared data with Gemini Insight if available
+                if buy_result.get('gemini_analysis'):
+                     insight = buy_result['gemini_analysis']
+                     shared_market_data['gemini_insight'] = insight
+                     
+                     # Restore log message for Gemini Buy Signal
+                     if insight.get('signal') == 'COMPRA':
+                         log(f"🟢 Sinal de \033[1;32mCOMPRA\033[0m recebido do Gemini.")
+                
                 if buy_result["buy"]:
                     executed_condition = buy_result["message"]
                     
@@ -492,6 +546,15 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     else:
                         log(f"\nPreço Atual: 📈 \033[1;33m${current_price:.2f}\033[0m\n")
                     
+                    # Check Minimum Notional
+                    min_notional = get_min_notional(symbol_info)
+                    if quantia_usdt_investimento_inicial < min_notional:
+                        log(f"⚠️ Saldo insuficiente (${quantia_usdt_investimento_inicial:.2f}) para o mínimo exigido pela Binance (${min_notional}). Operação cancelada.")
+                        message = f"⚠️ <b>Saldo insuficiente</b> (${quantia_usdt_investimento_inicial:.2f}) para o mínimo exigido (${min_notional}). Operação cancelada."
+                        asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
+                        await asyncio.sleep(5)
+                        continue
+
                     # Start socket context ONLY when buying
                     async with bsm.user_socket() as um:
                         order_count += 1

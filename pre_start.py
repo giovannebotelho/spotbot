@@ -1,53 +1,16 @@
-import os
-import subprocess
 
-from datetime import datetime, timedelta
+# from datetime import datetime, timedelta  <-- keeping date imports as they might be used elsewhere or remove if unused. Checking usage... 
+# actually datetime is used in other functions? No, looking at file content:
+# line 4: from datetime import datetime, timedelta
+# Used in read/write_last_sync_time and synchronize_time.
+# Used in cancel_all_oco_orders? No.
+# Used in escolher_simbolo? No.
+# So I can remove the imports too.
+
 from binance.exceptions import BinanceAPIException
 
 from telegram_integration import send_telegram_message
 from config import TELEGRAM_CONFIG
-
-sync_file_path = 'last_sync_time.txt'
-
-def read_last_sync_time():
-    """
-    Lê o último momento de sincronização do relógio do sistema a partir de um arquivo.
-    Returns:
-        datetime: A última data de sincronização, se disponível.
-    """
-    if os.path.exists(sync_file_path):
-        with open(sync_file_path, 'r') as file:
-            last_sync_time_str = file.read().strip()
-            if last_sync_time_str:
-                return datetime.fromisoformat(last_sync_time_str)
-    return None
-
-def write_last_sync_time():
-    """
-    Grava a data e hora atual no arquivo como a última vez que o relógio foi sincronizado.
-    """
-    with open(sync_file_path, 'w') as file:
-        file.write(datetime.now().isoformat())
-
-def synchronize_time():
-    """
-    Sincroniza o relógio do sistema com um servidor de tempo para garantir que o tempo está correto,
-    essencial para operações de trading que dependem de timing preciso.
-    """
-    last_sync_time = read_last_sync_time()
-    if last_sync_time is None or datetime.now() - last_sync_time > timedelta(days=3):
-        try:
-            subprocess.run(['w32tm', '/resync'], check=True)
-            print("✅️ Relógio do sistema sincronizado com sucesso.")
-            message = "✅️ Relógio do sistema sincronizado com sucesso."
-            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
-            write_last_sync_time()  # Atualiza a última data de sincronização no arquivo
-        except subprocess.CalledProcessError:
-            print("🚨 Falha ao sincronizar o relógio do sistema.")
-            message = "🚨 Falha ao sincronizar o relógio do sistema."
-            send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
-    else:
-        print("🟡 Sincronização de relógio não necessária. Última feita há menos de 3 dias.")
 
 async def cancel_all_oco_orders(client, symbol):
     """
