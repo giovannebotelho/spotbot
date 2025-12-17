@@ -1,5 +1,6 @@
 from nicegui import ui, app
 import asyncio
+from collections import deque
 import main
 from database import DatabaseManager
 
@@ -7,6 +8,7 @@ from database import DatabaseManager
 db = DatabaseManager()
 
 # Global State
+log_buffer = deque(maxlen=1000)
 log_ui = None
 status_ui = None
 bot_task = None
@@ -30,6 +32,7 @@ win_rate_val = None
 # --- Handlers ---
 def log_handler(message):
     print(message)
+    log_buffer.append(message)
     if log_ui:
         clean_msg = remove_ansi_codes(message)
         log_ui.push(clean_msg)
@@ -377,9 +380,10 @@ async def index():
                         ui.label('OUTPUT').classes('text-[0.6rem] font-bold text-zinc-500 tracking-wider')
                      
                      log_ui = ui.log(max_lines=500).classes('w-full flex-grow bg-zinc-950 text-emerald-500 terminal-font text-[0.7rem] p-2 leading-tight')
+                     for msg in log_buffer:
+                         log_ui.push(remove_ansi_codes(msg))
 
     # Init
-    await update_data()
     ui.timer(2.0, update_data)
 
 ui.run(title='SpotBot Pro | Terminal', dark=True, reload=False, port=8080)
