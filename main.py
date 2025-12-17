@@ -7,7 +7,7 @@ from binance import BinanceSocketManager
 from binance import AsyncClient as BinanceAsyncClient
 from binance.exceptions import BinanceAPIException
 
-from config import API_KEYS, TELEGRAM_CONFIG, TRADING_CONFIG, RSI_CONFIG
+from config import API_KEYS, TELEGRAM_CONFIG, TRADING_CONFIG, RSI_CONFIG, TRAILING_STOP_CONFIG
 from pre_start import escolher_simbolo, cancel_all_oco_orders
 from binance_api import extract_closes, extract_volumes, get_usdt_balance, get_order_details, get_klines, get_bnb_price
 from trading_functions import calculate_rsi, calculate_macd, calculate_bollinger_bands, check_trend, check_candle_patterns, calculate_vwap, get_candle_details, calculate_ema, is_market_downward
@@ -530,9 +530,11 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                      insight = buy_result['gemini_analysis']
                      shared_market_data['gemini_insight'] = insight
                      
+                     shared_market_data['gemini_insight'] = insight
+                     
                      # Restore log message for Gemini Buy Signal
-                     if insight.get('signal') == 'COMPRA':
-                         log(f"🟢 Sinal de \033[1;32mCOMPRA\033[0m recebido do Gemini.")
+                     if insight.get('signal'):
+                         log(f"🟢 Sinal de \033[1;32m{insight.get('signal')}\033[0m recebido do Gemini ({insight.get('confidence', 'N/A')})...")
                 
                 if buy_result["buy"]:
                     executed_condition = buy_result["message"]
@@ -638,6 +640,21 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                 # Reduced timeout for frequent price checks
                                 msg = await asyncio.wait_for(um.recv(), timeout=5) 
                             except asyncio.TimeoutError:
+                                # UX: Update Status & Heartbeat
+                                try:
+                                    ticker = await client.get_symbol_ticker(symbol=symbol)
+                                    cur_price = float(ticker['price'])
+                                    status(f"⏳ Monitorando OCO... Preço: ${cur_price:.2f}")
+                                    
+                                    # Log heartbeat every ~60s (12 * 5s)
+                                    if not hasattr(log, 'heartbeat_counter'): log.heartbeat_counter = 0
+                                    log.heartbeat_counter += 1
+                                    if log.heartbeat_counter >= 12:
+                                        log(f"⏱️ Aguardando alvo ou stop... Preço: ${cur_price:.2f}")
+                                        log.heartbeat_counter = 0
+                                except Exception:
+                                    pass
+                                    
                                 # Check for Trailing Stop
                                 if TRAILING_STOP_CONFIG['enabled']:
                                     try:

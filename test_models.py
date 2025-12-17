@@ -1,35 +1,18 @@
-
 import google.generativeai as genai
 import os
 from dotenv import load_dotenv
 
-# Try loading from parent dir or current
-load_dotenv('../.env')
-if not os.getenv("gemini_api"):
-    load_dotenv('.env')
-
+load_dotenv()
 api_key = os.getenv("gemini_api")
-genai.configure(api_key=api_key)
 
-candidates = [
-    "gemini-1.5-flash", 
-    "gemini-1.5-flash-latest", 
-    "gemini-1.5-flash-001", 
-    "gemini-1.5-flash-002",
-    "gemini-flash-latest",
-    "gemini-2.0-flash-exp",
-    "gemini-exp-1121"
-]
-
-
-with open('model_test.log', 'w', encoding='utf-8') as f:
-    f.write(f"Testing {len(candidates)} candidates...\n")
-    for model in candidates:
-        try:
-            m = genai.GenerativeModel(model)
-            resp = m.generate_content("Hello")
-            f.write(f"✅ SUCCESS: {model}\n")
-            print(f"✅ SUCCESS: {model}")
-        except Exception as e:
-            f.write(f"❌ FAILED: {model} - {e}\n")
-            print(f"❌ FAILED: {model}")
+if not api_key:
+    print("Erro: Chave API não encontrada no arquivo .env")
+else:
+    genai.configure(api_key=api_key)
+    print("🔍 Listando modelos disponíveis para sua chave API...")
+    try:
+        for m in genai.list_models():
+            if 'generateContent' in m.supported_generation_methods:
+                print(f"- {m.name}")
+    except Exception as e:
+        print(f"Erro ao listar modelos: {e}")

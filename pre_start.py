@@ -24,7 +24,7 @@ async def cancel_all_oco_orders(client, symbol):
         for order_list in open_oco_orders:
             if order_list['symbol'] == symbol:
                 order_list_id = order_list['orderListId']
-                await client.cancel_order_list(symbol=symbol, orderListId=order_list_id)
+                await client.cancel_order(symbol=symbol, orderListId=order_list_id)
                 print(f"Ordem OCO com orderListId {order_list_id} para o símbolo {symbol} cancelada.")
 
     except BinanceAPIException as e:

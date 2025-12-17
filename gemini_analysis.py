@@ -8,14 +8,25 @@ load_dotenv()
 
 def send_data_to_gemini(candle_data, candle_patterns, rsi, macd, bollinger_bands, sell_pressure, order_book, candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation, 
                         ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, historical_trades_data,
-                        api_key, model_name="gemini-2.0-flash-lite"):
+                        api_key, model_name="gemini-1.5-flash"):
     """Envia os dados das velas, padrões e indicadores para a API do Gemini usando o SDK."""
     
     from datetime import datetime
     current_datetime_str = datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
 
-    genai.configure(api_key=api_key)
+    # Priority list of models to try
+    models_to_try = [
+        "gemini-2.5-flash", 
+        "gemini-2.0-flash", 
+        "gemini-2.0-flash-lite"
+    ]
     
+    # If the caller provided a specific model (that isn't the default old one), prioritize it
+    if model_name != "gemini-1.5-flash" and model_name not in models_to_try:
+        models_to_try.insert(0, model_name)
+
+    genai.configure(api_key=api_key)
+
     generation_config = {
         "temperature": 1,
         "top_p": 0.95,
@@ -24,11 +35,7 @@ def send_data_to_gemini(candle_data, candle_patterns, rsi, macd, bollinger_bands
         "response_mime_type": "application/json",
     }
 
-    model = genai.GenerativeModel(
-        model_name=model_name,
-        generation_config=generation_config,
-    )
-
+    # Prompt text definition (Keep existing prompt)
     prompt = (
     "Você é um assistente especializado em negociação de criptomoedas, focado em análise técnica do par BTC/USDT no gráfico de **1 hora (1h)** da Binance.\n"
     "Seu objetivo principal é identificar **oportunidades de COMPRA de médio risco com ALTA probabilidade de sucesso** para um horizonte de **curto/médio prazo**, visando um lucro de **0.5%** e um stop loss de **1%**.\n\n"
@@ -85,28 +92,48 @@ def send_data_to_gemini(candle_data, candle_patterns, rsi, macd, bollinger_bands
         f"Dados Históricos de Trades (Resumo):\n{historical_trades_data}\n"
     )
 
-    try:
-        chat_session = model.start_chat(
-            history=[
-                {
-                    "role": "user",
-                    "parts": [prompt],
-                },
-                {
-                    "role": "model",
-                    "parts": ["Entendido. Aguardo os dados para análise."],
-                },
-            ]
-        )
+    # Loop through models with fallback
+    for current_model in models_to_try:
+        try:
+            print(f"\n🔹 Tentando conectar com modelo: \033[1;33m{current_model}\033[0m...")
+            
+            model = genai.GenerativeModel(
+                model_name=current_model,
+                generation_config=generation_config,
+            )
 
-        response = chat_session.send_message(user_message)
-        
-        print(f"\033[1;36mPrompt enviada para o Gemini (Modelo: {model_name})\033[0m")
-        return response.text
+            chat_session = model.start_chat(
+                history=[
+                    {
+                        "role": "user",
+                        "parts": [prompt],
+                    },
+                    {
+                        "role": "model",
+                        "parts": ["Entendido. Aguardo os dados para análise."],
+                    },
+                ]
+            )
 
-    except Exception as e:
-        print(f"Erro na solicitação ao Gemini: {e}")
-        return None
+            response = chat_session.send_message(user_message)
+            
+            print(f"\033[1;32m✅ Sucesso! Resposta recebida do modelo: {current_model}\033[0m")
+            return response.text
+
+        except Exception as e:
+            error_msg = str(e)
+            print(f"❌ Falha com {current_model}: {error_msg}")
+            
+            if "429" in error_msg:
+                print("⏳ Cota excedida (429). Aguardando 2 segundos antes de tentar próximo...")
+                time.sleep(2)
+            elif "404" in error_msg:
+                print(f"⚠️ Modelo {current_model} não encontrado ou depreciado.")
+            
+            continue # Try next model
+            
+    print("❌ \033[1;31mFALHA CRÍTICA: Todos os modelos falharam.\033[0m")
+    return None
 
 def interpret_gemini_response(response_text):
     """Interpreta a resposta JSON do Gemini para extrair o sinal."""
