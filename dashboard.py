@@ -266,7 +266,7 @@ async def index():
     with ui.row().classes('w-full min-h-[calc(100vh-3.5rem)] flex-nowrap gap-0'):
         
         # --- SIDEBAR (Compact) ---
-        with ui.column().classes('w-64 flex-shrink-0 bg-black border-r border-zinc-800 h-screen p-4 gap-6'):
+        with ui.column().classes('w-64 flex-shrink-0 bg-black border-r border-zinc-800 h-full p-4 gap-6'):
             
             # Config
             with ui.column().classes('w-full gap-3'):
@@ -308,15 +308,25 @@ async def index():
              # Chart Container (Fixed Height)
              with ui.card().classes('w-full h-[65vh] p-0 rounded-none bg-black border-b border-zinc-800 gap-0 shadow-none relative'):
                  
-                 # Overlay AI Card (Floating Top Right)
-                 ai_card = ui.card().classes('absolute top-4 right-4 w-72 z-20 zinc-panel p-3 rounded-lg shadow-xl opacity-90 backdrop-blur-sm')
+                 # Overlay AI Card (Floating Top Left)
+                 ai_card = ui.card().classes('absolute top-4 left-4 w-72 z-20 zinc-panel p-3 rounded-lg shadow-xl opacity-90 backdrop-blur-sm')
                  with ai_card:
-                     with ui.row().classes('items-center gap-2 mb-2'):
-                         ai_icon_container = ui.element('div').classes('p-1 rounded bg-zinc-800 text-zinc-400')
-                         with ai_icon_container: ui.icon('psychology', size='xs')
-                         ai_signal_label = ui.label('NEUTRO').classes('text-sm font-bold text-zinc-400')
+                     with ui.row().classes('w-full items-center justify-between mb-2'):
+                         with ui.row().classes('items-center gap-2'):
+                             ai_icon_container = ui.element('div').classes('p-1 rounded bg-zinc-800 text-zinc-400')
+                             with ai_icon_container: ui.icon('psychology', size='xs')
+                             ai_signal_label = ui.label('NEUTRO').classes('text-sm font-bold text-zinc-400')
+                         
+                         def toggle_ai_content():
+                             is_visible = ai_reason_scroll.visible
+                             ai_reason_scroll.set_visibility(not is_visible)
+                             # Update icon: Arrow Down (to expand) if hidden, Arrow Up (to collapse) if visible
+                             toggle_btn.props(f'icon={"keyboard_arrow_down" if is_visible else "keyboard_arrow_up"}')
+
+                         toggle_btn = ui.button(icon='keyboard_arrow_up', on_click=toggle_ai_content).props('flat dense round size=xs color=zinc-500')
                      
-                     with ui.scroll_area().classes('h-24'):
+                     ai_reason_scroll = ui.scroll_area().classes('h-24')
+                     with ai_reason_scroll:
                          ai_reason_markdown = ui.markdown('_IA analisando mercado..._').classes('text-[0.65rem] text-zinc-400 leading-relaxed')
 
                  # CHART (Direct Child, No Tabs)

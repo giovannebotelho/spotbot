@@ -32,7 +32,9 @@ Uma interface web moderna (acessível pelo navegador) onde você pode:
 *   Ver o saldo da sua carteira em tempo real (USDT e BNB).
 *   Escolher qual moeda operar (ex: BTCUSDT, ETHUSDT).
 *   Iniciar e Parar o robô com um clique.
+
 *   Acompanhar logs detalhados do que o robô está fazendo.
+*   **Visualização Limpa**: O Card de Insight da IA agora pode ser minimizado para liberar a visão do gráfico, garantindo que você não perca nenhum detalhe da ação do preço.
 
 ### 📱 Controle via Telegram
 Você não precisa ficar na frente do computador. O robô envia mensagens para o seu celular:

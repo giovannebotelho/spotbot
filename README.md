@@ -7,8 +7,9 @@
 ## ✨ Funcionalidades Principais
 
 *   **🧠 Análise Híbrida**: Utiliza indicadores técnicos (RSI, MACD, Bandas de Bollinger, VWAP, EMAs) em conjunto com a IA **Gemini 1.5 Flash** para validar entradas.
-*   **🖥️ Dashboard Profissional**: Interface web moderna (Dark Mode) construída com **NiceGUI** para monitoramento em tempo real, controle de operações e visualização de logs.
+*   **🖥️ Dashboard Profissional**: Interface web moderna (Dark Mode) construída com **NiceGUI**. Agora com **Sidebar otimizada** e **Card de IA recolhível** para máxima área de visualização gráfica.
 *   **📱 Controle via Telegram**: Receba notificações de trades e controle o bot (Inciar, Parar, Status, Saldo) diretamente pelo seu celular.
+*   **🛡️ Estabilidade Reforçada**: Proteção robusta contra falhas de API e tratamento de erros críticos (Crash Fixes) para operação contínua 24/7.
 *   **🛡️ Gerenciamento de Risco Dinâmico**:
     *   **Stop Loss & Take Profit via ATR**: Ajusta os alvos automaticamente com base na volatilidade do mercado.
     *   **Trailing Stop Inteligente**: Protege seus lucros movendo o Stop Loss automaticamente conforme o preço sobe.

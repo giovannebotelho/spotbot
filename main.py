@@ -625,7 +625,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         macd_current, signal_line_current = calculate_macd(closes)
                         lower_band, middle_band, upper_band = calculate_bollinger_bands(closes)
                         
-                        gemini_response = buy_result["gemini_response"]
+                        gemini_response = buy_result.get("gemini_response")
                                     
                         oco_order, limit_order_id, stop_order_id, lucro_alvo, stop_loss, stop_limit = await adjust_and_place_oco_order(client, symbol, executed_qty, tick_size, min_price_move, klines)
                         

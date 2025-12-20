@@ -149,7 +149,7 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
             print("\nEntrando na condição 5 de compra: Sinal de COMPRA do Gemini e RSI")
             message = "Entrando na <b>condição 5</b> de compra: <b>Sinal de COMPRA do Gemini e RSI</b>"
             asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
-        return {"buy": True, "message": "Gemini Buy Signal e RSI", "candle_data": "", "gemini_analysis": gemini_buy_signal}
+        return {"buy": True, "message": "Gemini Buy Signal e RSI", "candle_data": "", "gemini_analysis": gemini_buy_signal, "gemini_response": gemini_response}
 
     return {"buy": False, "message": None, "candle_data": "", "gemini_analysis": gemini_buy_signal}
 
