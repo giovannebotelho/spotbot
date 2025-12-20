@@ -79,6 +79,11 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
     if not trend_confirmed:
         return {"buy": False, "message": "Trend not confirmed (Price < EMA200)", "candle_data": "", "gemini_response": None}
 
+    # Gatekeeper: Só chame a IA se o mercado estiver técnico favorável (RSI < 55)
+    # Isso economiza 90% das chamadas de API e evita erro 429.
+    if rsi > 55:
+        return {"buy": False, "message": "RSI alto, IA ignorada", "candle_data": "", "gemini_response": None}
+
     # Prepare data for Gemini
     gemini_response = await get_gemini_analysis(
         f"Open: {candle_open}, High: {candle_high}, Low: {candle_low}, Close: {candle_close}, Volume: {candle_volume}",

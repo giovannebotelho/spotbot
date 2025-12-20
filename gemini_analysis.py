@@ -16,9 +16,10 @@ def send_data_to_gemini(candle_data, candle_patterns, rsi, macd, bollinger_bands
 
     # Priority list of models to try
     models_to_try = [
+        "gemma-3-27b-it",
+        "gemma-3-12b-it",
         "gemini-2.5-flash", 
-        "gemini-2.0-flash", 
-        "gemini-2.0-flash-lite"
+        "gemini-2.0-flash"
     ]
     
     # If the caller provided a specific model (that isn't the default old one), prioritize it
@@ -53,7 +54,8 @@ def send_data_to_gemini(candle_data, candle_patterns, rsi, macd, bollinger_bands
     "  \"confianca\": \"Alta\", \"Media\" ou \"Baixa\",\n"
     "  \"justificativa\": \"Explicação detalhada da decisão...\",\n"
     "  \"regras_chave\": [\"Regra 1\", \"Regra 2\"]\n"
-    "}\n"
+    "}\n\n"
+    "IMPORTANT: Do not include markdown formatting like ```json. Return RAW JSON only."
     )
 
     user_message = (
@@ -97,9 +99,15 @@ def send_data_to_gemini(candle_data, candle_patterns, rsi, macd, bollinger_bands
         try:
             print(f"\n🔹 Tentando conectar com modelo: \033[1;33m{current_model}\033[0m...")
             
+            # Ajuste de config para Gemma (não suporta modo JSON nativo)
+            current_generation_config = generation_config.copy()
+            if "gemma" in current_model.lower():
+                if "response_mime_type" in current_generation_config:
+                    del current_generation_config["response_mime_type"]
+            
             model = genai.GenerativeModel(
                 model_name=current_model,
-                generation_config=generation_config,
+                generation_config=current_generation_config,
             )
 
             chat_session = model.start_chat(
