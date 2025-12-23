@@ -50,73 +50,81 @@ def remove_ansi_codes(text):
 
 async def update_data():
     """Updates Balances, Stats, and Charts."""
-    # 1. Balances
-    balances = await main.get_account_balances()
-    if balances:
-        if bnb_val: bnb_val.text = f"{balances['bnb']:.4f}"
-        if bnb_usdt_val: bnb_usdt_val.text = f"~${balances['bnb_usdt']:.2f}"
-        if usdt_val: usdt_val.text = f"${balances['usdt']:.2f}"
-    
-    # 2. Database Stats
-    stats = db.get_stats()
-    if total_profit_val:
-        total_profit_val.text = f"${stats['total_net_profit']:.2f}"
-        total_profit_val.classes(remove='text-emerald-400 text-rose-400', add='text-emerald-400' if stats['total_net_profit'] >= 0 else 'text-rose-400')
-    if win_rate_val:
-        win_rate_val.text = f"{stats['win_rate']:.1f}%"
-    
-    # 3. Market Chart Update (Price + Volume)
-    market_data = main.shared_market_data
-    if market_data['dates'] and candle_chart:
-        # Common X Axis
-        candle_chart.options['xAxis'][0]['data'] = market_data['dates'] # Price Axis
-        candle_chart.options['xAxis'][1]['data'] = market_data['dates'] # Volume Axis
+    try:
+        # 1. Balances
+        balances = await main.get_account_balances()
+        if balances:
+            if bnb_val: bnb_val.text = f"{balances['bnb']:.4f}"
+            if bnb_usdt_val: bnb_usdt_val.text = f"~${balances['bnb_usdt']:.2f}"
+            if usdt_val: usdt_val.text = f"${balances['usdt']:.2f}"
         
-        # Series 0: Candle
-        candle_chart.options['series'][0]['data'] = market_data['klines'] 
+        # 2. Database Stats
+        stats = db.get_stats()
+        if total_profit_val:
+            total_profit_val.text = f"${stats['total_net_profit']:.2f}"
+            total_profit_val.classes(remove='text-emerald-400 text-rose-400', add='text-emerald-400' if stats['total_net_profit'] >= 0 else 'text-rose-400')
+        if win_rate_val:
+            win_rate_val.text = f"{stats['win_rate']:.1f}%"
         
-        # Series 1-3: Indicators
-        candle_chart.options['series'][1]['data'] = market_data.get('bb_upper', [])
-        candle_chart.options['series'][2]['data'] = market_data.get('bb_lower', [])
-        candle_chart.options['series'][3]['data'] = market_data.get('ema200', [])
-        
-        # Series 4: Volume
-        candle_chart.options['series'][4]['data'] = market_data.get('volumes', [])
-        
-        # Series 4: Volume
-        candle_chart.options['series'][4]['data'] = market_data.get('volumes', [])
-        
-        candle_chart.update()
-        candle_chart.run_method('resize')
-
-    # 4. Recent Trades (Table)
-    update_recent_trades_table()
-    
-    # 5. Logs Scroll
-    if log_ui:
-        log_ui.run_method('scrollTo', 0, 999999)
-
-    # 6. AI Insight Update
-    insight = main.shared_market_data.get('gemini_insight')
-    if insight and ai_signal_label and ai_reason_markdown:
-        signal = insight.get('signal', 'N/A')
-        ai_signal_label.text = f"{signal}"
-        
-        # Color Logic
-        if signal == 'COMPRA':
-            ai_card.classes(remove='border-zinc-800', add='border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]')
-            ai_signal_label.classes(remove='text-zinc-500 text-rose-500 text-amber-500', add='text-emerald-400')
-            ai_icon_container.classes(remove='bg-zinc-800', add='bg-emerald-500/10 text-emerald-400')
-        elif signal == 'VENDA':
-            ai_card.classes(remove='border-zinc-800 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]', add='border-rose-500/50')
-            ai_signal_label.classes(remove='text-zinc-500 text-emerald-400 text-amber-500', add='text-rose-500')
-            ai_icon_container.classes(remove='bg-zinc-800', add='bg-rose-500/10 text-rose-400')
-        else:
-            ai_card.classes(remove='border-emerald-500/50 border-rose-500/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]', add='border-zinc-800')
-            ai_signal_label.classes(remove='text-zinc-500 text-emerald-400 text-rose-500', add='text-amber-500')
-            ai_icon_container.classes(remove='bg-zinc-800', add='bg-amber-500/10 text-amber-400')
+        # 3. Market Chart Update (Price + Volume)
+        market_data = main.shared_market_data
+        if market_data['dates'] and candle_chart:
+            # Common X Axis
+            candle_chart.options['xAxis'][0]['data'] = market_data['dates'] # Price Axis
+            candle_chart.options['xAxis'][1]['data'] = market_data['dates'] # Volume Axis
             
-        ai_reason_markdown.content = insight.get('justification', '**Sem justificativa disponível.**')
+            # Series 0: Candle
+            candle_chart.options['series'][0]['data'] = market_data['klines'] 
+            
+            # Series 1-3: Indicators
+            candle_chart.options['series'][1]['data'] = market_data.get('bb_upper', [])
+            candle_chart.options['series'][2]['data'] = market_data.get('bb_lower', [])
+            candle_chart.options['series'][3]['data'] = market_data.get('ema200', [])
+            
+            # Series 4: Volume
+            candle_chart.options['series'][4]['data'] = market_data.get('volumes', [])
+            
+            # Series 4: Volume
+            candle_chart.options['series'][4]['data'] = market_data.get('volumes', [])
+            
+            candle_chart.update()
+            candle_chart.run_method('resize')
+
+        # 4. Recent Trades (Table)
+        update_recent_trades_table()
+        
+        # 5. Logs Scroll
+        if log_ui:
+            log_ui.run_method('scrollTo', 0, 999999)
+
+        # 6. AI Insight Update
+        insight = main.shared_market_data.get('gemini_insight')
+        if insight and ai_signal_label and ai_reason_markdown:
+            signal = insight.get('signal', 'N/A')
+            ai_signal_label.text = f"{signal}"
+            
+            # Color Logic
+            if signal == 'COMPRA':
+                ai_card.classes(remove='border-zinc-800', add='border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]')
+                ai_signal_label.classes(remove='text-zinc-500 text-rose-500 text-amber-500', add='text-emerald-400')
+                ai_icon_container.classes(remove='bg-zinc-800', add='bg-emerald-500/10 text-emerald-400')
+            elif signal == 'VENDA':
+                ai_card.classes(remove='border-zinc-800 border-emerald-500/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]', add='border-rose-500/50')
+                ai_signal_label.classes(remove='text-zinc-500 text-emerald-400 text-amber-500', add='text-rose-500')
+                ai_icon_container.classes(remove='bg-zinc-800', add='bg-rose-500/10 text-rose-400')
+            else:
+                ai_card.classes(remove='border-emerald-500/50 border-rose-500/50 shadow-[0_0_20px_rgba(16,185,129,0.1)]', add='border-zinc-800')
+                ai_signal_label.classes(remove='text-zinc-500 text-emerald-400 text-rose-500', add='text-amber-500')
+                ai_icon_container.classes(remove='bg-zinc-800', add='bg-amber-500/10 text-amber-400')
+                
+            ai_reason_markdown.content = insight.get('justification', '**Sem justificativa disponível.**')
+
+    except RuntimeError as e:
+        if 'client' in str(e) and 'deleted' in str(e):
+            return # Client disconnected
+        raise e
+    except Exception as e:
+        print(f"Erro no update_data: {e}")
 
 def update_recent_trades_table():
     if not recent_trades_table:
@@ -283,6 +291,7 @@ async def index():
             .terminal-font { font-family: 'JetBrains Mono', monospace; }
         </style>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+        <link rel="apple-touch-icon" href="data:,">
     ''')
 
     # --- Header ---
