@@ -7,6 +7,7 @@ env_spotbot/
 
 # Arquivos de configuração local
 .env
+.key
 
 # Logs
 *.log

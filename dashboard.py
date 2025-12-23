@@ -1,4 +1,5 @@
 from nicegui import ui, app
+import os
 import asyncio
 from collections import deque
 import main
@@ -202,9 +203,54 @@ def update_timeframe(value):
         main.shared_market_data['dates'] = []
         ui.notify(f'Timeframe: {value}')
 
+# --- Login System ---
+@ui.page('/login')
+def login():
+    # Credentials
+    USER = os.getenv('DASHBOARD_USER', 'admin')
+    PASS = os.getenv('DASHBOARD_PASSWORD', 'admin123')
+    
+    def try_login():
+        if username.value == USER and password.value == PASS:
+            app.storage.user['authenticated'] = True
+            ui.navigate.to('/')
+        else:
+            ui.notify('Acesso Negado', type='negative')
+
+    # Styling
+    ui.colors(primary='#22d3ee', secondary='#94a3b8', accent='#f472b6', positive='#34d399', negative='#fb7185', dark='#000000')
+    ui.add_head_html('''
+        <style>
+            body { background-color: #000000; color: #e2e8f0; font-family: 'Inter', sans-serif; }
+            .zinc-input .q-field__native { color: white !important; }
+            .zinc-input .q-field__label { color: #71717a !important; }
+            .zinc-input .q-field__control:before { border-color: #27272a !important; }
+        </style>
+    ''')
+
+    with ui.column().classes('w-full h-screen items-center justify-center bg-black'):
+        with ui.card().classes('w-80 p-8 bg-zinc-950 border border-zinc-800 shadow-2xl items-center gap-6 rounded-xl'):
+            # Logo/Header
+            with ui.column().classes('items-center gap-2'):
+                ui.icon('lock', size='2rem', color='cyan-500')
+                ui.label('SPOTBOT').classes('text-xl font-bold tracking-tight text-white')
+                ui.label('ACCESS CONTROL').classes('text-[0.6rem] font-bold text-zinc-600 tracking-[0.2em]')
+            
+            # Inputs
+            username = ui.input('Usuário').classes('w-full zinc-input').props('dark outlined dense')
+            password = ui.input('Senha', password=True, password_toggle_button=True).classes('w-full zinc-input').props('dark outlined dense').on('keydown.enter', try_login)
+            
+            # Button
+            ui.button('ENTRAR', on_click=try_login).props('unelevated').classes('w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold tracking-wide rounded')
+
+
 # --- UI Layout ---
 @ui.page('/')
 async def index():
+    # Auth Check
+    if not app.storage.user.get('authenticated', False):
+        return ui.navigate.to('/login')
+
     global log_ui, status_ui, investment_input, symbol_select, bnb_val, bnb_usdt_val, usdt_val
     global total_profit_val, win_rate_val, recent_trades_table, status_indicator, candle_chart
     global ai_signal_label, ai_reason_markdown, ai_card, ai_icon_container
@@ -253,6 +299,13 @@ async def index():
             ui.button('START', on_click=start_bot).props('flat dense size=sm').classes('text-emerald-400 font-bold px-3 hover:bg-emerald-500/10 rounded')
             with ui.element('div').classes('w-px h-4 bg-zinc-800'): pass
             ui.button('STOP', on_click=stop_bot).props('flat dense size=sm').classes('text-rose-400 font-bold px-3 hover:bg-rose-500/10 rounded')
+            
+            # Add Logout after Stop
+            with ui.element('div').classes('w-px h-4 bg-zinc-800'): pass
+            def logout():
+                app.storage.user.clear()
+                ui.navigate.to('/login')
+            ui.button(icon='logout', on_click=logout).props('flat dense size=sm').classes('text-zinc-500 hover:text-white px-2 rounded')
 
         # KPI & Actions
         with ui.row().classes('items-center gap-4'):
@@ -396,4 +449,4 @@ async def index():
     # Init
     ui.timer(2.0, update_data)
 
-ui.run(title='SpotBot Pro | Terminal', dark=True, reload=False, port=8080)
+ui.run(title='SpotBot Pro | Terminal', dark=True, reload=False, port=8080, storage_secret='spotbot_secured_key_8823')

@@ -149,7 +149,19 @@ def interpret_gemini_response(response_text):
         return None
 
     try:
-        data = json.loads(response_text)
+        # Sanitização da resposta para remover blocos de código markdown
+        clean_text = response_text.strip()
+        if clean_text.startswith("```json"):
+            clean_text = clean_text[7:] 
+        elif clean_text.startswith("```"):
+            clean_text = clean_text[3:]
+        
+        if clean_text.endswith("```"):
+            clean_text = clean_text[:-3]
+            
+        clean_text = clean_text.strip()
+        
+        data = json.loads(clean_text)
         sinal = data.get("sinal", "").upper()
         justificativa = data.get("justificativa", "")
         
