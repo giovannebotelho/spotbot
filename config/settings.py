@@ -53,64 +53,49 @@ TRADING_CONFIG = {
     "macd_fast": 12,
     "macd_slow": 26,
     "macd_signal": 9,
-    "use_ema_filter": False
+    "use_ema_filter": False,
+    "adx_period": 14,
+    "min_adx": 20.0
 }
+
+# Perfis de Risco Selecionáveis
+RISK_PROFILES = {
+    "Conservador": {"rsi_threshold": 22, "adx_min": 25.0, "risk_percent": 1.0},
+    "Moderado": {"rsi_threshold": 30, "adx_min": 20.0, "risk_percent": 2.0},
+    "Agressivo": {"rsi_threshold": 35, "adx_min": 15.0, "risk_percent": 3.0}
+}
+ACTIVE_RISK_PROFILE = "Moderado"
+PAPER_TRADING = False
 
 # Configurações Dinâmicas de RSI
 RSI_CONFIG = {
-    "levels": {
-        0: 20,
-        1: 25,
-        2: 30,
-        3: 35,
-        4: 40,
-        5: 50
-    },
+    "levels": {0: 18, 1: 20, 2: 22, 3: 25, 4: 28, 5: 30},
     "high": 70,
-    "dynamic_low": {
-        0: 20,
-        1: 25,
-        2: 30,
-        3: 35,
-        4: 40,
-        5: 50
-    },
-    "min": {
-        0: 15,
-        1: 20,
-        2: 25,
-        3: 30,
-        4: 35,
-        5: 45
-    }
+    "dynamic_low": {0: 18, 1: 20, 2: 22, 3: 25, 4: 28, 5: 30},
+    "min": {0: 12, 1: 15, 2: 18, 3: 20, 4: 22, 5: 25}
 }
 
-# Configurações de Ordem OCO (Fixed Percent Multipliers)
+# Configurações de Ordens OCO (Lucro & Stop)
 OCO_CONFIG = {
-    "price_under_1": {
-        "profit_multiplier": 1.008,
-        "stop_loss_multiplier": 0.99
-    },
-    "price_over_1": {
-        "profit_multiplier": 1.005,
-        "stop_loss_multiplier": 0.990
-    }
+    "target_profit_percent": 0.025,  # 2.5% Lucro Alvo
+    "stop_loss_percent": 0.015,       # 1.5% Stop Loss
+    "stop_limit_buffer": 0.002        # 0.2% Buffer para execução do Stop
 }
 
-# Configurações de Stop baseado em ATR (Average True Range)
+# Configurações de Stop baseado em Volatilidade (ATR)
 ATR_CONFIG = {
     "period": 14,
-    "sl_multiplier": 1.5,
-    "tp_multiplier": 2.0,
+    "sl_multiplier": 2.0,
+    "tp_multiplier": 3.0,
     "use_atr_stop": True
 }
 
-# Configurações de Trailing Stop
+# Configurações de Trailing Stop Móvel
 TRAILING_STOP_CONFIG = {
     "enabled": True,
-    "activation_percent": 0.015, # 1.5% lucro para ativar
-    "callback_percent": 0.005    # 0.5% recuo do topo dispara o stop
+    "activation_percent": 0.015,   # Ativa o trailing quando o lucro atinge +1.5%
+    "callback_percent": 0.008       # Recua o stop se o preço cair 0.8% da máxima
 }
 
-# Configurações do Banco de Dados (SQLite Local vs PostgreSQL Nuvem/Railway)
-DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{BASE_DIR / 'spotbot.db'}")
+# Banco de Dados Híbrido
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///spotbot.db")

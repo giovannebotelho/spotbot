@@ -63,131 +63,123 @@ def calculate_bollinger_bands(closes, period=None, num_std=None):
     if num_std is None: num_std = TRADING_CONFIG['num_std']
 
     closes_series = pd.Series(closes)
-    ma = closes_series.rolling(window=period).mean()
-    std = closes_series.rolling(window=period).std()
-    
-    upper_band = ma + (std * num_std)
-    lower_band = ma - (std * num_std)
-    
-    return lower_band.iloc[-1], ma.iloc[-1], upper_band.iloc[-1]
+    rolling_mean = closes_series.rolling(window=period).mean()
+    rolling_std = closes_series.rolling(window=period).std()
 
-def calculate_volume_moving_average(volumes, period=None):
-    if period is None: period = TRADING_CONFIG['period']
-    return sum(volumes[-period:]) / period
+    upper_band = rolling_mean + (rolling_std * num_std)
+    lower_band = rolling_mean - (rolling_std * num_std)
+    return lower_band.iloc[-1], rolling_mean.iloc[-1], upper_band.iloc[-1]
 
-def calculate_moving_average(closes, period):
-    return sum(closes[-period:]) / period
+def calculate_vwap(closes, volumes):
+    cumulative_pv = np.cumsum(np.array(closes) * np.array(volumes))
+    cumulative_v = np.cumsum(volumes)
+    vwap = cumulative_pv / cumulative_v
+    return vwap[-1]
 
 def calculate_ema(closes, period):
-    return pd.Series(closes).ewm(span=period, adjust=False).mean().iloc[-1]
-
-def check_trend(klines, short_period=None, long_period=None):
-    if short_period is None: short_period = TRADING_CONFIG['short_period']
-    if long_period is None: long_period = TRADING_CONFIG['long_period']
-
-    closes = extract_closes(klines)
-    short_ma = calculate_moving_average(closes, short_period)
-    long_ma = calculate_moving_average(closes, long_period)
-    return short_ma > long_ma
-
-def check_candle_patterns(klines):
-    if not klines or len(klines) < 5:
-        return None
-
-    last_candle = klines[-1]
-    second_last_candle = klines[-2]
-    third_last_candle = klines[-3]
-    fourth_last_candle = klines[-4]
-    fifth_last_candle = klines[-5]
-
-    patterns = []
-
-    if is_hammer(last_candle): patterns.append("hammer")
-    if is_shooting_star(last_candle): patterns.append("shooting_star")
-    if is_bullish_engulfing(second_last_candle, last_candle): patterns.append("bullish_engulfing")
-    if is_piercing_line(second_last_candle, last_candle): patterns.append("piercing_line")
-    if is_dark_cloud_cover(second_last_candle, last_candle): patterns.append("dark_cloud_cover")
-    if is_kicker_bullish(second_last_candle, last_candle): patterns.append("kicker_bullish")
-    if is_kicker_bearish(second_last_candle, last_candle): patterns.append("kicker_bearish")
-    if is_long_day(last_candle): patterns.append("long_day")
-    if is_short_day(last_candle): patterns.append("short_day")
-    if is_doji(last_candle): patterns.append("doji")
-    if is_doji_dragonfly(last_candle): patterns.append("doji_dragonfly")
-    if is_doji_gravestone(last_candle): patterns.append("doji_gravestone")
-    if is_doji_long_shadows(last_candle): patterns.append("doji_long_shadows")
-    if is_rising_three_methods(fifth_last_candle, fourth_last_candle, third_last_candle, second_last_candle, last_candle): patterns.append("rising_three_methods")
-    if is_falling_three_methods(fifth_last_candle, fourth_last_candle, third_last_candle, second_last_candle, last_candle): patterns.append("falling_three_methods")
-    if is_bullish_and_bearish_strike(second_last_candle, last_candle): patterns.append("bullish_or_bearish_strike")
-    if is_stick_sandwich(third_last_candle,second_last_candle, last_candle): patterns.append("stick_sandwich")
-
-    return patterns if patterns else None
-
-def get_candle_details(klines):
-    if klines:
-        last_kline = klines[-1]
-        return {
-            "open": float(last_kline[1]),
-            "high": float(last_kline[2]),
-            "low": float(last_kline[3]),
-            "close": float(last_kline[4]),
-            "volume": float(last_kline[5])
-        }
-    return None
-
-def is_market_downward(klines, limit=4, high_amplitude_threshold=0.25):
-    if not klines or len(klines) < limit:
-        return False
-
-    recent_klines = klines[-limit:]
-    red_high_amplitude_candles = 0
-    for kline in recent_klines:
-        open_price, high_price, low_price, close_price = float(kline[1]), float(kline[2]), float(kline[3]), float(kline[4])
-        amplitude = (high_price - low_price) / open_price * 100
-
-        if close_price < open_price and amplitude >= high_amplitude_threshold:
-            red_high_amplitude_candles += 1
-    
-    return red_high_amplitude_candles >= 2
+    closes_series = pd.Series(closes)
+    ema = closes_series.ewm(span=period, adjust=False).mean()
+    return ema.iloc[-1]
 
 def calculate_atr(klines, period=None):
     if period is None: period = ATR_CONFIG['period']
-    if not klines or len(klines) < period + 1:
+    highs = np.array([float(k[2]) for k in klines])
+    lows = np.array([float(k[3]) for k in klines])
+    closes = np.array([float(k[4]) for k in klines])
+
+    tr1 = highs[1:] - lows[1:]
+    tr2 = np.abs(highs[1:] - closes[:-1])
+    tr3 = np.abs(lows[1:] - closes[:-1])
+
+    tr = np.maximum(np.maximum(tr1, tr2), tr3)
+    atr = pd.Series(tr).ewm(alpha=1/period, min_periods=period, adjust=False).mean().iloc[-1]
+    return atr
+
+def calculate_adx(klines, period=14):
+    """Calcula o ADX (Average Directional Index) para medir força da tendência."""
+    if len(klines) < period + 1:
         return 0.0
 
     highs = np.array([float(k[2]) for k in klines])
     lows = np.array([float(k[3]) for k in klines])
     closes = np.array([float(k[4]) for k in klines])
-    
+
+    up_move = highs[1:] - highs[:-1]
+    down_move = lows[:-1] - lows[1:]
+
+    plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+    minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
+
     tr1 = highs[1:] - lows[1:]
     tr2 = np.abs(highs[1:] - closes[:-1])
     tr3 = np.abs(lows[1:] - closes[:-1])
+    tr = np.maximum(np.maximum(tr1, tr2), tr3)
+
+    tr_smoothed = pd.Series(tr).ewm(alpha=1/period, min_periods=period, adjust=False).mean()
+    plus_dm_smoothed = pd.Series(plus_dm).ewm(alpha=1/period, min_periods=period, adjust=False).mean()
+    minus_dm_smoothed = pd.Series(minus_dm).ewm(alpha=1/period, min_periods=period, adjust=False).mean()
+
+    plus_di = 100 * (plus_dm_smoothed / tr_smoothed)
+    minus_di = 100 * (minus_dm_smoothed / tr_smoothed)
+
+    sum_di = plus_di + minus_di
+    dx = 100 * (np.abs(plus_di - minus_di) / np.where(sum_di == 0, 1, sum_di))
+
+    adx = pd.Series(dx).ewm(alpha=1/period, min_periods=period, adjust=False).mean().iloc[-1]
+    return float(adx)
+
+def check_trend(klines):
+    closes = extract_closes(klines)
+    ema200 = calculate_ema(closes, 200)
+    return closes[-1] > ema200
+
+def is_market_downward(klines, period=24):
+    closes = extract_closes(klines)
+    if len(closes) < period: return False
     
-    tr = np.maximum(tr1, np.maximum(tr2, tr3))
-    tr_series = pd.Series(tr)
-    atr = tr_series.ewm(alpha=1/period, min_periods=period, adjust=False).mean().iloc[-1]
-    return atr
-
-def calculate_vwap(closes, volumes):
-    if not closes or not volumes or len(closes) != len(volumes):
-        return np.nan
+    first_price = closes[-period]
+    last_price = closes[-1]
+    price_change = ((last_price - first_price) / first_price) * 100
     
-    closes_series = pd.Series(closes)
-    volumes_series = pd.Series(volumes)
-    typical_price = (closes_series + closes_series.shift(1) + closes_series.shift(2)) / 3
-    cumulative_tp_volume = (typical_price * volumes_series).cumsum()
-    cumulative_volume = volumes_series.cumsum()
-    vwap = cumulative_tp_volume / cumulative_volume
-    return vwap.iloc[-1]
+    ema50 = calculate_ema(closes, 50)
+    ema200 = calculate_ema(closes, 200)
+    
+    return price_change < -2.0 and closes[-1] < ema50 and ema50 < ema200
 
-async def calculate_fee(client, symbol, executed_qty, price):
-    try:
-        bnb_balance = await client.get_asset_balance(asset='BNB')
-        bnb_balance = float(bnb_balance['free'])
-        fee_rate = (0.00075 * 2) if bnb_balance > 0 else (0.001 * 2)
-        return executed_qty * price * fee_rate
-    except Exception as e:
-        print(f"Erro ao calcular taxa: {e}")
-        return 0.0
+def check_candle_patterns(klines):
+    opens = [float(k[1]) for k in klines]
+    highs = [float(k[2]) for k in klines]
+    lows = [float(k[3]) for k in klines]
+    closes = [float(k[4]) for k in klines]
 
-def calculate_trade_result(entry_price, quantity, exit_price):
-    return (exit_price - entry_price) * quantity
+    patterns = []
+    if is_hammer(opens, highs, lows, closes): patterns.append("Hammer")
+    if is_shooting_star(opens, highs, lows, closes): patterns.append("Shooting Star")
+    if is_bullish_engulfing(opens, highs, lows, closes): patterns.append("Bullish Engulfing")
+    if is_piercing_line(opens, highs, lows, closes): patterns.append("Piercing Line")
+    if is_dark_cloud_cover(opens, highs, lows, closes): patterns.append("Dark Cloud Cover")
+    if is_kicker_bullish(opens, highs, lows, closes): patterns.append("Bullish Kicker")
+    if is_kicker_bearish(opens, highs, lows, closes): patterns.append("Bearish Kicker")
+    if is_long_day(opens, highs, lows, closes): patterns.append("Long Day")
+    if is_short_day(opens, highs, lows, closes): patterns.append("Short Day")
+    if is_doji(opens, highs, lows, closes): patterns.append("Doji")
+    if is_doji_dragonfly(opens, highs, lows, closes): patterns.append("Dragonfly Doji")
+    if is_doji_gravestone(opens, highs, lows, closes): patterns.append("Gravestone Doji")
+    if is_doji_long_shadows(opens, highs, lows, closes): patterns.append("Long Legged Doji")
+    if is_bullish_and_bearish_strike(opens, highs, lows, closes): patterns.append("Three Line Strike")
+    if is_rising_three_methods(opens, highs, lows, closes): patterns.append("Rising Three Methods")
+    if is_falling_three_methods(opens, highs, lows, closes): patterns.append("Falling Three Methods")
+    if is_stick_sandwich(opens, highs, lows, closes): patterns.append("Stick Sandwich")
+
+    return patterns
+
+def get_candle_details(klines):
+    if not klines: return None
+    last_candle = klines[-1]
+    return {
+        'open': float(last_candle[1]),
+        'high': float(last_candle[2]),
+        'low': float(last_candle[3]),
+        'close': float(last_candle[4]),
+        'volume': float(last_candle[5]),
+    }

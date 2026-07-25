@@ -2,7 +2,8 @@ from nicegui import ui, app
 import os
 import asyncio
 from collections import deque
-from config.settings import DASHBOARD_CONFIG
+from config.settings import DASHBOARD_CONFIG, RISK_PROFILES, TRADING_CONFIG, RSI_CONFIG
+import config.settings as settings
 from services.database import DatabaseManager
 import core.engine as engine
 from utils.formatting import remove_ansi_codes
@@ -21,6 +22,8 @@ ai_reason_markdown = None
 ai_icon_container = None
 investment_input = None
 symbol_select = None
+risk_profile_select = None
+paper_trading_switch = None
 status_indicator = None
 
 bnb_val = None
@@ -170,6 +173,18 @@ def update_timeframe(value):
     engine.shared_market_data['dates'] = []
     ui.notify(f'Timeframe alterado para: {value}')
 
+def set_risk_profile(val):
+    if val in RISK_PROFILES:
+        prof = RISK_PROFILES[val]
+        TRADING_CONFIG['min_adx'] = prof['adx_min']
+        RSI_CONFIG['dynamic_low'][0] = prof['rsi_threshold']
+        ui.notify(f'Perfil alterado: {val} (RSI <= {prof["rsi_threshold"]}, ADX >= {prof["adx_min"]})', type='info')
+
+def toggle_paper_trading(e):
+    settings.PAPER_TRADING = e.value
+    status_text = "Simulação Ativa 🧪" if e.value else "Conta Real 💰"
+    ui.notify(f'Modo: {status_text}', type='positive' if e.value else 'warning')
+
 @ui.page('/login')
 def login():
     USER = DASHBOARD_CONFIG['user']
@@ -211,7 +226,7 @@ async def index():
 
     global log_ui, status_ui, investment_input, symbol_select, bnb_val, bnb_usdt_val, usdt_val
     global total_profit_val, win_rate_val, recent_trades_table, status_indicator, candle_chart
-    global ai_signal_label, ai_reason_markdown, ai_card, ai_icon_container
+    global ai_signal_label, ai_reason_markdown, ai_card, ai_icon_container, risk_profile_select, paper_trading_switch
     
     ui.colors(primary='#22d3ee', secondary='#94a3b8', accent='#f472b6', positive='#34d399', negative='#fb7185', dark='#000000')
     
@@ -256,16 +271,22 @@ async def index():
             status_indicator = ui.element('div').classes('w-2 h-2 rounded-full bg-rose-500')
 
     with ui.row().classes('w-full min-h-[calc(100vh-3.5rem)] flex-nowrap gap-0'):
-        with ui.column().classes('w-64 flex-shrink-0 bg-black border-r border-zinc-800 h-full p-4 gap-6'):
-            with ui.column().classes('w-full gap-3'):
+        with ui.column().classes('w-64 flex-shrink-0 bg-black border-r border-zinc-800 h-full p-4 gap-4'):
+            with ui.column().classes('w-full gap-2'):
                 ui.label('CONFIGURAÇÃO').classes('text-[0.6rem] font-bold text-zinc-600 tracking-wider')
                 symbol_select = ui.select(['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'ADAUSDT'], value='BTCUSDT').props('outlined dense options-dense color=cyan-500').classes('w-full input-zinc font-mono text-xs')
                 investment_input = ui.input('Valor (USDT)', value='100%').props('outlined dense color=cyan-500').classes('w-full input-zinc font-mono text-xs')
                 
-                ui.label('TIMEFRAME').classes('text-[0.6rem] font-bold text-zinc-600 tracking-wider mt-2')
+                ui.label('PERFIL DE RISCO').classes('text-[0.6rem] font-bold text-zinc-600 tracking-wider mt-1')
+                risk_profile_select = ui.select(['Conservador', 'Moderado', 'Agressivo'], value='Moderado', on_change=lambda e: set_risk_profile(e.value)).props('outlined dense options-dense color=cyan-500').classes('w-full input-zinc text-xs')
+
+                ui.label('PAPER TRADING (SIMULADOR)').classes('text-[0.6rem] font-bold text-zinc-600 tracking-wider mt-1')
+                paper_trading_switch = ui.switch('Simulação', value=False, on_change=toggle_paper_trading).props('dense color=cyan-500').classes('text-xs text-zinc-400')
+
+                ui.label('TIMEFRAME').classes('text-[0.6rem] font-bold text-zinc-600 tracking-wider mt-1')
                 ui.toggle(['1m', '15m', '1h', '4h'], value='1h', on_change=lambda e: update_timeframe(e.value)).props('unelevated dense spread size=xs color=zinc-800 text-color=zinc-400 toggle-color=cyan-600').classes('w-full border border-zinc-800 rounded')
 
-            with ui.column().classes('w-full gap-3 mt-4'):
+            with ui.column().classes('w-full gap-2 mt-2'):
                 ui.label('PERFORMANCE').classes('text-[0.6rem] font-bold text-zinc-600 tracking-wider')
                 with ui.row().classes('w-full justify-between items-center p-2 rounded bg-zinc-900 border border-zinc-800'):
                     ui.label('Profit').classes('text-xs text-zinc-400')
@@ -320,7 +341,7 @@ async def index():
                  with ui.column().classes('w-3/5 h-full border-r border-zinc-800 bg-black p-0'):
                      with ui.row().classes('w-full h-8 items-center px-4 border-b border-zinc-800 bg-zinc-950'):
                          ui.label('EXECUÇÕES').classes('text-[0.6rem] font-bold text-zinc-500 tracking-wider')
-                     
+                      
                      recent_trades_table = ui.table(
                          columns=[
                             {'name': 'date', 'label': 'Time', 'field': 'date', 'align': 'left'},
@@ -343,7 +364,7 @@ async def index():
                      with ui.row().classes('w-full h-8 items-center px-4 border-b border-zinc-800 bg-zinc-950'):
                         ui.icon('terminal', size='xs', color='zinc-600')
                         ui.label('OUTPUT').classes('text-[0.6rem] font-bold text-zinc-500 tracking-wider')
-                     
+                      
                      log_ui = ui.log(max_lines=500).classes('w-full flex-grow bg-zinc-950 text-emerald-500 terminal-font text-[0.7rem] p-2 leading-tight')
                      for msg in log_buffer:
                          log_ui.push(msg)
