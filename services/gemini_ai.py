@@ -1,30 +1,40 @@
 import json
 import time
 from datetime import datetime
-from config.settings import API_KEYS, TRADING_CONFIG
-from utils.formatting import BOLD, RESET, GREEN, RED, YELLOW, CYAN
+from config.settings import API_KEYS
+from utils.formatting import RESET, GREEN, RED, YELLOW, CYAN
+
+_last_429_time = 0
+COOLDOWN_429_SECONDS = 300  # 5 minutos de pausa no Gemini se der erro 429 de cota/crédito
 
 def analyze_with_gemini(
     candle_data, candle_patterns, rsi, macd, bollinger_bands, sell_pressure, order_book,
     candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation, 
     ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1,
     period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, historical_trades_data,
-    api_key=None, model_name="gemini-1.5-flash"
+    api_key=None, model_name="gemini-2.0-flash"
 ):
+    global _last_429_time
+    now = time.time()
+    
+    # Se estivemos em cooldown por erro 429 recentemente, avisa de forma silenciosa e pula chamada
+    if now - _last_429_time < COOLDOWN_429_SECONDS:
+        return None
+
     if not api_key:
         api_key = API_KEYS.get('gemini')
     if not api_key:
-        print("⚠️ Chave API do Gemini não configurada.")
+        print("⚠️ Chave API do Gemini não configurada no .env.")
         return None
 
     current_datetime_str = datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
 
-    # Lista prioritária de modelos para tentar com fallback completo (incluindo 1.5-flash e 1.5-pro da cota gratuita)
+    # Modelos recomendados na SDK moderna google-genai
     models_to_try = [
-        "gemini-1.5-flash",
-        "gemini-1.5-pro",
-        "gemini-2.0-flash", 
-        "gemini-2.5-flash"
+        "gemini-2.0-flash",
+        "gemini-2.5-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash"
     ]
 
     if model_name and model_name not in models_to_try:
@@ -69,7 +79,6 @@ def analyze_with_gemini(
         f"Histórico de Trades Recentes:\n{historical_trades_data}\n"
     )
 
-    # Tentativa via nova SDK `google.genai`
     try:
         from google import genai
         from google.genai import types
@@ -77,8 +86,6 @@ def analyze_with_gemini(
         client = genai.Client(api_key=api_key)
         for current_model in models_to_try:
             try:
-                print(f"\n🔹 Conectando ao Gemini usando google-genai SDK ({current_model})...")
-                
                 config = types.GenerateContentConfig(
                     system_instruction=prompt_system,
                     temperature=1.0,
@@ -95,34 +102,23 @@ def analyze_with_gemini(
                 )
 
                 if response and response.text:
-                    print(f"{GREEN}✅ Sucesso! Resposta recebida do modelo: {current_model}{RESET}")
+                    print(f"{GREEN}✅ Sucesso! Resposta recebida da IA ({current_model}){RESET}")
                     return response.text
             except Exception as model_err:
-                print(f"❌ Erro ao tentar modelo {current_model} via google.genai: {model_err}")
-                time.sleep(1)
-                continue
-
-    except ImportError:
-        try:
-            import google.generativeai as genai
-            genai.configure(api_key=api_key)
-            
-            for current_model in models_to_try:
-                try:
-                    print(f"\n🔹 Conectando ao Gemini via SDK legado ({current_model})...")
-                    model = genai.GenerativeModel(model_name=current_model)
-                    response = model.generate_content(f"{prompt_system}\n\n{user_message}")
-                    if response and response.text:
-                        print(f"{GREEN}✅ Sucesso! Resposta recebida do modelo: {current_model}{RESET}")
-                        return response.text
-                except Exception as model_err:
-                    print(f"❌ Erro ao tentar modelo {current_model} via SDK legado: {model_err}")
-                    time.sleep(1)
+                err_str = str(model_err)
+                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                    _last_429_time = time.time()
+                    print(f"{YELLOW}⚠️ Cota da API Gemini excedida (ou sem créditos em AI Studio). O robô continuará operando normalmente com os Filtros Técnicos.{RESET}")
+                    return None
+                elif "404" in err_str:
                     continue
-        except Exception as legacy_err:
-            print(f"❌ Falha crítica de conexão com Gemini: {legacy_err}")
+                else:
+                    print(f"❌ Erro ao consultar IA no modelo {current_model}: {model_err}")
+                    continue
 
-    print("❌ FALHA CRÍTICA: Nenhum modelo da IA Gemini respondeu.")
+    except Exception as e:
+        print(f"❌ Falha de integração com Gemini: {e}")
+
     return None
 
 def interpret_gemini_response(response_text):
@@ -158,9 +154,6 @@ def interpret_gemini_response(response_text):
             print(f"🟡 Sinal {YELLOW}NEUTRO{RESET} recebido do Gemini.\n")
             return {'action': None, 'signal': 'NEUTRO', 'justification': justificativa}
 
-    except json.JSONDecodeError:
-        print(f"Erro ao decodificar JSON do Gemini: {response_text}")
-        return None
     except Exception as e:
-        print(f"Erro ao interpretar resposta do Gemini: {e}")
+        print(f"Erro ao interpretar resposta da IA: {e}")
         return None
