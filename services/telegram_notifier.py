@@ -1,6 +1,24 @@
 import aiohttp
 import asyncio
-import logging
+
+async def send_telegram_message(bot_token, chat_id, message):
+    """Envia uma mensagem assíncrona para o Telegram."""
+    if not bot_token or not chat_id:
+        return None
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    payload = {
+        "chat_id": chat_id,
+        "text": message,
+        "parse_mode": "HTML"
+    }
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload) as response:
+                return await response.json()
+    except Exception as e:
+        print(f"🚨 Erro ao enviar mensagem no Telegram: {e}")
+        return None
 
 class TelegramBot:
     def __init__(self, token, allowed_chat_id, command_handler):
@@ -37,8 +55,7 @@ class TelegramBot:
                     data = await response.json()
                     return data.get('result', [])
                 return []
-        except Exception as e:
-            # print(f"Erro de conexão Telegram: {e}")
+        except Exception:
             return []
 
     async def process_update(self, update, session):
@@ -48,13 +65,12 @@ class TelegramBot:
         chat_id = str(message['chat']['id'])
         text = message.get('text', '').strip()
         
-        # Security check: only allow configured chat_id
         if chat_id != self.allowed_chat_id:
-            print(f"⛔ Comando ignorado de chat_id desconhecido: {chat_id}")
+            print(f"⛔ Comando ignorado de chat_id não autorizado: {chat_id}")
             return
         
         if text.startswith('/'):
-            print(f"📩 Comando recebido: {text}")
+            print(f"📩 Comando recebido no Telegram: {text}")
             response = await self.command_handler(text)
             if response:
                 await self.send_message(session, chat_id, response)
@@ -65,4 +81,4 @@ class TelegramBot:
             payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
             await session.post(url, json=payload)
         except Exception as e:
-            print(f"Erro ao enviar mensagem Telegram: {e}")
+            print(f"Erro ao responder Telegram: {e}")

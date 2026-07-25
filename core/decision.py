@@ -1,25 +1,17 @@
 import asyncio
 import math
-import time
-import os
 import pandas as pd
-from pathlib import Path
-from dotenv import load_dotenv
-load_dotenv()
-
 from binance.exceptions import BinanceAPIException
-from trading_functions import calculate_moving_average_sell_pressure, calculate_atr
-from binance_api import get_order_book, get_klines
-from telegram_integration import send_telegram_message
-from config import TRADING_CONFIG, RSI_CONFIG, OCO_CONFIG, TELEGRAM_CONFIG, ATR_CONFIG, API_KEYS
-from gemini_analysis import analyze_with_gemini, interpret_gemini_response
+from core.indicators import calculate_moving_average_sell_pressure, calculate_atr
+from services.binance_client import get_order_book
+from services.telegram_notifier import send_telegram_message
+from config.settings import TRADING_CONFIG, RSI_CONFIG, OCO_CONFIG, TELEGRAM_CONFIG, ATR_CONFIG, API_KEYS
+from services.gemini_ai import analyze_with_gemini, interpret_gemini_response
+from services.database import DatabaseManager
 
 pd.set_option('future.no_silent_downcasting', True)
 
 async def should_place_order(client, symbol, sell_pressure_threshold=None, interval=None, limit=None, status_callback=None, silent=False):
-    """
-    Determina se uma ordem deve ser colocada com base na pressão de venda média.
-    """
     if sell_pressure_threshold is None: sell_pressure_threshold = TRADING_CONFIG['sell_pressure_threshold']
     if interval is None: interval = TRADING_CONFIG['interval']
     if limit is None: limit = TRADING_CONFIG['limit']
@@ -41,15 +33,84 @@ async def should_place_order(client, symbol, sell_pressure_threshold=None, inter
         await asyncio.sleep(0.15)
     return False
 
+async def get_historical_trades_data():
+    try:
+        db = DatabaseManager()
+        df = db.get_recent_trades(limit=20)
+        
+        if df.empty:
+            return "Nenhum dado histórico disponível."
+
+        cols_to_keep = ["Símbolo", "Preço de Compra", "VWAP", "Data/Hora da Compra", "Resultado da Ordem OCO", "Data/Hora OCO",
+                        "RSI da operação", "Condição Atendida", "Intervalo de tempo (Candles)", "Padrões de Candle", 
+                        "Tendência de Alta"]
+        
+        existing_cols = [col for col in cols_to_keep if col in df.columns]
+        df = df[existing_cols]
+
+        df = df.infer_objects(copy=False)
+        if "Resultado da Ordem OCO" in df.columns:
+            df["Resultado da Ordem OCO"] = df["Resultado da Ordem OCO"].replace({"profit": 1, "stop loss": 0})
+        
+        if "Padrões de Candle" in df.columns:
+            df["Padrões de Candle"] = df["Padrões de Candle"].fillna("Nenhum")
+        
+        return df.to_string(index=False)
+    except Exception as e:
+        return f"Erro ao ler histórico do banco de dados: {e}"
+
+async def get_gemini_analysis(candle_data, candle_patterns, rsi, macd, bollinger_bands, sell_pressure, order_book, candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation, 
+                              ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, historical_trades_data,
+                              client, symbol):
+    gemini_api_key = API_KEYS.get('gemini')
+    if not gemini_api_key: return None
+
+    try:
+        return await asyncio.get_running_loop().run_in_executor(
+            None,
+            analyze_with_gemini,
+            candle_data,
+            candle_patterns,
+            rsi,
+            macd,
+            bollinger_bands,
+            sell_pressure,
+            order_book,
+            candle_open,
+            candle_high,
+            candle_low,
+            candle_close,
+            candle_volume,
+            variation_24h,
+            candle_variation,
+            ema7,
+            ema15,
+            ema25,
+            ema50,
+            ema100,
+            ema200,
+            vwap,
+            trend_is_up,
+            SELL_PRESSURE_THRESHOLD_1,
+            period,
+            num_std,
+            short_period,
+            long_period,
+            limit,
+            depth,
+            maxlen,
+            volume_avg,
+            historical_trades_data,
+            gemini_api_key
+        )
+    except Exception as e:
+        print(f"Erro ao obter análise do Gemini: {e}")
+        return None
+
 async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_close, lower_band, middle_band, upper_band, vwap, candle_patterns, candle_open, candle_high, candle_low, 
                      candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, symbol, klines, silent=False, config_override=None):
-    """
-    Avalia se as condições são adequadas para comprar.
-    """
-    # Use config override if provided
     rsi_config = config_override.get('RSI_CONFIG', RSI_CONFIG) if config_override else RSI_CONFIG
     
-    # Use dynamic RSI levels
     rsi_low_level0 = rsi <= rsi_config['dynamic_low'][0]
     rsi_low_level1 = rsi <= rsi_config['dynamic_low'][1]
     rsi_low_level2 = rsi <= rsi_config['dynamic_low'][2]
@@ -61,7 +122,6 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
     vwap_tolerance = 0.07
     price_below_vwap = last_close < vwap * (1 + vwap_tolerance)
 
-    # EMA200 Trend Filter
     use_ema_filter = TRADING_CONFIG.get('use_ema_filter', True)
     if config_override and 'TRADING_CONFIG' in config_override:
         use_ema_filter = config_override['TRADING_CONFIG'].get('use_ema_filter', use_ema_filter)
@@ -71,20 +131,14 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
         if ema200 > 0:
             trend_confirmed = last_close > ema200
         else:
-            # If EMA200 is not available (not enough data), we might want to skip or fallback.
-            # For safety, let's assume no trend if data is missing, or allow if we want to be risky.
-            # Let's be conservative: if we want a filter and data is missing, we don't buy.
             trend_confirmed = False
 
     if not trend_confirmed:
         return {"buy": False, "message": "Trend not confirmed (Price < EMA200)", "candle_data": "", "gemini_response": None}
 
-    # Gatekeeper: Só chame a IA se o mercado estiver técnico favorável (RSI < 55)
-    # Isso economiza 90% das chamadas de API e evita erro 429.
     if rsi > 55:
         return {"buy": False, "message": "RSI alto, IA ignorada", "candle_data": "", "gemini_response": None}
 
-    # Prepare data for Gemini
     gemini_response = await get_gemini_analysis(
         f"Open: {candle_open}, High: {candle_high}, Low: {candle_low}, Close: {candle_close}, Volume: {candle_volume}",
         candle_patterns,
@@ -109,10 +163,7 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
         symbol
     )
 
-    if gemini_response:
-        gemini_buy_signal = interpret_gemini_response(gemini_response)
-    else:
-        gemini_buy_signal = None
+    gemini_buy_signal = interpret_gemini_response(gemini_response) if gemini_response else None
 
     if rsi_low_level0:
         if not silent:
@@ -158,63 +209,10 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
 
     return {"buy": False, "message": None, "candle_data": "", "gemini_analysis": gemini_buy_signal}
 
-async def get_gemini_analysis(candle_data, candle_patterns, rsi, macd, bollinger_bands, sell_pressure, order_book, candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation, 
-                              ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1, period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, historical_trades_data,
-                              client, symbol):
-    """Função auxiliar para obter a análise do Gemini."""
-    gemini_api_key = API_KEYS['gemini']
-    if not gemini_api_key: return None
-
-    try:
-        return await asyncio.get_running_loop().run_in_executor(
-            None,
-            analyze_with_gemini,
-            gemini_api_key,
-            candle_data,
-            candle_patterns,
-            rsi,
-            macd,
-            bollinger_bands,
-            sell_pressure,
-            order_book,
-            candle_open,
-            candle_high,
-            candle_low,
-            candle_close,
-            candle_volume,
-            variation_24h,
-            candle_variation,
-            ema7,
-            ema15,
-            ema25,
-            ema50,
-            ema100,
-            ema200,
-            vwap,
-            trend_is_up,
-            SELL_PRESSURE_THRESHOLD_1,
-            period,
-            num_std,
-            short_period,
-            long_period,
-            limit,
-            depth,
-            maxlen,
-            volume_avg,
-            historical_trades_data
-        )
-    except Exception as e:
-        print(f"Erro ao obter análise do Gemini: {e}")
-        return None
-
 def should_sell(rsi, trend_is_up, macd_current, signal_line_current, last_close, lower_band, vwap):
-    """
-    Avalia se as condições são adequadas para vender.
-    """
     rsi_high = rsi >= RSI_CONFIG['high']
     macd_bearish = macd_current < signal_line_current and last_close > lower_band
     price_above_vwap = last_close > vwap
-
     return (rsi_high and not trend_is_up) or macd_bearish or price_above_vwap
 
 def adjust_price_to_tick_size(price, tick_size):
@@ -234,20 +232,19 @@ def get_min_notional(symbol_info):
     min_notional_filter = next((f for f in symbol_info['filters'] if f['filterType'] == 'MIN_NOTIONAL'), None)
     if min_notional_filter:
         return float(min_notional_filter['minNotional'])
-    return 5.0 # Fallback
+    return 5.0
 
 def calculate_adjustment(price, quantity, required_notional, current_notional):
     if current_notional < required_notional:
         ratio = required_notional / current_notional
-        new_quantity = quantity * ratio * 1.01 # +1% buffer
+        new_quantity = quantity * ratio * 1.01
         return price, new_quantity
     return price, quantity
 
+def get_precision(tick_size):
+    return int(-math.log10(tick_size))
+
 async def adjust_and_place_oco_order(client, symbol, quantity, tick_size, min_price_move, klines, silent=False, config_override=None):
-    """
-    Calcula preços e coloca ordem OCO.
-    """
-    # Use config override if provided
     atr_config = config_override.get('ATR_CONFIG', ATR_CONFIG) if config_override else ATR_CONFIG
     oco_config = config_override.get('OCO_CONFIG', OCO_CONFIG) if config_override else OCO_CONFIG
 
@@ -255,7 +252,6 @@ async def adjust_and_place_oco_order(client, symbol, quantity, tick_size, min_pr
     
     for attempt in range(max_attempts):
         try:
-            # Validate balance
             symbol_info = await client.get_symbol_info(symbol)
             base_asset = symbol_info['baseAsset']
             balance_info = await client.get_asset_balance(asset=base_asset)
@@ -266,26 +262,16 @@ async def adjust_and_place_oco_order(client, symbol, quantity, tick_size, min_pr
                 quantity = free_balance
 
             quantity = adjust_quantity_to_lot_size(quantity, symbol_info)
-
             order_book = await get_order_book(client, symbol)
             current_price = float(order_book['asks'][0][0])
-
-            # Calculate ATR
             atr = calculate_atr(klines, atr_config['period'])
-            
             use_atr = atr_config.get('use_atr_stop', False)
             
             if use_atr and atr > 0:
                 lucro_alvo = current_price + (atr * atr_config['tp_multiplier'])
                 stop_loss = current_price - (atr * atr_config['sl_multiplier'])
-                
                 if not silent: print(f"🔹 Usando ATR para SL/TP. ATR: {atr:.4f}, TP: {lucro_alvo:.4f}, SL: {stop_loss:.4f}")
-                
             else:
-                # Fixed Percentage Logic (Fallback)
-                if use_atr and not silent:
-                    print("🔸 ATR inválido ou insuficiente. Usando multiplicadores fixos.")
-                
                 if current_price < 1:
                     lucro_multiplier = oco_config['price_under_1']['profit_multiplier']
                     stop_loss_multiplier = oco_config['price_under_1']['stop_loss_multiplier']
@@ -297,41 +283,22 @@ async def adjust_and_place_oco_order(client, symbol, quantity, tick_size, min_pr
                 stop_loss = current_price * stop_loss_multiplier
 
             stop_limit = stop_loss * 0.999
-            
             lucro_alvo = adjust_price_to_tick_size(lucro_alvo, tick_size)
             stop_loss = adjust_price_to_tick_size(stop_loss, tick_size)
             stop_limit = adjust_price_to_tick_size(stop_limit, tick_size)
 
-            params = {
-                'symbol': symbol,
-                'side': 'SELL',
-                'quantity': quantity,
-                'price': f"{lucro_alvo:.2f}",
-                'stopPrice': f"{stop_loss:.2f}",
-                'stopLimitPrice': f"{stop_limit:.2f}",
-                'stopLimitTimeInForce': 'GTC'
-            }
-            
-            # If silent (backtest), we don't actually place the order on Binance
             if silent:
                 return {
                     'orderListId': 'SIMULATED',
                     'orders': [{'orderId': 'SIM_STOP'}, {'orderId': 'SIM_LIMIT'}]
                 }, 'SIM_LIMIT', 'SIM_STOP', lucro_alvo, stop_loss, stop_limit
 
-            # Retrieve step_size for formatting
             lot_size_filter = next(filter for filter in symbol_info['filters'] if filter['filterType'] == 'LOT_SIZE')
             step_size = float(lot_size_filter['stepSize'])
             qty_str = f"{quantity:.{get_precision(step_size)}f}"
-
             p_str = f"{lucro_alvo:.{get_precision(tick_size)}f}"
             sl_str = f"{stop_loss:.{get_precision(tick_size)}f}"
-            
             sl_limit_str = f"{stop_limit:.{get_precision(tick_size)}f}"
-            
-            # Use explicit parameters as in the old working code
-            # Note: create_oco_order in newer python-binance might not take **kwargs nicely if signatures changed, 
-            # but the error 'Mandatory parameter aboveType' suggests we are interacting with an endpoint/method that expects this raw structure.
             
             params = {
                 'symbol': symbol,
@@ -343,22 +310,14 @@ async def adjust_and_place_oco_order(client, symbol, quantity, tick_size, min_pr
                 'belowStopPrice': sl_str,
                 'belowPrice': sl_limit_str,
                 'belowTimeInForce': 'GTC',
-                #'timestamp': int(time.time() * 1000) # Library usually handles timestamp, but old code added it. Let's omit first to avoid conflict, or add if fails.
             }
-            
-            if not silent:
-                print(f"DEBUG: OCO Params (Manual): {params}")
 
             oco_order = await client.create_oco_order(**params)
-            
-            # Since we removed stopLimit, the response might not have 'stopLimitPrice'.
-            # Adjust return values or usage accordingly if needed.
-
             order_list_id = oco_order.get('orderListId', 'N/A')
             limit_order_id = oco_order['orders'][1]['orderId']
             stop_order_id = oco_order['orders'][0]['orderId']
             
-            message = f"✅️ Ordem OCO colocada. Moeda: <b>{symbol}</b>. ID: <b>{order_list_id}</b>. Lucro: <b>${lucro_alvo:.4f}</b>, Preço de Parada: <b>${stop_loss:.4f}</b>"
+            message = f"✅️ Ordem OCO colocada. Moeda: <b>{symbol}</b>. ID: <b>{order_list_id}</b>. Lucro: <b>${lucro_alvo:.4f}</b>, Stop: <b>${stop_loss:.4f}</b>"
             print(f"✅️ Ordem OCO colocada: {symbol}")
             asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
             
@@ -381,9 +340,6 @@ async def adjust_and_place_oco_order(client, symbol, quantity, tick_size, min_pr
     raise Exception("Falha ao colocar ordem OCO")
 
 def adjust_rsi_levels(result, silent=False):
-    """
-    Ajusta os níveis de RSI dinâmicos.
-    """
     if result == 'stop loss':
         for i in range(6):
             RSI_CONFIG['dynamic_low'][i] = max(RSI_CONFIG['dynamic_low'][i] - 2, RSI_CONFIG['min'][i])
@@ -395,40 +351,3 @@ def adjust_rsi_levels(result, silent=False):
         print(f"\033[1mRSI ajustados:\033[0m {list(RSI_CONFIG['dynamic_low'].values())}")
         message = f"<b>RSI ajustados:</b> {list(RSI_CONFIG['dynamic_low'].values())}"
         asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message))
-
-from database import DatabaseManager
-
-async def get_historical_trades_data():
-    """
-    Lê os dados do banco de dados SQLite.
-    """
-    try:
-        db = DatabaseManager()
-        df = db.get_recent_trades(limit=20)
-        
-        if df.empty:
-            return "Nenhum dado histórico disponível."
-
-        cols_to_keep = ["Símbolo", "Preço de Compra", "VWAP", "Data/Hora da Compra", "Resultado da Ordem OCO", "Data/Hora OCO",
-                 "RSI da operação", "Condição Atendida", "Intervalo de tempo (Candles)", "Padrões de Candle", 
-                 "Tendência de Alta"]
-        
-        existing_cols = [col for col in cols_to_keep if col in df.columns]
-        df = df[existing_cols]
-
-        # No need to tail(20) as get_recent_trades already limits
-
-        df = df.infer_objects(copy=False)
-        if "Resultado da Ordem OCO" in df.columns:
-            df["Resultado da Ordem OCO"] = df["Resultado da Ordem OCO"].replace({"profit": 1, "stop loss": 0})
-        
-        if "Padrões de Candle" in df.columns:
-            df["Padrões de Candle"] = df["Padrões de Candle"].fillna("Nenhum")
-        
-        return df.to_string(index=False)
-
-    except Exception as e:
-        return f"Erro ao ler histórico do banco de dados: {e}"
-
-def get_precision(tick_size):
-    return int(-math.log10(tick_size))

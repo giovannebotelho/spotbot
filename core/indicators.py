@@ -1,30 +1,25 @@
 import numpy as np
 import pandas as pd
-import asyncio
 from collections import deque
 from binance.exceptions import BinanceAPIException
+from services.binance_client import get_order_book, extract_closes
+from core.patterns import (
+    is_hammer, is_shooting_star, is_bullish_engulfing, is_piercing_line, is_dark_cloud_cover,
+    is_kicker_bullish, is_kicker_bearish, is_long_day, is_short_day, is_doji, is_doji_dragonfly,
+    is_doji_gravestone, is_doji_long_shadows, is_bullish_and_bearish_strike, is_rising_three_methods,
+    is_falling_three_methods, is_stick_sandwich
+)
+from config.settings import TRADING_CONFIG, ATR_CONFIG
 
-from binance_api import get_order_book, extract_closes
-from patterns import (is_hammer, is_shooting_star, is_bullish_engulfing, is_piercing_line, is_dark_cloud_cover, is_kicker_bullish, is_kicker_bearish, is_long_day, is_short_day, is_doji, is_doji_dragonfly, 
-                      is_doji_gravestone, is_doji_long_shadows, is_bullish_and_bearish_strike, is_rising_three_methods, is_falling_three_methods, is_stick_sandwich)
-from config import TRADING_CONFIG
-
-# Cria um deque para armazenar o histórico de pressão de venda
 sell_pressure_history = deque(maxlen=TRADING_CONFIG['maxlen'])
 
 def calculate_sell_pressure(order_book):
-    """
-    Calcula a pressão de venda com base na proporção das ordens de venda (asks) sobre o total de ordens no livro de ofertas.
-    """
     total_asks = sum(float(ask[1]) for ask in order_book['asks'])
     total_bids = sum(float(bid[1]) for bid in order_book['bids'])
     total = total_asks + total_bids
     return total_asks / total if total > 0 else 0
 
 async def calculate_moving_average_sell_pressure(client, symbol, interval=None, limit=None, depth=None):
-    """
-    Calcula a média móvel da pressão de venda para um símbolo específico.
-    """
     if depth is None:
         depth = TRADING_CONFIG['depth']
         
@@ -34,9 +29,6 @@ async def calculate_moving_average_sell_pressure(client, symbol, interval=None, 
     return sum(sell_pressure_history) / len(sell_pressure_history)
 
 def calculate_rsi(closes, period=None):
-    """
-    Calcula o Índice de Força Relativa (RSI).
-    """
     if period is None:
         period = TRADING_CONFIG['period']
 
@@ -44,7 +36,6 @@ def calculate_rsi(closes, period=None):
     gain = np.where(deltas > 0, deltas, 0)
     loss = np.where(deltas < 0, -deltas, 0)
 
-    # Wilder's Smoothing
     avg_gain = pd.Series(gain).ewm(alpha=1/period, min_periods=period, adjust=False).mean().iloc[-1]
     avg_loss = pd.Series(loss).ewm(alpha=1/period, min_periods=period, adjust=False).mean().iloc[-1]
 
@@ -56,9 +47,6 @@ def calculate_rsi(closes, period=None):
     return rsi
 
 def calculate_macd(closes, slow=None, fast=None, signal=None):
-    """
-    Calcula MACD.
-    """
     if slow is None: slow = TRADING_CONFIG['macd_slow']
     if fast is None: fast = TRADING_CONFIG['macd_fast']
     if signal is None: signal = TRADING_CONFIG['macd_signal']
@@ -71,9 +59,6 @@ def calculate_macd(closes, slow=None, fast=None, signal=None):
     return macd.iloc[-1], signal_line.iloc[-1]
 
 def calculate_bollinger_bands(closes, period=None, num_std=None):
-    """
-    Calcula Bandas de Bollinger.
-    """
     if period is None: period = TRADING_CONFIG['period']
     if num_std is None: num_std = TRADING_CONFIG['num_std']
 
@@ -87,28 +72,16 @@ def calculate_bollinger_bands(closes, period=None, num_std=None):
     return lower_band.iloc[-1], ma.iloc[-1], upper_band.iloc[-1]
 
 def calculate_volume_moving_average(volumes, period=None):
-    """
-    Calcula média móvel de volume.
-    """
     if period is None: period = TRADING_CONFIG['period']
     return sum(volumes[-period:]) / period
 
 def calculate_moving_average(closes, period):
-    """
-    Calcula média móvel simples.
-    """
     return sum(closes[-period:]) / period
 
 def calculate_ema(closes, period):
-    """
-    Calcula média móvel exponencial.
-    """
     return pd.Series(closes).ewm(span=period, adjust=False).mean().iloc[-1]
 
 def check_trend(klines, short_period=None, long_period=None):
-    """
-    Determina a tendência do mercado.
-    """
     if short_period is None: short_period = TRADING_CONFIG['short_period']
     if long_period is None: long_period = TRADING_CONFIG['long_period']
 
@@ -118,9 +91,6 @@ def check_trend(klines, short_period=None, long_period=None):
     return short_ma > long_ma
 
 def check_candle_patterns(klines):
-    """
-    Verifica padrões de candles.
-    """
     if not klines or len(klines) < 5:
         return None
 
@@ -153,9 +123,6 @@ def check_candle_patterns(klines):
     return patterns if patterns else None
 
 def get_candle_details(klines):
-    """
-    Obtém detalhes da vela.
-    """
     if klines:
         last_kline = klines[-1]
         return {
@@ -168,9 +135,6 @@ def get_candle_details(klines):
     return None
 
 def is_market_downward(klines, limit=4, high_amplitude_threshold=0.25):
-    """
-    Verifica se o mercado está em tendência de baixa.
-    """
     if not klines or len(klines) < limit:
         return False
 
@@ -183,18 +147,10 @@ def is_market_downward(klines, limit=4, high_amplitude_threshold=0.25):
         if close_price < open_price and amplitude >= high_amplitude_threshold:
             red_high_amplitude_candles += 1
     
-    if red_high_amplitude_candles >= 2:
-        return True
-    else:
-        return False
+    return red_high_amplitude_candles >= 2
 
 def calculate_atr(klines, period=None):
-    """
-    Calcula o Average True Range (ATR).
-    """
-    from config import ATR_CONFIG
     if period is None: period = ATR_CONFIG['period']
-    
     if not klines or len(klines) < period + 1:
         return 0.0
 
@@ -207,60 +163,31 @@ def calculate_atr(klines, period=None):
     tr3 = np.abs(lows[1:] - closes[:-1])
     
     tr = np.maximum(tr1, np.maximum(tr2, tr3))
-    
     tr_series = pd.Series(tr)
     atr = tr_series.ewm(alpha=1/period, min_periods=period, adjust=False).mean().iloc[-1]
-    
     return atr
 
 def calculate_vwap(closes, volumes):
-    """
-    Calcula o Volume Weighted Average Price (VWAP).
-    """
     if not closes or not volumes or len(closes) != len(volumes):
-      return np.nan
+        return np.nan
     
     closes_series = pd.Series(closes)
     volumes_series = pd.Series(volumes)
-    
     typical_price = (closes_series + closes_series.shift(1) + closes_series.shift(2)) / 3
-    
     cumulative_tp_volume = (typical_price * volumes_series).cumsum()
     cumulative_volume = volumes_series.cumsum()
-    
     vwap = cumulative_tp_volume / cumulative_volume
     return vwap.iloc[-1]
 
 async def calculate_fee(client, symbol, executed_qty, price):
-    """
-    Calcula a taxa da corretora.
-    """
     try:
         bnb_balance = await client.get_asset_balance(asset='BNB')
         bnb_balance = float(bnb_balance['free'])
-
-        if bnb_balance > 0:
-            fee_rate = 0.00075 * 2
-        else:
-            fee_rate = 0.001 * 2
-        
+        fee_rate = (0.00075 * 2) if bnb_balance > 0 else (0.001 * 2)
         return executed_qty * price * fee_rate
-    
-    except BinanceAPIException as e:
-        print(f"Erro ao obter informações da conta: {e}")
-        return 0.0
     except Exception as e:
-        print(f"Erro inesperado ao obter informações da conta: {e}")
+        print(f"Erro ao calcular taxa: {e}")
         return 0.0
 
 def calculate_trade_result(entry_price, quantity, exit_price):
-    """
-    Calcula o resultado financeiro de uma operação.
-    Args:
-        entry_price (float): Preço de entrada.
-        quantity (float): Quantidade negociada.
-        exit_price (float): Preço de saída.
-    Returns:
-        float: Resultado financeiro (Lucro ou Prejuízo).
-    """
     return (exit_price - entry_price) * quantity

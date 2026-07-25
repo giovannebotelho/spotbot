@@ -1,22 +1,40 @@
-# Pastas
-__pycache__/
-
-prints/
-
+# Ambientes Virtuais
 env_spotbot/
+venv/
+.venv/
+env/
 
-# Arquivos de configuração local
+# Cache Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Arquivos de Configuração Local e Segredos
 .env
-.key
+*.env
+!.env.example
+*.key
 
-# Logs
+# Banco de Dados e backups locais
+*.db
+*.sqlite
+*.sqlite3
+spotbot.db
+test_spotbot.db
+results.csv
+results_backup.csv
+optimization_results.json
+
+# Logs e Arquivos Temporários
 *.log
-
-# Planilhas de resultados
-*.xlsx
-*.csv
-
-# Outros arquivos temporários
-*.pyc
-*.pyo
+prints/
 last_sync_time.txt
+
+# IDEs e Editores
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# NiceGUI local cache
+.nicegui/

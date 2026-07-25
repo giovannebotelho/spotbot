@@ -16,7 +16,7 @@ O robô monitora o mercado 24 horas por dia. Ele usa indicadores clássicos para
 
 ### Passo 2: A Validação da IA (Google Gemini)
 Quando o filtro matemático encontra uma oportunidade, ele não compra imediatamente. Ele "chama" a Inteligência Artificial e envia uma foto do momento atual do mercado (preços, tendências, volume).
-*   **A Pergunta**: "IA, com base nestes dados, isso é uma oportunidade real ou uma armadilha?"
+*   **A Pergunta**: "IA, com base nestes dados, isso é uma oportunidade real ou armadilha?"
 *   **A Resposta**: A IA analisa o contexto e dá um veredito. Se ela aprovar, o robô segue para a compra.
 
 ### Passo 3: Proteção de Capital (Gerenciamento de Risco)
@@ -32,27 +32,15 @@ Uma interface web moderna (acessível pelo navegador) onde você pode:
 *   Ver o saldo da sua carteira em tempo real (USDT e BNB).
 *   Escolher qual moeda operar (ex: BTCUSDT, ETHUSDT).
 *   Iniciar e Parar o robô com um clique.
-
 *   Acompanhar logs detalhados do que o robô está fazendo.
-*   **Visualização Limpa**: O Card de Insight da IA agora pode ser minimizado para liberar a visão do gráfico, garantindo que você não perca nenhum detalhe da ação do preço.
 
 ### 📱 Controle via Telegram
 Você não precisa ficar na frente do computador. O robô envia mensagens para o seu celular:
 *   **Notificações**: Avisa quando comprou, vendeu ou teve lucro.
 *   **Comandos**: Você pode digitar `/saldo` para ver quanto dinheiro tem ou `/stop` para desligar o robô de onde estiver.
 
-### 💾 Banco de Dados Seguro
-Todas as operações são salvas em um banco de dados seguro (`SQLite`). Isso significa que mesmo se o computador desligar ou reiniciar, o histórico de suas operações não é perdido.
+### 💾 Banco de Dados Seguro (Híbrido)
+Todas as operações são salvas em um banco de dados seguro (`SQLite` local ou `PostgreSQL` na nuvem). Isso significa que mesmo se o computador desligar ou reiniciar, o histórico de suas operações não é perdido.
 
 ### 🧪 Simulador de Estratégia (Backtest)
 Antes de arriscar dinheiro real, o sistema permite testar suas configurações com dados do passado. Você pode ver como o robô teria se comportado nos últimos meses para ajustar a estratégia.
-
-## 4. Estrutura Técnica (Resumo)
-
-*   **Linguagem**: Python (robusto e rápido).
-*   **Interface**: NiceGUI (moderna e responsiva).
-*   **Conexão**: API Oficial da Binance (segurança bancária).
-*   **Inteligência**: Google Gemini 1.5 Flash (rápida e eficiente).
-
-## 5. Conclusão
-O SpotBot Pro é uma ferramenta poderosa que tira a emoção da negociação. Ele não se cansa, não sente medo e segue a estratégia à risca. Com a otimização recente, ele foi ajustado para ser **conservador**, priorizando a proteção do seu dinheiro em vez de fazer apostas arriscadas a todo momento.
