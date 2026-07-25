@@ -154,29 +154,33 @@ def is_market_downward(klines, period=24):
     return price_change < -2.0 and closes[-1] < ema50 and ema50 < ema200
 
 def check_candle_patterns(klines):
-    opens = [float(k[1]) for k in klines]
-    highs = [float(k[2]) for k in klines]
-    lows = [float(k[3]) for k in klines]
-    closes = [float(k[4]) for k in klines]
+    if not klines or len(klines) < 5:
+        return []
+
+    c1 = klines[-1]
+    c2 = klines[-2]
+    c3 = klines[-3]
+    c4 = klines[-4]
+    c5 = klines[-5]
 
     patterns = []
-    if is_hammer(opens, highs, lows, closes): patterns.append("Hammer")
-    if is_shooting_star(opens, highs, lows, closes): patterns.append("Shooting Star")
-    if is_bullish_engulfing(opens, highs, lows, closes): patterns.append("Bullish Engulfing")
-    if is_piercing_line(opens, highs, lows, closes): patterns.append("Piercing Line")
-    if is_dark_cloud_cover(opens, highs, lows, closes): patterns.append("Dark Cloud Cover")
-    if is_kicker_bullish(opens, highs, lows, closes): patterns.append("Bullish Kicker")
-    if is_kicker_bearish(opens, highs, lows, closes): patterns.append("Bearish Kicker")
-    if is_long_day(opens, highs, lows, closes): patterns.append("Long Day")
-    if is_short_day(opens, highs, lows, closes): patterns.append("Short Day")
-    if is_doji(opens, highs, lows, closes): patterns.append("Doji")
-    if is_doji_dragonfly(opens, highs, lows, closes): patterns.append("Dragonfly Doji")
-    if is_doji_gravestone(opens, highs, lows, closes): patterns.append("Gravestone Doji")
-    if is_doji_long_shadows(opens, highs, lows, closes): patterns.append("Long Legged Doji")
-    if is_bullish_and_bearish_strike(opens, highs, lows, closes): patterns.append("Three Line Strike")
-    if is_rising_three_methods(opens, highs, lows, closes): patterns.append("Rising Three Methods")
-    if is_falling_three_methods(opens, highs, lows, closes): patterns.append("Falling Three Methods")
-    if is_stick_sandwich(opens, highs, lows, closes): patterns.append("Stick Sandwich")
+    if is_hammer(c1): patterns.append("Hammer")
+    if is_shooting_star(c1): patterns.append("Shooting Star")
+    if is_bullish_engulfing(c2, c1): patterns.append("Bullish Engulfing")
+    if is_piercing_line(c2, c1): patterns.append("Piercing Line")
+    if is_dark_cloud_cover(c2, c1): patterns.append("Dark Cloud Cover")
+    if is_kicker_bullish(c2, c1): patterns.append("Bullish Kicker")
+    if is_kicker_bearish(c2, c1): patterns.append("Bearish Kicker")
+    if is_long_day(c1): patterns.append("Long Day")
+    if is_short_day(c1): patterns.append("Short Day")
+    if is_doji(c1): patterns.append("Doji")
+    if is_doji_dragonfly(c1): patterns.append("Dragonfly Doji")
+    if is_doji_gravestone(c1): patterns.append("Gravestone Doji")
+    if is_doji_long_shadows(c1): patterns.append("Long Legged Doji")
+    if is_bullish_and_bearish_strike(c2, c1): patterns.append("Three Line Strike")
+    if is_rising_three_methods(c5, c4, c3, c2, c1): patterns.append("Rising Three Methods")
+    if is_falling_three_methods(c5, c4, c3, c2, c1): patterns.append("Falling Three Methods")
+    if is_stick_sandwich(c3, c2, c1): patterns.append("Stick Sandwich")
 
     return patterns
 
