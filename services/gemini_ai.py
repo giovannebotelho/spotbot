@@ -12,7 +12,7 @@ def analyze_with_gemini(
     candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation, 
     ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1,
     period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, historical_trades_data,
-    api_key=None, model_name="gemini-2.0-flash"
+    api_key=None, model_name="gemini-2.5-flash"
 ):
     global _last_429_time
     now = time.time()
@@ -29,12 +29,11 @@ def analyze_with_gemini(
 
     current_datetime_str = datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
 
-    # Modelos recomendados na SDK moderna google-genai
+    # Modelos recomendados na SDK moderna google-genai (gemini-2.5-flash é o mais rápido e com melhor custo-benefício)
     models_to_try = [
-        "gemini-2.0-flash",
         "gemini-2.5-flash",
-        "gemini-2.0-flash-lite",
-        "gemini-1.5-flash"
+        "gemini-2.5-flash-lite",
+        "gemini-flash-latest"
     ]
 
     if model_name and model_name not in models_to_try:
