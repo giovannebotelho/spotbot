@@ -11,6 +11,14 @@ from services.database import DatabaseManager
 
 pd.set_option('future.no_silent_downcasting', True)
 
+def adjust_rsi_levels(result):
+    if result == 'profit':
+        for i in range(6):
+            RSI_CONFIG['dynamic_low'][i] = RSI_CONFIG['levels'][i]
+    elif result == 'stop loss':
+        for i in range(6):
+            RSI_CONFIG['dynamic_low'][i] = max(RSI_CONFIG['min'][i], RSI_CONFIG['dynamic_low'][i] - 1)
+
 async def should_place_order(client, symbol, sell_pressure_threshold=None, interval=None, limit=None, status_callback=None, silent=False):
     if sell_pressure_threshold is None: sell_pressure_threshold = TRADING_CONFIG['sell_pressure_threshold']
     if interval is None: interval = TRADING_CONFIG['interval']

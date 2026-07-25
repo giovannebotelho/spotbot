@@ -13,6 +13,13 @@ from config.settings import TRADING_CONFIG, ATR_CONFIG
 
 sell_pressure_history = deque(maxlen=TRADING_CONFIG['maxlen'])
 
+def calculate_trade_result(buy_price, quantity, sell_price):
+    return (sell_price - buy_price) * quantity
+
+async def calculate_fee(client, symbol, quantity, sell_price, fee_rate=0.001):
+    total_val = sell_price * quantity
+    return total_val * fee_rate
+
 def calculate_sell_pressure(order_book):
     total_asks = sum(float(ask[1]) for ask in order_book['asks'])
     total_bids = sum(float(bid[1]) for bid in order_book['bids'])
