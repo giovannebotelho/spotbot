@@ -62,7 +62,11 @@ TRADING_CONFIG = {
     'volume_avg': 50,
     'adx_period': 14,
     'min_adx': 20.0,
-    'sell_pressure_threshold': 0.65
+    'sell_pressure_threshold': 0.65,
+    'macd_fast': 12,
+    'macd_slow': 26,
+    'macd_signal': 9,
+    'use_ema_filter': True
 }
 
 RISK_PROFILES = {
@@ -88,13 +92,16 @@ PAPER_TRADING = False
 
 RSI_CONFIG = {
     'levels': [25, 23, 20, 18, 15, 12],
-    'dynamic_low': [25, 23, 20, 18, 15, 12]
+    'dynamic_low': [25, 23, 20, 18, 15, 12],
+    'min': [15, 15, 15, 15, 15, 15],
+    'high': 70
 }
 
 ATR_CONFIG = {
     'period': 14,
     'tp_multiplier': 2.0,
-    'sl_multiplier': 1.5
+    'sl_multiplier': 1.5,
+    'use_atr_stop': True
 }
 
 OCO_CONFIG = {

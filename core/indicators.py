@@ -11,7 +11,7 @@ from core.patterns import (
 )
 from config.settings import TRADING_CONFIG, ATR_CONFIG
 
-sell_pressure_history = deque(maxlen=TRADING_CONFIG['maxlen'])
+sell_pressure_history = deque(maxlen=TRADING_CONFIG.get('maxlen', 10))
 
 def calculate_trade_result(buy_price, quantity, sell_price):
     return (sell_price - buy_price) * quantity
@@ -28,7 +28,7 @@ def calculate_sell_pressure(order_book):
 
 async def calculate_moving_average_sell_pressure(client, symbol, interval=None, limit=None, depth=None):
     if depth is None:
-        depth = TRADING_CONFIG['depth']
+        depth = TRADING_CONFIG.get('depth', 20)
         
     order_book = await get_order_book(client, symbol, depth=depth)
     sell_pressure = calculate_sell_pressure(order_book)
@@ -37,7 +37,7 @@ async def calculate_moving_average_sell_pressure(client, symbol, interval=None, 
 
 def calculate_rsi(closes, period=None):
     if period is None:
-        period = TRADING_CONFIG['period']
+        period = TRADING_CONFIG.get('period', 14)
 
     deltas = np.diff(closes)
     gain = np.where(deltas > 0, deltas, 0)
@@ -54,9 +54,9 @@ def calculate_rsi(closes, period=None):
     return rsi
 
 def calculate_macd(closes, slow=None, fast=None, signal=None):
-    if slow is None: slow = TRADING_CONFIG['macd_slow']
-    if fast is None: fast = TRADING_CONFIG['macd_fast']
-    if signal is None: signal = TRADING_CONFIG['macd_signal']
+    if slow is None: slow = TRADING_CONFIG.get('macd_slow', 26)
+    if fast is None: fast = TRADING_CONFIG.get('macd_fast', 12)
+    if signal is None: signal = TRADING_CONFIG.get('macd_signal', 9)
 
     closes_series = pd.Series(closes)
     ema_fast = closes_series.ewm(span=fast, adjust=False).mean()
@@ -66,8 +66,8 @@ def calculate_macd(closes, slow=None, fast=None, signal=None):
     return macd.iloc[-1], signal_line.iloc[-1]
 
 def calculate_bollinger_bands(closes, period=None, num_std=None):
-    if period is None: period = TRADING_CONFIG['period']
-    if num_std is None: num_std = TRADING_CONFIG['num_std']
+    if period is None: period = TRADING_CONFIG.get('period', 14)
+    if num_std is None: num_std = TRADING_CONFIG.get('num_std', 2.0)
 
     closes_series = pd.Series(closes)
     rolling_mean = closes_series.rolling(window=period).mean()
@@ -89,7 +89,7 @@ def calculate_ema(closes, period):
     return ema.iloc[-1]
 
 def calculate_atr(klines, period=None):
-    if period is None: period = ATR_CONFIG['period']
+    if period is None: period = ATR_CONFIG.get('period', 14)
     highs = np.array([float(k[2]) for k in klines])
     lows = np.array([float(k[3]) for k in klines])
     closes = np.array([float(k[4]) for k in klines])
