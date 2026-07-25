@@ -148,12 +148,12 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             return "🛑 Comando recebido. Parando o bot..."
         elif cmd == '/status':
             return (
-                f"📊 <b>Status do Bot</b>\n"
-                f"Moeda: <b>{bot_status_data['symbol']}</b>\n"
-                f"Preço: <b>${bot_status_data['price']:.2f}</b>\n"
-                f"RSI: <b>{bot_status_data['rsi']:.2f}</b>\n"
-                f"Tendência: <b>{bot_status_data['trend']}</b>\n"
-                f"Ação: {bot_status_data['action']}"
+                f"📊 <b>Status do Bot SpotBot Pro</b>\n\n"
+                f"🪙 Par: <b>{bot_status_data['symbol']}</b>\n"
+                f"💵 Preço Atual: <b>${bot_status_data['price']:.2f}</b>\n"
+                f"📈 RSI Atual: <b>{bot_status_data['rsi']:.1f}</b>\n"
+                f"🎯 Tendência: <b>{bot_status_data['trend']}</b>\n"
+                f"⚡ Ação Atual: <i>{bot_status_data['action']}</i>"
             )
         elif cmd == '/saldo':
             c = None
@@ -163,14 +163,24 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 bnb = await c.get_asset_balance(asset='BNB')
                 bnb_free = float(bnb['free'])
                 bnb_price = await get_bnb_price(c)
-                return f"💰 <b>Saldos</b>\nUSDT: <b>${usdt:.2f}</b>\nBNB: <b>{bnb_free:.4f} (~${bnb_free*bnb_price:.2f})</b>"
+                return (
+                    f"💰 <b>Saldos da Carteira</b>\n\n"
+                    f"💵 USDT: <b>${usdt:.2f}</b>\n"
+                    f"🪙 BNB: <b>{bnb_free:.4f} (~${bnb_free*bnb_price:.2f})</b>"
+                )
             except Exception as e:
                 return f"Erro ao buscar saldo: {e}"
             finally:
                 if c: await c.close_connection()
         elif cmd == '/ajuda':
-            return "📚 <b>Comandos</b>: /status, /saldo, /stop, /ajuda"
-        return "❓ Comando não reconhecido."
+            return (
+                "📚 <b>Comandos Disponíveis</b>:\n"
+                "/status - Exibe o preço, RSI e estado atual do bot\n"
+                "/saldo - Consulta os saldos em USDT e BNB\n"
+                "/stop - Para a execução remota do bot\n"
+                "/ajuda - Mostra esta mensagem de ajuda"
+            )
+        return "❓ Comando não reconhecido. Digite /ajuda para ver as opções."
 
     if TELEGRAM_CONFIG.get('bot_token'):
         tg_bot = TelegramBot(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], handle_telegram_command)
@@ -183,7 +193,10 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
 
     log("\n🚀 \033[5;33mBot SpotBot Pro iniciado!\033[0m 🚀\n")
     if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
-        asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], "<b>🚀 Bot SpotBot Pro iniciado! 🚀</b>"))
+        asyncio.create_task(send_telegram_message(
+            TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+            "<b>🚀 Bot SpotBot Pro iniciado e monitorando o mercado! 🚀</b>"
+        ))
     
     try:
         db = DatabaseManager()
@@ -312,12 +325,32 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                               candle_low, candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, symbol, klines)
                 
                 if buy_result.get('gemini_analysis'):
-                     shared_market_data['gemini_insight'] = buy_result['gemini_analysis']
+                     insight = buy_result['gemini_analysis']
+                     shared_market_data['gemini_insight'] = insight
+                     if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                         signal = insight.get('signal', 'NEUTRO')
+                         emoji = "🟢" if signal == "COMPRA" else ("🔴" if signal == "VENDA" else "🟡")
+                         just = insight.get('justification', '')[:300]
+                         tg_msg = (
+                             f"{emoji} <b>Análise da IA Gemini ({symbol})</b>\n"
+                             f"Sinal: <b>{signal}</b> | RSI: <b>{rsi:.1f}</b>\n"
+                             f"<i>{just}</i>"
+                         )
+                         asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], tg_msg))
 
                 if buy_result["buy"]:
                     executed_condition = buy_result["message"]
                     log(f"🟢 Sinal de COMPRA ativado! Condição: {executed_condition}")
                     
+                    if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                        asyncio.create_task(send_telegram_message(
+                            TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                            f"🛒 <b>Sinal de COMPRA Ativado!</b>\n"
+                            f"Moeda: <b>{symbol}</b>\n"
+                            f"Motivo: <i>{executed_condition}</i>\n"
+                            f"Preço Atual: <b>${closes[-1]:.2f}</b>"
+                        ))
+
                     min_notional = get_min_notional(symbol_info)
                     if quantia_usdt_investimento_inicial < min_notional:
                         log(f"⚠️ Saldo insuficiente (${quantia_usdt_investimento_inicial:.2f}) para o mínimo exigido (${min_notional}).")
@@ -412,6 +445,11 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
 
     except asyncio.CancelledError:
         log("\n🛑 Bot parado pelo usuário.")
+        if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+            asyncio.create_task(send_telegram_message(
+                TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                "🛑 <b>SpotBot Pro parado pelo usuário.</b>"
+            ))
     except Exception as e:
         log(f"\n⚠️ Erro de execução: {e}")
     finally:
