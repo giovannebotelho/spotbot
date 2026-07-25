@@ -192,11 +192,6 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
     order_count = 0
 
     log("\n🚀 \033[5;33mBot SpotBot Pro iniciado!\033[0m 🚀\n")
-    if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
-        asyncio.create_task(send_telegram_message(
-            TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
-            "<b>🚀 Bot SpotBot Pro iniciado e monitorando o mercado! 🚀</b>"
-        ))
     
     try:
         db = DatabaseManager()
@@ -231,7 +226,16 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             quantia_usdt_investimento_inicial = saldo_inicial_usdt
         
         symbol = selected_symbol or TRADING_CONFIG.get("symbol", "BTCUSDT")
-        log(f"\n🪙 Símbolo selecionado: {symbol}")
+        log(f"🪙 Símbolo selecionado: {symbol}\n")
+
+        # Notificação Telegram completa na inicialização conforme solicitado
+        if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+            asyncio.create_task(send_telegram_message(
+                TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                f"<b>🚀 Bot SpotBot Pro iniciado! 🚀</b>\n\n"
+                f"💰 Saldo USDT disponível: <b>${saldo_inicial_usdt:.2f}</b>\n"
+                f"🪙 Símbolo selecionado: <b>{symbol}</b>"
+            ))
         
         await cancel_all_oco_orders(client, symbol)
         
@@ -325,18 +329,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                               candle_low, candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, symbol, klines)
                 
                 if buy_result.get('gemini_analysis'):
-                     insight = buy_result['gemini_analysis']
-                     shared_market_data['gemini_insight'] = insight
-                     if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
-                         signal = insight.get('signal', 'NEUTRO')
-                         emoji = "🟢" if signal == "COMPRA" else ("🔴" if signal == "VENDA" else "🟡")
-                         just = insight.get('justification', '')[:300]
-                         tg_msg = (
-                             f"{emoji} <b>Análise da IA Gemini ({symbol})</b>\n"
-                             f"Sinal: <b>{signal}</b> | RSI: <b>{rsi:.1f}</b>\n"
-                             f"<i>{just}</i>"
-                         )
-                         asyncio.create_task(send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], tg_msg))
+                     shared_market_data['gemini_insight'] = buy_result['gemini_analysis']
 
                 if buy_result["buy"]:
                     executed_condition = buy_result["message"]
@@ -345,10 +338,11 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
                         asyncio.create_task(send_telegram_message(
                             TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
-                            f"🛒 <b>Sinal de COMPRA Ativado!</b>\n"
-                            f"Moeda: <b>{symbol}</b>\n"
-                            f"Motivo: <i>{executed_condition}</i>\n"
-                            f"Preço Atual: <b>${closes[-1]:.2f}</b>"
+                            f"🛒 <b>Ordem de COMPRA Executada!</b>\n\n"
+                            f"🪙 Par: <b>{symbol}</b>\n"
+                            f"💵 Preço: <b>${closes[-1]:.2f}</b>\n"
+                            f"🎯 Motivo: <i>{executed_condition}</i>\n"
+                            f"💰 Valor: <b>${quantia_usdt_investimento_inicial:.2f} USDT</b>"
                         ))
 
                     min_notional = get_min_notional(symbol_info)
@@ -448,7 +442,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
             asyncio.create_task(send_telegram_message(
                 TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
-                "🛑 <b>SpotBot Pro parado pelo usuário.</b>"
+                "🛑 <b>Bot parado pelo usuário.</b>"
             ))
     except Exception as e:
         log(f"\n⚠️ Erro de execução: {e}")

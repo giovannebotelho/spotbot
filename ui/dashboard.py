@@ -236,7 +236,7 @@ async def index():
     ui.add_head_html('''
         <style>
             :root { --nicegui-default-padding: 0.5rem; }
-            body { background-color: #0B0E14; color: #f8fafc; font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+            body { background-color: #0B0E14; color: #f8fafc; font-family: 'Inter', system-ui, -apple-system, sans-serif; overflow-x: hidden; }
             ::-webkit-scrollbar { width: 6px; height: 6px; }
             ::-webkit-scrollbar-track { background: #0B0E14; }
             ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
@@ -246,9 +246,59 @@ async def index():
             .input-zinc .q-field__label { color: #64748b !important; }
             .input-zinc .q-field__control:before { border-color: #1e293b !important; }
             .terminal-font { font-family: 'JetBrains Mono', monospace; }
+
+            /* Marquee Ticker CoinMarketCap Style */
+            @keyframes ticker {
+                0% { transform: translate3d(0, 0, 0); }
+                100% { transform: translate3d(-50%, 0, 0); }
+            }
+            .ticker-wrap {
+                width: 100%;
+                overflow: hidden;
+                white-space: nowrap;
+                box-sizing: border-box;
+                background: #080B10;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            }
+            .ticker-move {
+                display: inline-block;
+                white-space: nowrap;
+                padding-right: 100%;
+                box-sizing: content-box;
+                animation: ticker 35s linear infinite;
+            }
+            .ticker-item {
+                display: inline-block;
+                padding: 0 1.25rem;
+                font-size: 0.7rem;
+                font-weight: 600;
+            }
         </style>
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     ''')
+
+    # Barra Marquee Estilo CoinMarketCap no Topo
+    with ui.element('div').classes('ticker-wrap py-1 flex items-center border-b border-slate-800/80'):
+        with ui.element('div').classes('ticker-move'):
+            ui.html('''
+                <span class="ticker-item text-slate-400">Market Cap: <b class="text-white">$2.38T</b> <span class="text-[#00F5A0]">(+0.62%)</span></span>
+                <span class="ticker-item text-slate-400">24h Vol: <b class="text-white">$78.4B</b></span>
+                <span class="ticker-item text-slate-400">Bitcoin Dominance: <b class="text-cyan-400">54.2%</b></span>
+                <span class="ticker-item text-slate-400">BTC: <b class="text-white">$64,340.00</b> <span class="text-[#00F5A0]">(+0.37%)</span></span>
+                <span class="ticker-item text-slate-400">ETH: <b class="text-white">$1,873.20</b> <span class="text-[#00F5A0]">(+0.81%)</span></span>
+                <span class="ticker-item text-slate-400">BNB: <b class="text-white">$568.49</b> <span class="text-[#00F5A0]">(+0.82%)</span></span>
+                <span class="ticker-item text-slate-400">SOL: <b class="text-white">$74.38</b> <span class="text-[#FF2E93]">(-1.44%)</span></span>
+                <span class="ticker-item text-slate-400">XRP: <b class="text-white">$1.09</b> <span class="text-[#00F5A0]">(+0.87%)</span></span>
+                
+                <span class="ticker-item text-slate-400">Market Cap: <b class="text-white">$2.38T</b> <span class="text-[#00F5A0]">(+0.62%)</span></span>
+                <span class="ticker-item text-slate-400">24h Vol: <b class="text-white">$78.4B</b></span>
+                <span class="ticker-item text-slate-400">Bitcoin Dominance: <b class="text-cyan-400">54.2%</b></span>
+                <span class="ticker-item text-slate-400">BTC: <b class="text-white">$64,340.00</b> <span class="text-[#00F5A0]">(+0.37%)</span></span>
+                <span class="ticker-item text-slate-400">ETH: <b class="text-white">$1,873.20</b> <span class="text-[#00F5A0]">(+0.81%)</span></span>
+                <span class="ticker-item text-slate-400">BNB: <b class="text-white">$568.49</b> <span class="text-[#00F5A0]">(+0.82%)</span></span>
+                <span class="ticker-item text-slate-400">SOL: <b class="text-white">$74.38</b> <span class="text-[#FF2E93]">(-1.44%)</span></span>
+                <span class="ticker-item text-slate-400">XRP: <b class="text-white">$1.09</b> <span class="text-[#00F5A0]">(+0.87%)</span></span>
+            ''')
 
     # Topbar Header Futurista
     with ui.header().classes('h-14 bg-[#0B0E14]/90 backdrop-blur-md border-b border-slate-800/80 flex items-center px-4 justify-between z-50'):
@@ -272,7 +322,8 @@ async def index():
             with ui.row().classes('items-center gap-2 hidden md:flex bg-[#121722] px-3 py-1 rounded-lg border border-slate-800'):
                 ui.label('USDT').classes('text-[0.6rem] font-bold text-slate-500')
                 usdt_val = ui.label('$0.00').classes('text-xs font-mono font-bold text-white')
-            status_indicator = ui.element('div').classes('w-2.5 h-2.5 rounded-full bg-[#FF2E93]')
+            # Pulso luminoso verde / rosa no cabeçalho
+            status_indicator = ui.element('div').classes('w-3 h-3 rounded-full bg-[#FF2E93] shadow-[0_0_10px_#FF2E93]')
 
     # Layout Principal
     with ui.row().classes('w-full min-h-[calc(100vh-3.5rem)] flex-nowrap gap-0 bg-[#0B0E14]'):
