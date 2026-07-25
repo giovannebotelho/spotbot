@@ -1,63 +1,94 @@
 # SpotBot Pro 🤖📈
 
-**SpotBot Pro** é um assistente de trading automatizado para o mercado **Spot da Binance**, combinando **Análise Técnica quantitativa** (RSI, MACD, Bandas de Bollinger, VWAP, EMAs, Padrões de Candlestick, ATR) com a **Inteligência Artificial Generativa do Google Gemini / Gemma** e controle total via **Dashboard Web (NiceGUI)** e **Notificações bidirecionais no Telegram**.
+[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Binance Spot](https://img.shields.io/badge/Binance-Spot%20API-yellow.svg)](https://www.binance.com/)
+[![Google Gemini](https://img.shields.io/badge/Google-Gemini%202.5--Flash-4285F4.svg)](https://aistudio.google.com/)
+
+**SpotBot Pro** é um assistente quantitativo de negociação automatizada no mercado **Spot da Binance**, combinando **Análise Técnica Avançada** (RSI, ADX, MACD, Bandas de Bollinger, VWAP, EMAs 7-200, Padrões de Candlestick, ATR) com a **Inteligência Artificial Generativa do Google Gemini (SDK `google-genai`)**, controlado por um **Terminal Web Institucional (NiceGUI & ECharts)** e notificações no **Telegram**.
 
 ---
 
 ## ✨ Funcionalidades Principais
 
-- 🖥️ **Dashboard Web Interativo (NiceGUI)**: Interface moderna em tempo real na porta `8080` com gráfico ECharts, saldo de USDT/BNB, controle de start/stop e exibição dos raciocínios da IA.
-- 🧠 **Validação por IA (Google GenAI)**: Suporte aos modelos de última geração (`gemini-2.5-flash`, `gemini-2.0-flash`, `gemma-3-27b-it`) para confirmação de sinais e filtragem de armadilhas de mercado.
-- 📱 **Bot Telegram Bidirecional**: Recebe alertas automáticos de ordens/lucros e responde a comandos (`/status`, `/saldo`, `/stop`, `/ajuda`).
-- 🛡️ **Gerenciamento de Risco Inteligente**: Ordens OCO (Lucro Alvo + Stop Loss), Stop baseado em Volatilidade (ATR) e Trailing Stop móvel automatizado.
-- 💾 **Persistência Híbrida de Dados**: Suporte nativo a `SQLite` (`spotbot.db`) para desenvolvimento local e `PostgreSQL` para deploy 24/7 na nuvem.
-- 🧪 **Simulador & Otimizador**: Ferramentas integradas para Backtest e Grid Search de parâmetros técnicos.
+- 🖥️ **Terminal Web Institucional (NiceGUI & ECharts)**:
+  - Tema *Deep Obsidian* com gráfico interativo de velas (candlesticks), volume e médias móveis.
+  - Ticker contínuo no topo estilo CoinMarketCap / DexScreener.
+  - Card holográfico da IA Gemini com justificativas técnicas em tempo real.
+  - Seletor de Perfis de Risco (**Conservador**, **Moderado**, **Agressivo**).
+  - Chave de **Paper Trading (Simulador de Mercado)**.
+- 🧠 **Validação por IA Generativa (Google Gemini 2.5-Flash)**:
+  - Análise contextual de velas, livro de ofertas, médias e volume.
+  - Tratamento inteligente de cotas com pausa de segurança sem interromper operações técnicas.
+- 📈 **Filtros Técnicos Robustos**:
+  - **ADX (Average Directional Index)**: Filtro anti-armadilha para evitar compras em mercados lateralizados.
+  - **RSI Dinâmico & VWAP**: Entradas cirúrgicas em sobrevenda extrema.
+  - **Padrões de Velas**: Detecção de Hammer, Engolfo, Doji, Shooting Star, Kicker e outros 12 padrões.
+- 🛡️ **Gerenciamento de Risco Integrado**:
+  - Ordens OCO (Lucro Alvo + Stop Loss).
+  - Stop Loss por Volatilidade (**ATR**).
+  - Trailing Stop Móvel automatizado.
+- 📱 **Bot Telegram Integrado**:
+  - Alertas automáticos de inicialização, compras, vendas, lucros e stops.
+  - Comandos interativos (`/status`, `/saldo`, `/stop`, `/ajuda`).
+- 💾 **Persistência de Dados**:
+  - Suporte nativo a `SQLite` local (`spotbot.db`) e `PostgreSQL` para deploy em nuvem.
 
 ---
 
-## 📂 Estrutura Modular do Projeto
+## 📂 Estrutura Modular do Repositório
 
 ```text
 spotbot/
 │
-├── config/             # Configurações centralizadas e variáveis .env
+├── config/                  # Configurações centralizadas e leitura do .env
 │   └── settings.py
-├── core/               # Motor de trading e indicadores técnicos
-│   ├── engine.py       # Loop assíncrono principal
-│   ├── decision.py     # Lógica de decisão de compra/venda, OCO e Trailing Stop
-│   ├── indicators.py   # Cálculos quânticos (RSI, MACD, Bollinger, VWAP, ATR)
-│   ├── patterns.py     # Reconhecimento de padrões de velas (Candlesticks)
-│   └── post_trade.py   # Tratamento de resultados pós-operação
-├── services/           # Integrações externas
-│   ├── binance_client.py # Cliente Binance API
-│   ├── database.py     # Gerenciador de Banco de Dados Híbrido (SQLite / PostgreSQL)
-│   ├── gemini_ai.py    # Conector oficial com a SDK google-genai
+├── core/                    # Núcleo quantitativo de trading
+│   ├── engine.py            # Loop assíncrono principal
+│   ├── decision.py          # Decisão de compra/venda, OCO e Trailing Stop
+│   ├── indicators.py        # Cálculos de RSI, ADX, MACD, Bollinger, VWAP, ATR, EMAs
+│   ├── patterns.py          # Reconhecimento de 17 padrões de velas (Candlesticks)
+│   └── post_trade.py        # Processamento e logs pós-operação
+├── services/                # Integrações externas
+│   ├── binance_client.py    # Cliente assíncrono da Binance API
+│   ├── database.py          # Gerenciador de Banco de Dados Híbrido (SQLite / PostgreSQL)
+│   ├── gemini_ai.py         # Conector oficial google-genai (Gemini 2.5-Flash)
 │   └── telegram_notifier.py # Notificações e Bot Telegram
-├── ui/                 # Interface Gráfica Web
-│   └── dashboard.py    # Painel NiceGUI
-├── backtest/           # Ferramentas de simulação
-│   └── runner.py       # Motor de Backtest
-├── utils/              # Formatação e utilitários
+├── ui/                      # Interface Web Grafica
+│   └── dashboard.py         # Terminal Web Institucional NiceGUI
+├── backtest/                # Ferramentas de simulação
+│   ├── runner.py            # Motor de Backtest
+│   └── optimizer.py         # Otimizador Grid Search
+├── utils/                   # Utilitários de texto e ANSI
 │   └── formatting.py
-├── Dockerfile          # Container para deploy no Railway / Docker
-├── Procfile            # Gerenciador de processos do Railway
-├── .env.example        # Modelo de variáveis de ambiente
-└── run.py              # Ponto de entrada unificado da aplicação
+├── docs/                    # Guias e tutoriais
+│   ├── DOCUMENTATION.md
+│   └── RAILWAY_DEPLOY_TUTORIAL.md
+├── Dockerfile               # Containerização para deploy em nuvem
+├── Procfile                 # Process Manager
+├── .env.example             # Modelo seguro de variáveis de ambiente
+├── requirements.txt         # Dependências do projeto
+└── run.py                   # Ponto de entrada unificado
 ```
 
 ---
 
-## 🚀 Como Rodar Localmente
+## 🚀 Como Rodar o Robô
 
-### 1. Criar o Ambiente Virtual
+### 1. Clonar o Repositório e Criar o Ambiente Virtual
+
 No Windows PowerShell:
 ```powershell
+git clone https://github.com/giovannebotelho/spotbot.git
+cd spotbot
 python -m venv env_spotbot
 .\env_spotbot\Scripts\activate
 ```
 
 No Linux / macOS:
 ```bash
+git clone https://github.com/giovannebotelho/spotbot.git
+cd spotbot
 python3 -m venv env_spotbot
 source env_spotbot/bin/activate
 ```
@@ -68,52 +99,55 @@ pip install -r requirements.txt
 ```
 
 ### 3. Configurar as Variáveis de Ambiente (`.env`)
-Copie o arquivo `.env.example` para `.env` e preencha suas chaves:
+Copie o arquivo `.env.example` para `.env`:
 ```bash
 cp .env.example .env
 ```
 
-### 4. Executar a Aplicação
+Abra o arquivo `.env` e preencha suas chaves:
+```env
+# Binance API (Chaves Spot)
+mainnet_api_key=SUA_BINANCE_API_KEY
+mainnet_secret_key=SEU_BINANCE_SECRET_KEY
 
-- **Modo Dashboard Web (Recomendado)**:
+# Google Gemini API Key (Obtenha em aistudio.google.com/app/apikey)
+gemini_api=SUA_GEMINI_API_KEY
+
+# Telegram Bot (Obtenha com o @BotFather)
+bot_token=SEU_TELEGRAM_BOT_TOKEN
+chat_id=SEU_TELEGRAM_CHAT_ID
+
+# Credenciais de Acesso ao Dashboard Web
+DASHBOARD_USER=admin
+DASHBOARD_PASSWORD=admin123
+```
+
+### 4. Iniciar a Aplicação
+
+- **Modo Terminal Web Dashboard (Recomendado)**:
   ```bash
   python run.py --mode dashboard
   ```
-  Acesse no seu navegador: `http://localhost:8080` (Credenciais padrão: `admin` / `admin123`).
+  Acesse no navegador: `http://localhost:8080`
 
 - **Modo Terminal CLI (Puro)**:
   ```bash
   python run.py --mode cli
   ```
 
-- **Modo Simulação (Backtest)**:
+- **Modo Simulação / Backtest**:
   ```bash
   python run.py --mode backtest --days 30
   ```
 
 ---
 
-## ☁️ Deploy 24/7 no Railway (Nuvem)
+## 🔒 Licença e Segurança
 
-O SpotBot Pro vem 100% preparado para ser implantado no **Railway**:
-
-1. Crie um novo projeto no [Railway.app](https://railway.app).
-2. Conecte seu repositório privado ou público do GitHub.
-3. Adicione um plugin de **PostgreSQL** no Railway (ele fornecerá a variável `DATABASE_URL` automaticamente).
-4. Em **Variables** do projeto no Railway, adicione suas chaves do `.env`:
-   - `mainnet_api_key`
-   - `mainnet_secret_key`
-   - `gemini_api`
-   - `bot_token`
-   - `chat_id`
-   - `DASHBOARD_USER`
-   - `DASHBOARD_PASSWORD`
-   - `DASHBOARD_SECRET_KEY`
-5. O Railway usará o `Dockerfile` / `Procfile` automaticamente para manter seu robô rodando 24 horas por dia sem gastar energia do seu computador!
+- **Chaves de API**: NUNCA envie seu arquivo `.env` ou chaves reais para o GitHub. O repositório vem com `.gitignore` configurado.
+- **Permissões Binance**: Ao criar sua API Key na Binance, desative permissões de **Saque** e **Transferência**, deixando ativas apenas **Leitura** e **Trading Spot**.
 
 ---
 
-## 🔒 Licença e Segurança
-
-- Nunca suba o seu arquivo `.env` ou o arquivo `spotbot.db` para o GitHub.
-- Certifique-se de restringir a permissão das suas API Keys da Binance apenas para **Leitura** e **Trading Spot** (Desative permissões de Saque/Transferência).
+## 📜 Licença
+Este projeto está sob a licença MIT. Sinta-se livre para colaborar e usar.
