@@ -2,7 +2,7 @@ from nicegui import ui, app
 import os
 import asyncio
 from collections import deque
-from config.settings import DASHBOARD_CONFIG, RISK_PROFILES, TRADING_CONFIG, RSI_CONFIG
+from config.settings import DASHBOARD_CONFIG, RISK_PROFILES, TRADING_CONFIG, RSI_CONFIG, TOP_20_SYMBOLS
 import config.settings as settings
 from services.database import DatabaseManager
 import core.engine as engine
@@ -16,6 +16,7 @@ status_ui = None
 bot_task = None
 candle_chart = None
 recent_trades_table = None
+scanner_table = None
 ai_card = None
 ai_signal_label = None
 ai_reason_markdown = None
@@ -228,7 +229,7 @@ async def index():
         return ui.navigate.to('/login')
 
     global log_ui, status_ui, investment_input, symbol_select, bnb_val, bnb_usdt_val, usdt_val
-    global total_profit_val, win_rate_val, recent_trades_table, status_indicator, candle_chart
+    global total_profit_val, win_rate_val, recent_trades_table, status_indicator, candle_chart, scanner_table
     global ai_signal_label, ai_reason_markdown, ai_card, ai_icon_container, risk_profile_select, paper_trading_switch
     
     ui.colors(primary='#00E5FF', secondary='#64748b', accent='#00F5A0', positive='#00F5A0', negative='#FF2E93', dark='#0B0E14')
@@ -330,9 +331,9 @@ async def index():
         # Sidebar Esquerda
         with ui.column().classes('w-64 flex-shrink-0 bg-[#0B0E14] border-r border-slate-800/80 h-full p-4 gap-4'):
             with ui.column().classes('w-full gap-2'):
-                ui.label('CONFIGURAÇÃO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
-                symbol_select = ui.select(['BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'SOLUSDT', 'ADAUSDT'], value='BTCUSDT').props('outlined dense options-dense color=cyan-500').classes('w-full input-zinc font-mono text-xs')
-                investment_input = ui.input('Valor (USDT)', value='100%').props('outlined dense color=cyan-500').classes('w-full input-zinc font-mono text-xs')
+                ui.label('MODO DE MONITORAMENTO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
+                symbol_select = ui.select(['⚡ SCANNER TOP 20'] + TOP_20_SYMBOLS, value='⚡ SCANNER TOP 20').props('outlined dense options-dense color=cyan-500').classes('w-full input-zinc font-mono text-xs')
+                investment_input = ui.input('Valor USDT por Ordem', value='Dinâmico (Min $10)').props('outlined dense color=cyan-500').classes('w-full input-zinc font-mono text-xs')
                 
                 ui.label('PERFIL DE RISCO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
                 risk_profile_select = ui.select(['Conservador', 'Moderado', 'Agressivo'], value='Moderado', on_change=lambda e: set_risk_profile(e.value)).props('outlined dense options-dense color=cyan-500').classes('w-full input-zinc text-xs')
@@ -340,8 +341,8 @@ async def index():
                 ui.label('PAPER TRADING').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
                 paper_trading_switch = ui.switch('Simulação', value=False, on_change=toggle_paper_trading).props('dense color=cyan-500').classes('text-xs text-slate-400')
 
-                ui.label('TIMEFRAME').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
-                ui.toggle(['1m', '15m', '1h', '4h'], value='1h', on_change=lambda e: update_timeframe(e.value)).props('unelevated dense spread size=xs color=slate-900 text-color=slate-400 toggle-color=cyan-600').classes('w-full border border-slate-800 rounded-lg overflow-hidden')
+                ui.label('TIMEFRAME ADAPTATIVO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
+                ui.toggle(['Adaptativo (1h/15m)', '15m (Scalping)', '1h (Swing)'], value='Adaptativo (1h/15m)').props('unelevated dense spread size=xs color=slate-900 text-color=slate-400 toggle-color=cyan-600').classes('w-full border border-slate-800 rounded-lg overflow-hidden text-[0.6rem]')
 
             with ui.column().classes('w-full gap-2 mt-2'):
                 ui.label('PERFORMANCE').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')

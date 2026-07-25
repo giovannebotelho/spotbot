@@ -1,3 +1,4 @@
+import asyncio
 from config.settings import TRADING_CONFIG
 
 async def get_usdt_balance(client):
@@ -29,6 +30,19 @@ async def get_klines(client, symbol, interval, limit):
     """Obtém as velas (klines) para um símbolo específico."""
     klines = await client.get_klines(symbol=symbol, interval=interval, limit=limit)
     return klines
+
+async def get_multi_klines(client, symbols, interval, limit):
+    """Obtém klines em lote de forma assíncrona para múltiplos símbolos."""
+    async def fetch(sym):
+        try:
+            res = await client.get_klines(symbol=sym, interval=interval, limit=limit)
+            return sym, res
+        except Exception:
+            return sym, []
+
+    tasks = [fetch(s) for s in symbols]
+    results = await asyncio.gather(*tasks)
+    return dict(results)
 
 async def get_bnb_price(client):
     """Obtém o preço atual do BNB em USDT."""

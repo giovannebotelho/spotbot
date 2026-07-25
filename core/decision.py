@@ -2,7 +2,7 @@ import asyncio
 import math
 import pandas as pd
 from binance.exceptions import BinanceAPIException
-from core.indicators import calculate_moving_average_sell_pressure, calculate_atr, calculate_adx
+from core.indicators import calculate_moving_average_sell_pressure, calculate_atr, calculate_adx, calculate_ema
 from services.binance_client import get_order_book
 from services.telegram_notifier import send_telegram_message
 from config.settings import TRADING_CONFIG, RSI_CONFIG, OCO_CONFIG, TELEGRAM_CONFIG, ATR_CONFIG, API_KEYS
@@ -10,6 +10,32 @@ from services.gemini_ai import analyze_with_gemini, interpret_gemini_response
 from services.database import DatabaseManager
 
 pd.set_option('future.no_silent_downcasting', True)
+
+def calculate_dynamic_position_slots(total_usdt, min_usdt_per_slot=10.0):
+    """
+    Calcula dinamicamente a quantidade de slots e o valor por ordem em USDT.
+    Garante rigorosamente que NENHUMA ordem seja inferior a $10.00 USDT.
+    Exemplo:
+      - Saldo $10-$19: 1 slot de $10-$19.
+      - Saldo $30: 3 slots de $10 (ou 2 slots de $15).
+      - Saldo $100: 4 slots de $25.
+    """
+    if total_usdt < min_usdt_per_slot:
+        return 0, 0.0
+    
+    if total_usdt < 20.0:
+        return 1, round(total_usdt, 2)
+    elif total_usdt < 40.0:
+        slots = int(total_usdt // min_usdt_per_slot)
+        return slots, round(total_usdt / slots, 2)
+    else:
+        slots = min(5, int(total_usdt // 20.0))
+        if slots < 1: slots = 1
+        val_per_slot = round(total_usdt / slots, 2)
+        if val_per_slot < min_usdt_per_slot:
+            val_per_slot = min_usdt_per_slot
+            slots = int(total_usdt // min_usdt_per_slot)
+        return slots, val_per_slot
 
 def adjust_rsi_levels(result):
     if result == 'profit':
@@ -116,7 +142,7 @@ async def get_gemini_analysis(candle_data, candle_patterns, rsi, macd, bollinger
         return None
 
 async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_close, lower_band, middle_band, upper_band, vwap, candle_patterns, candle_open, candle_high, candle_low, 
-                     candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, symbol, klines, silent=False, config_override=None):
+                     candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, symbol, klines, silent=False, config_override=None, klines_4h=None):
     rsi_config = config_override.get('RSI_CONFIG', RSI_CONFIG) if config_override else RSI_CONFIG
     
     rsi_low_level0 = rsi <= rsi_config['dynamic_low'][0]
@@ -136,17 +162,24 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
 
     trend_confirmed = True
     if use_ema_filter:
-        if ema200 > 0:
+        if klines_4h and len(klines_4h) >= 200:
+            closes_4h = [float(k[4]) for k in klines_4h]
+            ema200_4h = calculate_ema(closes_4h, 200)
+            trend_confirmed = last_close > ema200_4h
+        elif ema200 > 0:
             trend_confirmed = last_close > ema200
         else:
             trend_confirmed = False
 
     if not trend_confirmed:
-        return {"buy": False, "message": "Tendência não confirmada (Preço < EMA200)", "candle_data": "", "gemini_response": None}
+        return {"buy": False, "message": "Tendência Macro não confirmada (Preço < EMA200)", "candle_data": "", "gemini_response": None}
 
     # Validação de força de tendência via ADX
     adx_val = calculate_adx(klines, period=TRADING_CONFIG.get('adx_period', 14))
     min_adx = TRADING_CONFIG.get('min_adx', 15.0)
+    if config_override and 'TRADING_CONFIG' in config_override:
+        min_adx = config_override['TRADING_CONFIG'].get('min_adx', min_adx)
+
     if adx_val < min_adx:
         return {"buy": False, "message": f"Mercado lateralizado (ADX={adx_val:.1f} < {min_adx})", "candle_data": "", "gemini_response": None}
 
