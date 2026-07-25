@@ -1,7 +1,10 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
+
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 API_KEYS = {
     'mainnet': {
@@ -29,6 +32,7 @@ DASHBOARD_CONFIG = {
 DB_CONFIG = {
     'url': os.getenv('DATABASE_URL', 'sqlite:///spotbot.db')
 }
+DATABASE_URL = DB_CONFIG['url']
 
 TOP_20_SYMBOLS = [
     'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
@@ -58,6 +62,7 @@ TRADING_CONFIG = {
     'volume_avg': 50,
     'adx_period': 14,
     'min_adx': 20.0,
+    'sell_pressure_threshold': 0.65
 }
 
 RISK_PROFILES = {
@@ -90,6 +95,12 @@ ATR_CONFIG = {
     'period': 14,
     'tp_multiplier': 2.0,
     'sl_multiplier': 1.5
+}
+
+OCO_CONFIG = {
+    'target_profit_percent': 0.025,
+    'stop_loss_percent': 0.02,
+    'stop_limit_buffer': 0.005
 }
 
 OCO_ORDER_CONFIG = {
