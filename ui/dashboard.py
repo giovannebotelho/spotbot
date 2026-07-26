@@ -303,8 +303,8 @@ async def index():
                 ui.label('SPOTBOT PRO').classes('font-bold tracking-wider text-white text-xs')
                 ui.label('QUANTITATIVE ENGINE').classes('text-[0.55rem] font-bold text-cyan-400/80 tracking-widest')
             
-            # Container do Marquee com largura controlada (max-w-[40%]) para NUNCA empurrar os botoes
-            with ui.element('div').classes('w-1/3 max-w-[40%] overflow-hidden relative h-full flex items-center flex-shrink'):
+            # Container do Marquee esticado (flex-1 mx-4 min-w-0) preenchendo TODO o espaco com margens perfeitas entre as linhas |
+            with ui.element('div').classes('flex-1 mx-4 overflow-hidden relative h-full flex items-center min-w-0'):
                 with ui.element('div').classes('animate-marquee items-center gap-8 text-[0.7rem] font-mono text-slate-300 whitespace-nowrap'):
                     ui.label('🔥 MARKET TICKER').classes('font-bold text-cyan-400')
                     ui.label('BTC: $64,340.00 (+0.37%)').classes('text-emerald-400 font-semibold')
