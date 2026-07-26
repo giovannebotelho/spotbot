@@ -32,7 +32,7 @@ class NumberedCanvas(canvas.Canvas):
         
         if self._pageNumber > 1:
             # Header Top Bar
-            self.drawString(40, 818, "SPOTBOT PRO v2.5.0-QUANT | MANUAL TÉCNICO DE ENGENHARIA DE TRADING")
+            self.drawString(40, 818, "SPOTBOT PRO v3.0.0-HEDGE_FUND | MANUAL TÉCNICO DE ENGENHARIA DE TRADING")
             self.drawRightString(555, 818, "CONFIDENCIAL & PROPRIETÁRIO")
             self.setStrokeColor(colors.HexColor("#CBD5E1"))
             self.setLineWidth(0.5)
