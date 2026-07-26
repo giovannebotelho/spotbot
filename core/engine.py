@@ -14,7 +14,7 @@ from core.indicators import (
     calculate_rsi, calculate_macd, calculate_bollinger_bands, check_trend, check_candle_patterns,
     calculate_vwap, get_candle_details, calculate_ema, is_market_downward, calculate_relative_strength_rank
 )
-from core.decision import should_place_order, should_buy, should_sell, adjust_and_place_oco_order, get_min_notional, adjust_price_to_tick_size, get_precision, calculate_dynamic_position_slots
+from core.decision import should_place_order, should_buy, should_sell, adjust_and_place_oco_order, get_min_notional, adjust_price_to_tick_size, get_precision, calculate_dynamic_position_slots, place_safe_oco_sell_order
 from core.post_trade import process_order_details, log_and_notify_results, create_data_row, save_to_csv
 from services.telegram_notifier import send_telegram_message, send_telegram_document, TelegramBot
 from services.database import DatabaseManager
@@ -541,12 +541,10 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                                         be_stop = adjust_price_to_tick_size(price, tick_size)
                                                         be_limit = adjust_price_to_tick_size(price * 0.999, tick_size)
                                                         
-                                                        oco_order = await client.create_oco_order(
-                                                            symbol=active_target_symbol, side='SELL', quantity=rem_qty,
-                                                            price=f"{lucro_alvo:.{get_precision(tick_size)}f}",
-                                                            stopPrice=f"{be_stop:.{get_precision(tick_size)}f}",
-                                                            stopLimitPrice=f"{be_limit:.{get_precision(tick_size)}f}",
-                                                            stopLimitTimeInForce='GTC'
+                                                        prec_p = get_precision(tick_size)
+                                                        prec_q = get_precision(step_size)
+                                                        oco_order = await place_safe_oco_sell_order(
+                                                            client, active_target_symbol, rem_qty, lucro_alvo, be_stop, be_limit, prec_p, prec_q
                                                         )
                                                         limit_order_id = oco_order['orders'][1]['orderId']
                                                         stop_order_id = oco_order['orders'][0]['orderId']
@@ -572,13 +570,15 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                                         log(f"🔄 Trailing Stop acionado! Movendo stop para ${new_stop:.4f}")
                                                         await client.cancel_order(symbol=active_target_symbol, orderListId=oco_order['orderListId'])
                                                         new_stop_limit = adjust_price_to_tick_size(new_stop * 0.999, tick_size)
-                                                        oco_order = await client.create_oco_order(
-                                                            symbol=active_target_symbol, side='SELL', quantity=executed_qty if not partial_take_done else rem_qty,
-                                                            price=f"{lucro_alvo:.{get_precision(tick_size)}f}",
-                                                            stopPrice=f"{new_stop:.{get_precision(tick_size)}f}",
-                                                            stopLimitPrice=f"{new_stop_limit:.{get_precision(tick_size)}f}",
-                                                            stopLimitTimeInForce='GTC'
+                                                        
+                                                        prec_p = get_precision(tick_size)
+                                                        prec_q = get_precision(step_size)
+                                                        qty_to_sell = executed_qty if not partial_take_done else rem_qty
+                                                        
+                                                        oco_order = await place_safe_oco_sell_order(
+                                                            client, active_target_symbol, qty_to_sell, lucro_alvo, new_stop, new_stop_limit, prec_p, prec_q
                                                         )
+                                                        
                                                         limit_order_id = oco_order['orders'][1]['orderId']
                                                         stop_order_id = oco_order['orders'][0]['orderId']
                                                         current_stop_loss = new_stop

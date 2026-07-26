@@ -41,10 +41,6 @@ def get_min_notional(symbol_info):
     return 10.0
 
 def calculate_dynamic_position_slots(usdt_balance, min_order_usdt=10.0, accumulated_net_profit=0.0):
-    """
-    FASE C (v3.0): Calculador de Slots com Juros Compostos (Snowball Compounding Engine).
-    Aplica margem de segurança de 1% (usable_balance = usdt_balance * 0.99) para evitar erro -2010 (Insufficient balance).
-    """
     usable_usdt = math.floor(usdt_balance * 0.99 * 100) / 100.0
     
     total_effective_balance = usable_usdt
@@ -64,6 +60,43 @@ def calculate_dynamic_position_slots(usdt_balance, min_order_usdt=10.0, accumula
         num_slots = min(5, max(3, int(total_effective_balance // 30)))
         slot_value = round(total_effective_balance / num_slots, 2)
         return num_slots, min(usable_usdt, slot_value)
+
+async def place_safe_oco_sell_order(client, symbol, quantity, price, stop_price, stop_limit_price, precision_price, precision_qty):
+    """
+    Envia ordem OCO na Binance Spot usando o endpoint legado resiliente /order/oco
+    com fallback automático para /orderList/oco se necessário.
+    """
+    q_str = f"{quantity:.{precision_qty}f}"
+    p_str = f"{price:.{precision_price}f}"
+    sp_str = f"{stop_price:.{precision_price}f}"
+    slp_str = f"{stop_limit_price:.{precision_price}f}"
+    
+    try:
+        return await client._post(
+            "order/oco",
+            signed=True,
+            data={
+                'symbol': symbol,
+                'side': 'SELL',
+                'quantity': q_str,
+                'price': p_str,
+                'stopPrice': sp_str,
+                'stopLimitPrice': slp_str,
+                'stopLimitTimeInForce': 'GTC'
+            }
+        )
+    except Exception as e1:
+        return await client.create_oco_order(
+            symbol=symbol,
+            side='SELL',
+            quantity=q_str,
+            price=p_str,
+            stopPrice=sp_str,
+            stopLimitPrice=slp_str,
+            stopLimitTimeInForce='GTC',
+            aboveType='LIMIT_MAKER',
+            belowType='STOP_LOSS_LIMIT'
+        )
 
 async def should_place_order(client, symbol, status_callback=None):
     try:
@@ -366,14 +399,8 @@ async def adjust_and_place_oco_order(client, symbol, quantity, price_tick_size, 
     stop_limit_price = adjust_price_to_tick_size(stop_limit_price, tick_size)
 
     try:
-        oco_order = await client.create_oco_order(
-            symbol=symbol,
-            side='SELL',
-            quantity=f"{quantity:.{quantity_precision}f}",
-            price=f"{take_profit_price:.{price_precision}f}",
-            stopPrice=f"{stop_loss_price:.{price_precision}f}",
-            stopLimitPrice=f"{stop_limit_price:.{price_precision}f}",
-            stopLimitTimeInForce='GTC'
+        oco_order = await place_safe_oco_sell_order(
+            client, symbol, quantity, take_profit_price, stop_loss_price, stop_limit_price, price_precision, quantity_precision
         )
         
         limit_order_id = oco_order['orders'][1]['orderId']
