@@ -180,9 +180,6 @@ def calculate_relative_strength_rank(multi_klines):
     return sorted(results, key=lambda x: x['score'], reverse=True)
 
 def analyze_futures_squeeze_potential(futures_data, smc_sweep_active=False):
-    """
-    FASE A (v3.0): Avalia a probabilidade de um Short Squeeze em alta nos contratos futuros.
-    """
     if not futures_data:
         return False, "Sem dados de mercado derivativo."
         
@@ -198,6 +195,36 @@ def analyze_futures_squeeze_potential(futures_data, smc_sweep_active=False):
         return False, f"Funding Rate levemente negativo ({funding_pct:.4f}%)."
     else:
         return False, f"Funding Rate neutro/positivo ({funding_pct:.4f}%)."
+
+def calculate_orderbook_imbalance(order_book):
+    """
+    FASE B (v3.0): Analisa o desequilíbrio entre ofertas de Compra (Bids) e Venda (Asks)
+    nos 20 primeiros níveis de profundidade do livro de ofertas.
+    """
+    if not order_book or 'bids' not in order_book or 'asks' not in order_book:
+        return 1.0, 0.0, 0.0, False, "Livro de ofertas indisponível."
+        
+    bids = order_book.get('bids', [])
+    asks = order_book.get('asks', [])
+    
+    total_bid_vol = sum([float(b[1]) for b in bids[:20]])
+    total_ask_vol = sum([float(a[1]) for a in asks[:20]])
+    
+    if total_ask_vol == 0:
+        ratio = 5.0
+    else:
+        ratio = total_bid_vol / total_ask_vol
+        
+    has_buy_wall = ratio >= 1.5
+    
+    if ratio >= 2.0:
+        msg = f"🛡️ MURO DE COMPRA DE BALEIA DETECTADO! Razão Bids/Asks: {ratio:.2f}x (Suporte Massivo em ${float(bids[0][0]):.2f})."
+    elif ratio >= 1.5:
+        msg = f"📊 Pressão Compradora no Livro (Bids/Asks: {ratio:.2f}x)."
+    else:
+        msg = f"Livro de ofertas neutro/vendedor (Bids/Asks: {ratio:.2f}x)."
+        
+    return ratio, total_bid_vol, total_ask_vol, has_buy_wall, msg
 
 def is_hammer(candle):
     o, h, l, c = float(candle[1]), float(candle[2]), float(candle[3]), float(candle[4])
