@@ -167,6 +167,10 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         elif cmd == '/stop':
             bot_running = False
             return "🛑 <b>Comando recebido. Parando o bot com segurança...</b>"
+
+        elif cmd in ['/cancel', '/abort', '/cancelar']:
+            bot_running = False
+            return "🚨 <b>INTERRUPÇÃO DE EMERGÊNCIA (CANCEL/CTRL+C)! Operações e conexões paralisadas imediatamente.</b>"
         
         elif cmd == '/status':
             target_asset = bot_status_data.get('target_asset', 'BTCUSDT')
@@ -248,7 +252,8 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 "/saldo - Exibe saldos USDT, BNB e cálculo de slots\n"
                 "/top20 ou /scanner - Varre a força relativa dos Top 20 ativos\n"
                 "/lucro ou /perf - Exibe o lucro total líquido acumulado\n"
-                "/stop - Pausa a execução remota do robô\n"
+                "/stop - Pausa a execução remota com segurança\n"
+                "/cancel ou /abort - Interrupção imediata de emergência (CTRL+C)\n"
                 "/ajuda - Exibe esta mensagem de ajuda"
             )
         return "❓ Comando não reconhecido. Digite /ajuda para ver as opções."
@@ -478,7 +483,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                     
                                     profit_pct = (cur_price - price) / price
 
-                                    # Fase 5: Scalp Locking (Venda Parcial de 50% em +1.5% de Lucro + Mover Stop para Breakeven)
+                                    # Scalp Locking (Venda Parcial de 50% em +1.5% de Lucro + Mover Stop para Breakeven)
                                     if profit_pct >= 0.015 and not partial_take_done:
                                         try:
                                             step_size = float(next(f for f in target_symbol_info['filters'] if f['filterType'] == 'LOT_SIZE')['stepSize'])

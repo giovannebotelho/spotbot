@@ -167,7 +167,7 @@ async def start_bot():
     ui.notify('Iniciando Sistema SpotBot Pro...', type='positive')
     engine.bot_running = True
     if status_indicator: 
-        status_indicator.classes(remove='bg-[#FF2E93]', add='bg-[#00F5A0] animate-pulse shadow-[0_0_15px_#00F5A0]')
+        status_indicator.classes(remove='bg-[#FF2E93] bg-[#FFB800]', add='bg-[#00F5A0] animate-pulse shadow-[0_0_15px_#00F5A0]')
     
     bot_task = asyncio.create_task(engine.run_bot(log_callback=log_handler, investment_amount=investment, selected_symbol=symbol, status_callback=status_handler))
     
@@ -188,9 +188,18 @@ def stop_bot():
         engine.bot_running = False
         if bot_task:
             bot_task.cancel()
-        ui.notify('Parando Sistema...', type='info')
+        ui.notify('Parando Sistema com segurança...', type='info')
     else:
         ui.notify('Sistema offline.', type='warning')
+
+def cancel_bot():
+    global bot_task
+    engine.bot_running = False
+    if bot_task and not bot_task.done():
+        bot_task.cancel()
+    ui.notify('🚨 EMERGÊNCIA: Execução abortada via Cancel (CTRL+C)!', type='negative')
+    if status_indicator: 
+        status_indicator.classes(remove='bg-[#00F5A0] animate-pulse shadow-[0_0_15px_#00F5A0]', add='bg-[#FFB800]')
 
 def update_timeframe(value):
     engine.TRADING_CONFIG['interval'] = value
@@ -287,14 +296,15 @@ async def index():
 
     with ui.column().classes('w-full h-screen gap-0 bg-[#0B0E14] overflow-hidden'):
         
-        # Header Ticker Neon Estilo CoinMarketCap
-        with ui.row().classes('w-full h-9 bg-[#080B10] border-b border-slate-800/80 items-center px-4 justify-between overflow-hidden relative text-xs'):
-            with ui.row().classes('items-center gap-2 z-10 bg-[#080B10] pr-4 border-r border-slate-800'):
+        # Header Ticker Neon Estilo CoinMarketCap com Botoes Acao Fixos
+        with ui.row().classes('w-full h-10 bg-[#080B10] border-b border-slate-800/80 items-center px-4 justify-between overflow-hidden relative text-xs flex-nowrap'):
+            with ui.row().classes('items-center gap-2 z-10 bg-[#080B10] pr-4 border-r border-slate-800 flex-shrink-0'):
                 ui.icon('token', size='sm', color='cyan-400')
                 ui.label('SPOTBOT PRO').classes('font-bold tracking-wider text-white text-xs')
                 ui.label('QUANTITATIVE ENGINE').classes('text-[0.55rem] font-bold text-cyan-400/80 tracking-widest')
             
-            with ui.element('div').classes('flex-grow overflow-hidden relative h-full flex items-center'):
+            # Container do Marquee com largura controlada (max-w-[40%]) para NUNCA empurrar os botoes
+            with ui.element('div').classes('w-1/3 max-w-[40%] overflow-hidden relative h-full flex items-center flex-shrink'):
                 with ui.element('div').classes('animate-marquee items-center gap-8 text-[0.7rem] font-mono text-slate-300 whitespace-nowrap'):
                     ui.label('🔥 MARKET TICKER').classes('font-bold text-cyan-400')
                     ui.label('BTC: $64,340.00 (+0.37%)').classes('text-emerald-400 font-semibold')
@@ -314,9 +324,11 @@ async def index():
                     ui.label('Market Cap: $2.38T (+1.2%)').classes('text-slate-400')
                     ui.label('24h Vol: $78.4B').classes('text-slate-400')
 
-            with ui.row().classes('items-center gap-3 z-10 bg-[#080B10] pl-4 border-l border-slate-800'):
-                ui.button('START', on_click=start_bot).props('unelevated dense').classes('bg-[#00F5A0] hover:bg-[#00E5FF] text-slate-950 font-bold px-3 py-1 text-xs rounded-md tracking-wider transition-all')
-                ui.button('STOP', on_click=stop_bot).props('unelevated dense').classes('bg-[#FF2E93] hover:bg-rose-600 text-white font-bold px-3 py-1 text-xs rounded-md tracking-wider transition-all')
+            # Botoes de Acao (START, STOP, CANCEL, LOGOUT) Fixos no Canto Superior Direito
+            with ui.row().classes('items-center gap-2.5 z-10 bg-[#080B10] pl-4 border-l border-slate-800 flex-shrink-0'):
+                ui.button('START', on_click=start_bot).props('unelevated dense').classes('bg-[#00F5A0] hover:bg-[#00E5FF] text-slate-950 font-bold px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md')
+                ui.button('STOP', on_click=stop_bot).props('unelevated dense').classes('bg-[#FF2E93] hover:bg-rose-600 text-white font-bold px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md')
+                ui.button('CANCEL', on_click=cancel_bot).props('unelevated dense').classes('bg-[#FFB800] hover:bg-amber-600 text-slate-950 font-bold px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md').tooltip('Abortar Emergência (CTRL+C)')
                 
                 status_indicator = ui.element('div').classes('w-2.5 h-2.5 rounded-full bg-[#FF2E93] transition-all')
                 
