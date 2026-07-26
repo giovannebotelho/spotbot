@@ -1,4 +1,5 @@
 import asyncio
+import aiohttp
 from config.settings import TRADING_CONFIG
 
 async def get_usdt_balance(client):
@@ -48,3 +49,36 @@ async def get_bnb_price(client):
     """Obtém o preço atual do BNB em USDT."""
     ticker = await client.get_symbol_ticker(symbol="BNBUSDT")
     return float(ticker['price'])
+
+async def get_futures_analytics(symbol):
+    """
+    Obtém métricas de Derivativos (Futures Funding Rate & Open Interest) da Binance em tempo real.
+    Permite detectar potenciais setups de Short Squeeze quando o Funding Rate está significativamente negativo.
+    """
+    url_funding = f"https://fapi.binance.com/fapi/v1/premiumIndex?symbol={symbol}"
+    url_oi = f"https://fapi.binance.com/fapi/v1/openInterest?symbol={symbol}"
+    
+    funding_rate = 0.0
+    open_interest = 0.0
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url_funding, timeout=5) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    funding_rate = float(data.get('lastFundingRate', 0.0))
+
+            async with session.get(url_oi, timeout=5) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    open_interest = float(data.get('openInterest', 0.0))
+    except Exception as e:
+        pass
+
+    return {
+        'symbol': symbol,
+        'funding_rate': funding_rate,
+        'funding_rate_pct': funding_rate * 100.0,
+        'open_interest': open_interest,
+        'is_short_heavy': funding_rate < -0.0001 # Funding Rate < -0.01%
+    }

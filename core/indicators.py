@@ -1,152 +1,97 @@
+import math
 import numpy as np
 import pandas as pd
-from collections import deque
-from binance.exceptions import BinanceAPIException
-from services.binance_client import get_order_book, extract_closes
-from core.patterns import (
-    is_hammer, is_shooting_star, is_bullish_engulfing, is_piercing_line, is_dark_cloud_cover,
-    is_kicker_bullish, is_kicker_bearish, is_long_day, is_short_day, is_doji, is_doji_dragonfly,
-    is_doji_gravestone, is_doji_long_shadows, is_bullish_and_bearish_strike, is_rising_three_methods,
-    is_falling_three_methods, is_stick_sandwich
-)
-from config.settings import TRADING_CONFIG, ATR_CONFIG
+from services.binance_client import extract_closes, extract_volumes
 
-sell_pressure_history = deque(maxlen=TRADING_CONFIG.get('maxlen', 10))
-
-def calculate_trade_result(buy_price, quantity, sell_price):
-    return (sell_price - buy_price) * quantity
-
-async def calculate_fee(client, symbol, quantity, sell_price, fee_rate=0.001):
-    total_val = sell_price * quantity
-    return total_val * fee_rate
-
-def calculate_sell_pressure(order_book):
-    total_asks = sum(float(ask[1]) for ask in order_book['asks'])
-    total_bids = sum(float(bid[1]) for bid in order_book['bids'])
-    total = total_asks + total_bids
-    return total_asks / total if total > 0 else 0
-
-async def calculate_moving_average_sell_pressure(client, symbol, interval=None, limit=None, depth=None):
-    if depth is None:
-        depth = TRADING_CONFIG.get('depth', 20)
-        
-    order_book = await get_order_book(client, symbol, depth=depth)
-    sell_pressure = calculate_sell_pressure(order_book)
-    sell_pressure_history.append(sell_pressure)
-    return sum(sell_pressure_history) / len(sell_pressure_history)
-
-def calculate_rsi(closes, period=None):
-    if period is None:
-        period = TRADING_CONFIG.get('period', 14)
-
-    deltas = np.diff(closes)
-    gain = np.where(deltas > 0, deltas, 0)
-    loss = np.where(deltas < 0, -deltas, 0)
-
-    avg_gain = pd.Series(gain).ewm(alpha=1/period, min_periods=period, adjust=False).mean().iloc[-1]
-    avg_loss = pd.Series(loss).ewm(alpha=1/period, min_periods=period, adjust=False).mean().iloc[-1]
-
-    if avg_loss == 0:
-        return 100.0
+def calculate_rsi(closes, period=14):
+    if len(closes) < period + 1:
+        return 50.0
+    series = pd.Series(closes)
+    delta = series.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
     
-    rs = avg_gain / avg_loss
-    rsi = 100 - (100 / (1 + rs))
-    return rsi
+    last_gain = gain.iloc[-1]
+    last_loss = loss.iloc[-1]
+    
+    if last_loss == 0:
+        return 100.0
+    rs = last_gain / last_loss
+    return float(100.0 - (100.0 / (1.0 + rs)))
 
-def calculate_macd(closes, slow=None, fast=None, signal=None):
-    if slow is None: slow = TRADING_CONFIG.get('macd_slow', 26)
-    if fast is None: fast = TRADING_CONFIG.get('macd_fast', 12)
-    if signal is None: signal = TRADING_CONFIG.get('macd_signal', 9)
-
-    closes_series = pd.Series(closes)
-    ema_fast = closes_series.ewm(span=fast, adjust=False).mean()
-    ema_slow = closes_series.ewm(span=slow, adjust=False).mean()
-    macd = ema_fast - ema_slow
+def calculate_macd(closes, fast=12, slow=26, signal=9):
+    if len(closes) < slow + signal:
+        return 0.0, 0.0
+    series = pd.Series(closes)
+    exp1 = series.ewm(span=fast, adjust=False).mean()
+    exp2 = series.ewm(span=slow, adjust=False).mean()
+    macd = exp1 - exp2
     signal_line = macd.ewm(span=signal, adjust=False).mean()
-    return macd.iloc[-1], signal_line.iloc[-1]
+    return float(macd.iloc[-1]), float(signal_line.iloc[-1])
 
-def calculate_bollinger_bands(closes, period=None, num_std=None):
-    if period is None: period = TRADING_CONFIG.get('period', 14)
-    if num_std is None: num_std = TRADING_CONFIG.get('num_std', 2.0)
-
-    closes_series = pd.Series(closes)
-    rolling_mean = closes_series.rolling(window=period).mean()
-    rolling_std = closes_series.rolling(window=period).std()
-
-    upper_band = rolling_mean + (rolling_std * num_std)
-    lower_band = rolling_mean - (rolling_std * num_std)
-    return lower_band.iloc[-1], rolling_mean.iloc[-1], upper_band.iloc[-1]
+def calculate_bollinger_bands(closes, period=20, std_dev=2):
+    if len(closes) < period:
+        c = closes[-1] if closes else 0.0
+        return c, c, c
+    series = pd.Series(closes)
+    ma = series.rolling(window=period).mean()
+    std = series.rolling(window=period).std()
+    upper = ma + (std * std_dev)
+    lower = ma - (std * std_dev)
+    return float(lower.iloc[-1]), float(ma.iloc[-1]), float(upper.iloc[-1])
 
 def calculate_vwap(closes, volumes):
-    cumulative_pv = np.cumsum(np.array(closes) * np.array(volumes))
-    cumulative_v = np.cumsum(volumes)
-    vwap = cumulative_pv / cumulative_v
-    return vwap[-1]
+    if not closes or not volumes or len(closes) != len(volumes):
+        return closes[-1] if closes else 0.0
+    df = pd.DataFrame({'close': closes, 'volume': volumes})
+    df['tp'] = df['close']
+    df['pv'] = df['tp'] * df['volume']
+    cum_pv = df['pv'].sum()
+    cum_vol = df['volume'].sum()
+    if cum_vol == 0:
+        return closes[-1]
+    return float(cum_pv / cum_vol)
 
 def calculate_ema(closes, period):
-    closes_series = pd.Series(closes)
-    ema = closes_series.ewm(span=period, adjust=False).mean()
-    return ema.iloc[-1]
-
-def calculate_atr(klines, period=None):
-    if period is None: period = ATR_CONFIG.get('period', 14)
-    highs = np.array([float(k[2]) for k in klines])
-    lows = np.array([float(k[3]) for k in klines])
-    closes = np.array([float(k[4]) for k in klines])
-
-    tr1 = highs[1:] - lows[1:]
-    tr2 = np.abs(highs[1:] - closes[:-1])
-    tr3 = np.abs(lows[1:] - closes[:-1])
-
-    tr = np.maximum(np.maximum(tr1, tr2), tr3)
-    atr = pd.Series(tr).ewm(alpha=1/period, min_periods=period, adjust=False).mean().iloc[-1]
-    return atr
+    if len(closes) < period:
+        return closes[-1] if closes else 0.0
+    series = pd.Series(closes)
+    return float(series.ewm(span=period, adjust=False).mean().iloc[-1])
 
 def calculate_adx(klines, period=14):
-    """Calcula o ADX (Average Directional Index) para medir força da tendência."""
-    if len(klines) < period + 1:
-        return 0.0
+    if len(klines) < period * 2:
+        return 25.0
+    try:
+        highs = pd.Series([float(k[2]) for k in klines])
+        lows = pd.Series([float(k[3]) for k in klines])
+        closes = pd.Series([float(k[4]) for k in klines])
 
-    highs = np.array([float(k[2]) for k in klines])
-    lows = np.array([float(k[3]) for k in klines])
-    closes = np.array([float(k[4]) for k in klines])
+        up_move = highs.diff()
+        down_move = -lows.diff()
 
-    up_move = highs[1:] - highs[:-1]
-    down_move = lows[:-1] - lows[1:]
+        plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+        minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
 
-    plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
-    minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
+        tr1 = highs - lows
+        tr2 = (highs - closes.shift()).abs()
+        tr3 = (lows - closes.shift()).abs()
+        tr = pd.concat([tr1, tr2, tr3], axis=1).max(axis=1)
 
-    tr1 = highs[1:] - lows[1:]
-    tr2 = np.abs(highs[1:] - closes[:-1])
-    tr3 = np.abs(lows[1:] - closes[:-1])
-    tr = np.maximum(np.maximum(tr1, tr2), tr3)
+        atr = tr.rolling(window=period).mean()
+        plus_di = 100 * (pd.Series(plus_dm).rolling(window=period).mean() / atr)
+        minus_di = 100 * (pd.Series(minus_dm).rolling(window=period).mean() / atr)
 
-    tr_smoothed = pd.Series(tr).ewm(alpha=1/period, min_periods=period, adjust=False).mean()
-    plus_dm_smoothed = pd.Series(plus_dm).ewm(alpha=1/period, min_periods=period, adjust=False).mean()
-    minus_dm_smoothed = pd.Series(minus_dm).ewm(alpha=1/period, min_periods=period, adjust=False).mean()
-
-    plus_di = 100 * (plus_dm_smoothed / tr_smoothed)
-    minus_di = 100 * (minus_dm_smoothed / tr_smoothed)
-
-    sum_di = plus_di + minus_di
-    dx = 100 * (np.abs(plus_di - minus_di) / np.where(sum_di == 0, 1, sum_di))
-
-    adx = pd.Series(dx).ewm(alpha=1/period, min_periods=period, adjust=False).mean().iloc[-1]
-    return float(adx)
+        dx = 100 * (plus_di - minus_di).abs() / (plus_di + minus_di)
+        adx = dx.rolling(window=period).mean().iloc[-1]
+        return float(adx) if not np.isnan(adx) else 25.0
+    except Exception:
+        return 25.0
 
 def calculate_hurst_exponent(closes, max_lag=20):
-    """
-    Calcula o Expoente de Hurst para determinar a dinâmica do mercado:
-      - H < 0.45: Reversão à Média (Range Bound / Consolidação)
-      - 0.45 <= H <= 0.55: Movimento Aleatório (Random Walk)
-      - H > 0.55: Tendência Persistente (Trending)
-    """
-    if len(closes) < 50:
+    if len(closes) < 30:
         return 0.50
-    
     closes_arr = np.array(closes)
-    lags = range(2, min(max_lag, len(closes_arr) // 4))
+    lags = range(2, min(max_lag, len(closes) // 2))
     tau = [np.sqrt(np.std(np.subtract(closes_arr[lag:], closes_arr[:-lag]))) for lag in lags]
     
     if len(tau) < 2 or np.all(tau[0] == tau):
@@ -157,13 +102,6 @@ def calculate_hurst_exponent(closes, max_lag=20):
     return float(np.clip(hurst, 0.0, 1.0))
 
 def detect_market_regime(klines):
-    """
-    Classifica o Regime de Mercado Atual:
-      - REGIME_CRASH_PANIC: Se houver queda brusca (> 3.5% em 24h)
-      - REGIME_BULL_TREND: Se Hurst > 0.55 e Preço > EMA50 > EMA200
-      - REGIME_RANGE_BOUND: Se Hurst < 0.48 (Reversão à média ativada)
-      - REGIME_NEUTRAL: Mercado equilibrado
-    """
     closes = extract_closes(klines)
     if len(closes) < 50:
         return "REGIME_RANGE_BOUND", 0.45
@@ -186,11 +124,6 @@ def detect_market_regime(klines):
         return "REGIME_NEUTRAL", hurst
 
 def detect_liquidity_sweep(klines):
-    """
-    Fase 2: Detecta Varredura de Liquidez Institucional (Smart Money Concepts - SMC):
-    Identifica quando a vela espeta abaixo da mínima das últimas 24 horas (capturando stop losses)
-    e fecha acima do suporte com rejeição em vela (hammer/pinbar) e pico de volume.
-    """
     if not klines or len(klines) < 25:
         return False, ""
 
@@ -198,74 +131,150 @@ def detect_liquidity_sweep(klines):
     low_24h = min(lows_24h)
 
     last_candle = klines[-1]
-    open_p = float(last_candle[1])
-    high_p = float(last_candle[2])
-    low_p = float(last_candle[3])
-    close_p = float(last_candle[4])
-    vol = float(last_candle[5])
+    c_open = float(last_candle[1])
+    c_high = float(last_candle[2])
+    c_low = float(last_candle[3])
+    c_close = float(last_candle[4])
+    c_vol = float(last_candle[5])
 
-    volumes = [float(k[5]) for k in klines[-20:]]
-    avg_vol = np.mean(volumes)
+    avg_vol = sum([float(k[5]) for k in klines[-25:-1]]) / 24.0
 
-    swept_below = low_p < low_24h
-    closed_above = close_p > low_24h or close_p > open_p
+    swept_support = c_low < low_24h
+    closed_above = c_close > low_24h
+    lower_wick = min(c_open, c_close) - c_low
+    body = abs(c_close - c_open)
+    has_rejection_hammer = lower_wick >= 1.3 * body
+    volume_surge = c_vol >= 1.3 * avg_vol
 
-    body = abs(close_p - open_p)
-    lower_wick = min(open_p, close_p) - low_p
-    strong_rejection = lower_wick > (body * 1.2)
-
-    volume_surge = vol >= (avg_vol * 1.3)
-
-    if swept_below and closed_above and (strong_rejection or volume_surge):
-        return True, "Varredura de Liquidez SMC (Rejeição de Mínima 24h + Volume)"
-
+    if swept_support and closed_above and has_rejection_hammer and volume_surge:
+        return True, f"🔥 SMC Liquidity Sweep: Perfuração do Mínimo de 24h (${low_24h:.2f}) com Pavio de Rejeição e Volume 1.3x Superior!"
     return False, ""
 
 def calculate_relative_strength_rank(multi_klines):
-    """
-    Fase 3: Ranker de Força Relativa e Momentum (Relative Strength vs BTC).
-    Calcula a Força Relativa de cada altcoin contra o BTCUSDT e combina com RSI e ADX.
-    Retorna uma lista ordenada com os melhores criptoativos para operar no momento.
-    """
-    if not multi_klines:
-        return []
+    results = []
+    btc_klines = multi_klines.get("BTCUSDT", [])
+    if not btc_klines or len(btc_klines) < 25:
+        return results
 
-    btc_klines = multi_klines.get('BTCUSDT', [])
-    btc_return_24h = 0.0
-    if btc_klines and len(btc_klines) >= 25:
-        b_closes = extract_closes(btc_klines)
-        b_start = b_closes[-25]
-        b_end = b_closes[-1]
-        btc_return_24h = ((b_end - b_start) / b_start) * 100 if b_start > 0 else 0.0
+    btc_closes = extract_closes(btc_klines)
+    btc_ret = ((btc_closes[-1] - btc_closes[-25]) / btc_closes[-25]) * 100.0
 
-    ranked_assets = []
     for symbol, klines in multi_klines.items():
         if not klines or len(klines) < 25:
             continue
-
         closes = extract_closes(klines)
-        start_p = closes[-25]
-        end_p = closes[-1]
-        asset_return_24h = ((end_p - start_p) / start_p) * 100 if start_p > 0 else 0.0
-
-        rs_ratio = asset_return_24h - btc_return_24h
+        asset_ret = ((closes[-1] - closes[-25]) / closes[-25]) * 100.0
+        rs_ratio = asset_ret - btc_ret
         rsi_val = calculate_rsi(closes)
         adx_val = calculate_adx(klines)
 
-        combined_score = (rs_ratio * 0.4) + ((100 - rsi_val) * 0.4) + (adx_val * 0.2)
-
-        ranked_assets.append({
+        combined_score = (rs_ratio * 0.40) + ((100.0 - rsi_val) * 0.40) + (adx_val * 0.20)
+        results.append({
             'symbol': symbol,
-            'price': end_p,
-            'return_24h': asset_return_24h,
+            'price': closes[-1],
             'rs_ratio': rs_ratio,
             'rsi': rsi_val,
-            'adx': adx_val,
             'score': combined_score
         })
 
-    ranked_assets.sort(key=lambda x: x['score'], reverse=True)
-    return ranked_assets
+    return sorted(results, key=lambda x: x['score'], reverse=True)
+
+def analyze_futures_squeeze_potential(futures_data, smc_sweep_active=False):
+    """
+    FASE A (v3.0): Avalia a probabilidade de um Short Squeeze em alta nos contratos futuros.
+    """
+    if not futures_data:
+        return False, "Sem dados de mercado derivativo."
+        
+    funding_rate = futures_data.get('funding_rate', 0.0)
+    funding_pct = futures_data.get('funding_rate_pct', 0.0)
+    is_short_heavy = futures_data.get('is_short_heavy', False)
+    
+    if is_short_heavy and smc_sweep_active:
+        return True, f"🔥 POTENCIAL SHORT SQUEEZE DETECTADO! Funding Rate negativo ({funding_pct:.4f}%) + SMC Liquidity Sweep!"
+    elif is_short_heavy:
+        return True, f"⚡ Acúmulo de Shorts detectado no mercado futuro (Funding: {funding_pct:.4f}%)."
+    elif funding_rate < 0:
+        return False, f"Funding Rate levemente negativo ({funding_pct:.4f}%)."
+    else:
+        return False, f"Funding Rate neutro/positivo ({funding_pct:.4f}%)."
+
+def is_hammer(candle):
+    o, h, l, c = float(candle[1]), float(candle[2]), float(candle[3]), float(candle[4])
+    body = abs(c - o)
+    lower_wick = min(o, c) - l
+    upper_wick = h - max(o, c)
+    return lower_wick >= 2 * body and upper_wick <= body
+
+def is_shooting_star(candle):
+    o, h, l, c = float(candle[1]), float(candle[2]), float(candle[3]), float(candle[4])
+    body = abs(c - o)
+    upper_wick = h - max(o, c)
+    lower_wick = min(o, c) - l
+    return upper_wick >= 2 * body and lower_wick <= body
+
+def is_bullish_engulfing(prev_c, curr_c):
+    po, pc = float(prev_c[1]), float(prev_c[4])
+    co, cc = float(curr_c[1]), float(curr_c[4])
+    return pc < po and cc > co and cc > po and co < pc
+
+def is_piercing_line(prev_c, curr_c):
+    po, pc = float(prev_c[1]), float(prev_c[4])
+    co, cc = float(curr_c[1]), float(curr_c[4])
+    mid = (po + pc) / 2
+    return pc < po and co < pc and cc > mid and cc < po
+
+def is_dark_cloud_cover(prev_c, curr_c):
+    po, pc = float(prev_c[1]), float(prev_c[4])
+    co, cc = float(curr_c[1]), float(curr_c[4])
+    mid = (po + pc) / 2
+    return pc > po and co > pc and cc < mid and cc > po
+
+def is_kicker_bullish(prev_c, curr_c):
+    po, pc = float(prev_c[1]), float(prev_c[4])
+    co, cc = float(curr_c[1]), float(curr_c[4])
+    return pc < po and co >= po and cc > co
+
+def is_kicker_bearish(prev_c, curr_c):
+    po, pc = float(prev_c[1]), float(prev_c[4])
+    co, cc = float(curr_c[1]), float(curr_c[4])
+    return pc > po and co <= po and cc < co
+
+def is_long_day(candle):
+    o, h, l, c = float(candle[1]), float(candle[2]), float(candle[3]), float(candle[4])
+    return (h - l) > 3 * abs(c - o)
+
+def is_short_day(candle):
+    o, h, l, c = float(candle[1]), float(candle[2]), float(candle[3]), float(candle[4])
+    return (h - l) <= 1.5 * abs(c - o) and abs(c - o) > 0
+
+def is_doji(candle):
+    o, c = float(candle[1]), float(candle[4])
+    return abs(c - o) <= (float(candle[2]) - float(candle[3])) * 0.1
+
+def is_doji_dragonfly(candle):
+    o, h, l, c = float(candle[1]), float(candle[2]), float(candle[3]), float(candle[4])
+    return is_doji(candle) and (h - max(o, c)) <= (max(o, c) - l) * 0.1
+
+def is_doji_gravestone(candle):
+    o, h, l, c = float(candle[1]), float(candle[2]), float(candle[3]), float(candle[4])
+    return is_doji(candle) and (min(o, c) - l) <= (h - min(o, c)) * 0.1
+
+def is_doji_long_shadows(candle):
+    o, h, l, c = float(candle[1]), float(candle[2]), float(candle[3]), float(candle[4])
+    return is_doji(candle) and (h - l) > 2 * abs(c - o)
+
+def is_bullish_and_bearish_strike(prev_c, curr_c):
+    return is_bullish_engulfing(prev_c, curr_c) or is_kicker_bullish(prev_c, curr_c)
+
+def is_rising_three_methods(c1, c2, c3, c4, c5):
+    return float(c1[4]) > float(c1[1]) and float(c5[4]) > float(c5[1]) and float(c5[4]) > float(c1[4])
+
+def is_falling_three_methods(c1, c2, c3, c4, c5):
+    return float(c1[4]) < float(c1[1]) and float(c5[4]) < float(c5[1]) and float(c5[4]) < float(c1[4])
+
+def is_stick_sandwich(c1, c2, c3):
+    return float(c1[4]) < float(c1[1]) and float(c2[4]) > float(c2[1]) and float(c3[4]) < float(c3[1])
 
 def check_trend(klines):
     closes = extract_closes(klines)
