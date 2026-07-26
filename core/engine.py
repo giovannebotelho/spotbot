@@ -142,8 +142,8 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
     bot_running = True
 
     def log(msg, end='\n', flush=False):
+        print(msg, end=end, flush=flush)
         if log_callback: log_callback(msg)
-        else: print(msg, end=end, flush=flush)
 
     def status(msg):
         if status_callback: status_callback(msg)

@@ -174,11 +174,17 @@ async def start_bot():
     try:
         await bot_task
     except asyncio.CancelledError:
-        ui.notify('Sistema Parado.', type='info')
+        try:
+            ui.notify('Sistema Parado.', type='info')
+        except Exception:
+            pass
         if status_indicator: 
             status_indicator.classes(remove='bg-[#00F5A0] animate-pulse shadow-[0_0_15px_#00F5A0]', add='bg-[#FF2E93]')
     except Exception as e:
-        ui.notify(f'Erro: {e}', type='negative')
+        try:
+            ui.notify(f'Erro: {e}', type='negative')
+        except Exception:
+            pass
         if status_indicator: 
             status_indicator.classes(remove='bg-[#00F5A0] animate-pulse shadow-[0_0_15px_#00F5A0]', add='bg-[#FF2E93]')
 
