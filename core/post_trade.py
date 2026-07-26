@@ -32,48 +32,40 @@ async def process_order_details(symbol, client, limit_order_details, stop_order_
     oco_timestamp = datetime.now().strftime("%d/%m/%Y at %H:%M:%S") if oco_order_result else None
     return symbol, oco_order_result, trade_result, novo_saldo_usdt, oco_timestamp, fee, trade_result_liquid
 
-def log_and_notify_results(order_result, symbol, trade_result, total_difference, timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_usdt):
+def log_and_notify_results(order_result, symbol, trade_result, total_difference, timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_usdt, log=print):
     if order_result == 'profit':
-        print(f"✅️ Ordem OCO concluída com \033[1;32mlucro\033[0m, Moeda: \033[1;33m{symbol}\033[0m \033[1;36m({timestamp})\033[0m")
-        message = f'✅️ Ordem OCO concluída com <b>lucro</b>, <b>Moeda: {symbol} ({timestamp})</b>'
+        log(f"🎉 Ordem OCO concluída com \033[1;32mlucro (PROFIT)\033[0m em \033[1;33m{symbol}\033[0m ({timestamp})")
+        message = f'🎉 <b>Ordem OCO concluída com PROFIT!</b>\n\n🪙 Par: <b>{symbol}</b>\n⏱️ Horário: <i>{timestamp}</i>'
     elif order_result == 'stop loss':
-        print(f"⛔ Ordem OCO concluída em \033[1;31mstop loss\033[0m, Moeda: \033[1;33m{symbol}\033[0m \033[1;36m({timestamp})\033[0m")
-        message = f'⛔ Ordem OCO concluída em <b>stop loss</b>, <b>Moeda: {symbol} ({timestamp})</b>'
-    send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+        log(f"⛔ Ordem OCO concluída em \033[1;31mSTOP LOSS\033[0m em \033[1;33m{symbol}\033[0m ({timestamp})")
+        message = f'⛔ <b>Ordem OCO concluída em STOP LOSS!</b>\n\n🪙 Par: <b>{symbol}</b>\n⏱️ Horário: <i>{timestamp}</i>'
+    
+    if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
 
     if trade_result >= 0:
-        result_message = f'\nLucro Parcial Bruto: 🟢 \033[1;32m${trade_result:.2f}\033[0m\nTaxa: 🔴 \033[1;31m${fee:.2f}\033[0m\nLucro Parcial Líquido: 🟢 \033[1;32m${trade_result_liquid:.2f}\033[0m\n'
-        telegram_message1 = f'Lucro Parcial Bruto: 🟢 <b>${trade_result:.2f}</b>\nTaxa: 🔴 <b>${fee:.2f}</b>\nLucro Parcial Líquido: 🟢 <b>${trade_result_liquid:.2f}</b>'
+        result_message = f"Lucro Parcial Bruto: 🟢 ${trade_result:.2f} | Taxa: 🔴 ${fee:.2f} | Lucro Líquido: 🟢 ${trade_result_liquid:.2f}"
+        telegram_message1 = f"💰 Lucro Parcial Bruto: 🟢 <b>${trade_result:.2f}</b>\n🔴 Taxa: <b>${fee:.2f}</b>\n💵 Lucro Líquido: 🟢 <b>${trade_result_liquid:.2f} USDT</b>"
     else:
-        result_message = f'\nPrejuízo Parcial Bruto: 🔴 \033[1;31m${trade_result:.2f}\033[0m\nTaxa: 🔴 \033[1;31m${fee:.2f}\033[0m\nPrejuízo Parcial Líquido: 🔴 \033[1;31m${trade_result_liquid:.2f}\033[0m\n'
-        telegram_message1 = f'Prejuízo Parcial Bruto: 🔴 <b>${trade_result:.2f}</b>\nTaxa: 🔴 <b>${fee:.2f}</b>\nPrejuízo Parcial Líquido: 🔴 <b>${trade_result_liquid:.2f}</b>'
+        result_message = f"Prejuízo Parcial Bruto: 🔴 ${trade_result:.2f} | Taxa: 🔴 ${fee:.2f} | Prejuízo Líquido: 🔴 ${trade_result_liquid:.2f}"
+        telegram_message1 = f"🔻 Prejuízo Parcial Bruto: 🔴 <b>${trade_result:.2f}</b>\n🔴 Taxa: <b>${fee:.2f}</b>\n💵 Prejuízo Líquido: 🔴 <b>${trade_result_liquid:.2f} USDT</b>"
     
-    send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message1)
-    print(result_message)
+    log(result_message)
+    if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message1)
 
-    if total_difference >= 0:
-        total_balance_message = f'Diferença total bruta no saldo: 🟢 \033[1;32m${total_difference:.2f}\033[0m'
-        telegram_message2 = f'Diferença total bruta no saldo: 🟢 <b>${total_difference:.2f}</b>'
-    else:
-        total_balance_message = f'Diferença total bruta no saldo: 🔴 \033[1;31m${total_difference:.2f}\033[0m'
-        telegram_message2 = f'Diferença total bruta no saldo: 🔴 <b>${total_difference:.2f}</b>'
-    
-    send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message2)
-    print(total_balance_message)
-    
     if total_difference_liquid >= 0:
-        total_balance_liquid_message = f'Diferença total líquida no saldo: 🟢 \033[1;32m${total_difference_liquid:.2f}\033[0m\n'
-        telegram_message3 = f'Diferença total líquida no saldo: 🟢 <b>${total_difference_liquid:.2f}</b>'
+        total_balance_liquid_message = f"📈 PnL Acumulado Líquido no Saldo: 🟢 ${total_difference_liquid:.2f} USDT"
+        telegram_message3 = f"📈 <b>PnL Acumulado Líquido no Saldo</b>: 🟢 <b>${total_difference_liquid:.2f} USDT</b>"
     else:
-        total_balance_liquid_message = f'Diferença total líquida no saldo: 🔴 \033[1;31m${total_difference_liquid:.2f}\033[0m\n'
-        telegram_message3 = f'Diferença total líquida no saldo: 🔴 <b>${total_difference_liquid:.2f}</b>'
+        total_balance_liquid_message = f"📉 PnL Acumulado Líquido no Saldo: 🔴 ${total_difference_liquid:.2f} USDT"
+        telegram_message3 = f"📉 <b>PnL Acumulado Líquido no Saldo</b>: 🔴 <b>${total_difference_liquid:.2f} USDT</b>"
     
-    send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message3)
-    print(total_balance_liquid_message)
+    log(total_balance_liquid_message)
+    if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message3)
     
-    print(f"💰 Saldo BNB em USDT na carteira: \033[1;34m${bnb_balance_usdt:.2f}\033[0m")
-    message = f"💰 Saldo BNB em USDT na carteira: <b>${bnb_balance_usdt:.2f}</b>"
-    send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+    log(f"🪙 Saldo BNB na carteira: ${bnb_balance_usdt:.2f} USDT")
 
 def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_inicial, symbol,
                     executed_qty, price_rounded, purchase_timestamp, lucro_alvo, stop_loss, stop_limit,

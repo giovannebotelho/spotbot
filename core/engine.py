@@ -502,7 +502,15 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         purchase_timestamp = timestamp
                         gemini_response = buy_result.get("gemini_response")
 
-                        oco_order, limit_order_id, stop_order_id, lucro_alvo, stop_loss, stop_limit = await adjust_and_place_oco_order(client, active_target_symbol, executed_qty, tick_size, tick_size, klines)
+                        oco_order, limit_order_id, stop_order_id, lucro_alvo, stop_loss, stop_limit = await adjust_and_place_oco_order(client, active_target_symbol, executed_qty, tick_size, tick_size, klines, log=log)
+                        if oco_order and TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                            asyncio.create_task(send_telegram_message(
+                                TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                                f"🎯 <b>Ordem OCO Posicionada!</b>\n\n"
+                                f"🪙 Par: <b>{active_target_symbol}</b>\n"
+                                f"🟢 Take Profit (TP): <b>${lucro_alvo:.4f}</b> (+4.0%)\n"
+                                f"🔴 Stop Loss (SL): <b>${stop_loss:.4f}</b> (-2.0%)"
+                            ))
                         last_operation_time = datetime.now()
 
                         highest_price = price
@@ -602,7 +610,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                             bnb_price = await get_bnb_price(client)
                                             
                                             if order_result:
-                                                log_and_notify_results(order_result, active_target_symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_free * bnb_price)
+                                                log_and_notify_results(order_result, active_target_symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_free * bnb_price, log=log)
                                                 data_row = create_data_row(
                                                     order_count, saldo_inicial_usdt, novo_saldo_usdt, active_target_symbol,
                                                     executed_qty, price, purchase_timestamp, lucro_alvo, stop_loss, stop_limit,
@@ -645,7 +653,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                         bnb_price = await get_bnb_price(client)
                                         
                                         if order_result:
-                                            log_and_notify_results(order_result, active_target_symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_free * bnb_price)
+                                            log_and_notify_results(order_result, active_target_symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_free * bnb_price, log=log)
                                             data_row = create_data_row(
                                                 order_count, saldo_inicial_usdt, novo_saldo_usdt, active_target_symbol,
                                                 executed_qty, price, purchase_timestamp, lucro_alvo, stop_loss, stop_limit,

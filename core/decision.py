@@ -62,10 +62,6 @@ def calculate_dynamic_position_slots(usdt_balance, min_order_usdt=10.0, accumula
         return num_slots, min(usable_usdt, slot_value)
 
 async def place_safe_oco_sell_order(client, symbol, quantity, price, stop_price, stop_limit_price, precision_price, precision_qty):
-    """
-    Envia ordem OCO na Binance Spot usando o endpoint legado resiliente /order/oco
-    com fallback automático para /orderList/oco se necessário.
-    """
     q_str = f"{quantity:.{precision_qty}f}"
     p_str = f"{price:.{precision_price}f}"
     sp_str = f"{stop_price:.{precision_price}f}"
@@ -366,7 +362,7 @@ async def should_sell(rsi, macd_current, signal_line_current, last_close, upper_
         return True, "MACD Baixista + Preço acima da Banda Superior"
     return False, ""
 
-async def adjust_and_place_oco_order(client, symbol, quantity, price_tick_size, qty_step_size, klines):
+async def adjust_and_place_oco_order(client, symbol, quantity, price_tick_size, qty_step_size, klines, log=print):
     symbol_info = await client.get_symbol_info(symbol)
 
     tick_size = float(next(filter for filter in symbol_info['filters'] if filter['filterType'] == 'PRICE_FILTER')['tickSize'])
@@ -384,7 +380,7 @@ async def adjust_and_place_oco_order(client, symbol, quantity, price_tick_size, 
     notional_value = quantity * current_price
 
     if notional_value < min_notional:
-        print(f"⚠️ Valor nocional ({notional_value:.2f}) é menor que o mínimo exigido ({min_notional:.2f}). Ajustando...")
+        log(f"⚠️ Valor nocional ({notional_value:.2f}) é menor que o mínimo exigido ({min_notional:.2f}). Ajustando...")
         quantity = round(math.ceil((min_notional / current_price) / step_size) * step_size, quantity_precision)
 
     stop_loss_pct = 0.02
@@ -406,9 +402,9 @@ async def adjust_and_place_oco_order(client, symbol, quantity, price_tick_size, 
         limit_order_id = oco_order['orders'][1]['orderId']
         stop_order_id = oco_order['orders'][0]['orderId']
 
-        print(f"✅ Ordem OCO enviada com sucesso para {symbol}: TP=${take_profit_price:.4f}, SL=${stop_loss_price:.4f}")
+        log(f"🎯 Ordem OCO Posicionada ({symbol}): TP=${take_profit_price:.4f} (+4.0%) | SL=${stop_loss_price:.4f} (-2.0%)")
         return oco_order, limit_order_id, stop_order_id, take_profit_price, stop_loss_price, stop_limit_price
 
     except Exception as e:
-        print(f"❌ Erro ao enviar ordem OCO: {e}")
+        log(f"❌ Erro ao enviar ordem OCO: {e}")
         return None, None, None, None, None, None
