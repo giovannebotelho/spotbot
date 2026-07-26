@@ -185,6 +185,42 @@ def detect_market_regime(klines):
     else:
         return "REGIME_NEUTRAL", hurst
 
+def detect_liquidity_sweep(klines):
+    """
+    Fase 2: Detecta Varredura de Liquidez Institucional (Smart Money Concepts - SMC):
+    Identifica quando a vela espeta abaixo da mínima das últimas 24 horas (capturando stop losses)
+    e fecha acima do suporte com rejeição em vela (hammer/pinbar) e pico de volume.
+    """
+    if not klines or len(klines) < 25:
+        return False, ""
+
+    lows_24h = [float(k[3]) for k in klines[-25:-1]]
+    low_24h = min(lows_24h)
+
+    last_candle = klines[-1]
+    open_p = float(last_candle[1])
+    high_p = float(last_candle[2])
+    low_p = float(last_candle[3])
+    close_p = float(last_candle[4])
+    vol = float(last_candle[5])
+
+    volumes = [float(k[5]) for k in klines[-20:]]
+    avg_vol = np.mean(volumes)
+
+    swept_below = low_p < low_24h
+    closed_above = close_p > low_24h or close_p > open_p
+
+    body = abs(close_p - open_p)
+    lower_wick = min(open_p, close_p) - low_p
+    strong_rejection = lower_wick > (body * 1.2)
+
+    volume_surge = vol >= (avg_vol * 1.3)
+
+    if swept_below and closed_above and (strong_rejection or volume_surge):
+        return True, "Varredura de Liquidez SMC (Rejeição de Mínima 24h + Volume)"
+
+    return False, ""
+
 def check_trend(klines):
     closes = extract_closes(klines)
     ema200 = calculate_ema(closes, 200)

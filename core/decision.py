@@ -2,7 +2,7 @@ import asyncio
 import math
 import pandas as pd
 from binance.exceptions import BinanceAPIException
-from core.indicators import calculate_moving_average_sell_pressure, calculate_atr, calculate_adx, calculate_ema, detect_market_regime
+from core.indicators import calculate_moving_average_sell_pressure, calculate_atr, calculate_adx, calculate_ema, detect_market_regime, detect_liquidity_sweep
 from services.binance_client import get_order_book
 from services.telegram_notifier import send_telegram_message
 from config.settings import TRADING_CONFIG, RSI_CONFIG, OCO_CONFIG, TELEGRAM_CONFIG, ATR_CONFIG, API_KEYS
@@ -148,6 +148,11 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
     regime, hurst_val = detect_market_regime(klines)
     if regime == "REGIME_CRASH_PANIC":
         return {"buy": False, "message": "Modo Defesa Ativado: Pânico de Queda no Mercado", "candle_data": "", "gemini_response": None, "regime": regime}
+
+    # 2. Detecção de Varredura de Liquidez Institucional (Fase 2: SMC Liquidity Sweeps)
+    is_sweep, sweep_msg = detect_liquidity_sweep(klines)
+    if is_sweep and rsi <= 50:
+        return {"buy": True, "message": f"🦈 {sweep_msg} ({regime})", "candle_data": "", "gemini_response": None, "gemini_analysis": None, "regime": regime}
 
     rsi_config = config_override.get('RSI_CONFIG', RSI_CONFIG) if config_override else RSI_CONFIG
     
