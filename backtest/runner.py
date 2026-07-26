@@ -1,13 +1,22 @@
+import sys
+import os
 import asyncio
 from datetime import datetime, timedelta
 from binance import AsyncClient
-from config.settings import API_KEYS, TRADING_CONFIG
+from config.settings import API_KEYS, TRADING_CONFIG, RISK_PROFILES
 from core.indicators import (
     calculate_rsi, calculate_macd, calculate_bollinger_bands, calculate_vwap,
     calculate_ema, check_trend, check_candle_patterns
 )
 from core.decision import should_buy, adjust_and_place_oco_order
 import core.decision as decision
+
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
 
 async def mock_get_gemini_analysis(*args, **kwargs):
     return None
@@ -23,21 +32,31 @@ class MockClient:
             'filters': [
                 {'filterType': 'LOT_SIZE', 'stepSize': '0.00001', 'minQty': '0.00001'},
                 {'filterType': 'NOTIONAL', 'minNotional': '5.0'},
-                {'filterType': 'MIN_NOTIONAL', 'minNotional': '5.0'}
+                {'filterType': 'MIN_NOTIONAL', 'minNotional': '5.0'},
+                {'filterType': 'PRICE_FILTER', 'tickSize': '0.01'}
             ]
         }
     
     async def get_asset_balance(self, asset):
         return {'free': '100000.0'}
+
+    async def get_symbol_ticker(self, symbol):
+        return {'price': str(self.current_price)}
     
     async def get_order_book(self, symbol, **kwargs):
-        return {'asks': [[str(self.current_price), '1.0']]}
+        return {'asks': [[str(self.current_price), '1.0']], 'bids': [[str(self.current_price), '1.0']]}
+
+    async def create_oco_order(self, **kwargs):
+        return {
+            'orderListId': 12345,
+            'orders': [{'orderId': 100}, {'orderId': 101}]
+        }
 
     def set_current_price(self, price):
         self.current_price = price
 
-async def run_backtest(symbol='BTCUSDT', days=30, initial_capital=100.0, config_override=None):
-    print(f"🚀 Iniciando Backtest para {symbol} nos últimos {days} dias...")
+async def run_backtest(symbol='BTCUSDT', days=365, initial_capital=100.0, config_override=None):
+    print(f"Iniciando Backtest para {symbol} nos últimos {days} dias...")
     
     api_k = API_KEYS['mainnet']['key']
     api_s = API_KEYS['mainnet']['secret']
@@ -47,7 +66,7 @@ async def run_backtest(symbol='BTCUSDT', days=30, initial_capital=100.0, config_
     start_time = end_time - timedelta(days=days)
     
     klines = await client.get_historical_klines(symbol, TRADING_CONFIG['interval'], start_time.strftime("%d %b %Y %H:%M:%S"), end_time.strftime("%d %b %Y %H:%M:%S"))
-    print(f"📊 Total de candles baixados: {len(klines)}")
+    print(f"Total de candles baixados: {len(klines)}")
     
     balance = initial_capital
     trades = []
@@ -112,7 +131,7 @@ async def run_backtest(symbol='BTCUSDT', days=30, initial_capital=100.0, config_
                 if dec['buy']:
                     quantity = balance / close_price
                     _, _, _, tp, sl, _ = await adjust_and_place_oco_order(
-                        mock_client, symbol, quantity, 0.01, 0.01, current_klines, silent=True, config_override=config_override
+                        mock_client, symbol, quantity, 0.01, 0.01, current_klines
                     )
                     active_trade = {'entry_price': close_price, 'quantity': quantity, 'stop_loss': sl, 'take_profit': tp, 'time': open_time}
                     balance -= (quantity * close_price)
@@ -122,20 +141,32 @@ async def run_backtest(symbol='BTCUSDT', days=30, initial_capital=100.0, config_
 
     await client.close_connection()
     
-    print("\n" + "="*30)
-    print("🏁 RESULTADO DO BACKTEST")
-    print("="*30)
-    print(f"Saldo Inicial: ${initial_capital:.2f}")
-    print(f"Saldo Final:   ${balance:.2f}")
+    wins = len([t for t in trades if t.get('pnl', 0) > 0])
+    losses = len([t for t in trades if t.get('pnl', 0) < 0])
+    total_completed = wins + losses
+    win_rate = (wins / total_completed * 100) if total_completed > 0 else 0
+    
     profit = balance - initial_capital
     profit_percent = (profit / initial_capital) * 100
-    color = "\033[1;32m" if profit > 0 else "\033[1;31m"
-    print(f"Lucro/Prejuízo: {color}${profit:.2f} ({profit_percent:.2f}%)\033[0m")
-    print(f"Total de Trades: {len([t for t in trades if t['type'] == 'BUY'])}")
+    
+    print("\n" + "="*50)
+    print("RESULTADO DO BACKTEST DE 1 ANO (PERFIL AGRESSIVO)")
+    print("="*50)
+    print(f"Saldo Inicial:   ${initial_capital:.2f}")
+    print(f"Saldo Final:     ${balance:.2f}")
+    print(f"Lucro/Prejuízo:  ${profit:.2f} ({profit_percent:.2f}%)")
+    print(f"Total de Trades: {total_completed}")
+    print(f"Vitórias:        {wins}")
+    print(f"Derrotas:        {losses}")
+    print(f"Win Rate:        {win_rate:.1f}%")
+    print("="*50)
     
     return {
         "profit": profit,
         "profit_percent": profit_percent,
-        "trades": len([t for t in trades if t['type'] == 'BUY']),
+        "trades": total_completed,
+        "wins": wins,
+        "losses": losses,
+        "win_rate": win_rate,
         "final_balance": balance
     }
