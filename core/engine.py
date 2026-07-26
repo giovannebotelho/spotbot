@@ -1,9 +1,11 @@
 import asyncio
 import os
+import time
 import pandas as pd
 from datetime import datetime, timedelta
 from binance import BinanceSocketManager
 from binance import AsyncClient as BinanceAsyncClient
+from binance.exceptions import BinanceAPIException
 
 from config.settings import API_KEYS, TELEGRAM_CONFIG, TRADING_CONFIG, RSI_CONFIG, TRAILING_STOP_CONFIG, SCANNER_CONFIG, TOP_20_SYMBOLS
 from services.binance_client import extract_closes, extract_volumes, get_usdt_balance, get_order_details, get_klines, get_bnb_price, get_multi_klines
@@ -30,7 +32,7 @@ else:
 
 bot_running = True
 bot_status_data = {
-    "rsi": 0, "price": 0, "symbol": "", "action": "Iniciando...", "trend": "N/A"
+    "rsi": 0, "price": 0, "symbol": "", "action": "Iniciando...", "trend": "N/A", "target_asset": "BTCUSDT"
 }
 shared_market_data = {
     "klines": [], "dates": [], "bb_upper": [], "bb_lower": [], "bb_middle": [], "ema200": [], "volumes": [], "scanner_results": []
@@ -45,6 +47,18 @@ pause_end_time = None
 MAX_RESTARTS = 3
 restart_attempts = 0
 last_operation_time = None
+
+async def sync_binance_time(client, log=print):
+    """Sincroniza o relógio do cliente com o horário do servidor da Binance para evitar erro -1021."""
+    try:
+        res = await client.get_server_time()
+        server_time = res['serverTime']
+        local_time = int(time.time() * 1000)
+        time_offset = server_time - local_time
+        client.TIME_OFFSET = time_offset
+        log(f"⏱️ Relógio sincronizado com a Binance! (Offset: {time_offset}ms)")
+    except Exception as e:
+        log(f"⚠️ Aviso ao sincronizar relógio com a Binance: {e}")
 
 async def cancel_all_oco_orders(client, symbol):
     try:
@@ -106,6 +120,7 @@ async def get_account_balances():
     client = None
     try:
         client = await BinanceAsyncClient.create(api_key, api_secret)
+        await sync_binance_time(client, log=lambda m: None)
         bnb_balance = await client.get_asset_balance(asset='BNB')
         bnb_balance_free = float(bnb_balance['free'])
         bnb_price_usdt = await get_bnb_price(client)
@@ -138,46 +153,106 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         status("⚠️ Chaves API ausentes no .env")
         return
 
+    db = DatabaseManager()
+
     async def handle_telegram_command(command):
         global bot_running
-        cmd = command.split()[0].lower()
-        if cmd == '/start': return "🤖 O bot já está rodando!"
+        cmd_parts = command.split()
+        cmd = cmd_parts[0].lower()
+
+        if cmd == '/start':
+            return "🤖 <b>SpotBot Pro está ativo e monitorando o mercado!</b>"
+        
         elif cmd == '/stop':
             bot_running = False
-            return "🛑 Comando recebido. Parando o bot..."
+            return "🛑 <b>Comando recebido. Parando o bot com segurança...</b>"
+        
         elif cmd == '/status':
+            target_asset = bot_status_data.get('target_asset', 'BTCUSDT')
             return (
-                f"📊 <b>Status do Bot SpotBot Pro</b>\n\n"
-                f"🪙 Modo: <b>{bot_status_data['symbol']}</b>\n"
-                f"💵 Preço Atual: <b>${bot_status_data['price']:.2f}</b>\n"
-                f"📈 RSI Atual: <b>{bot_status_data['rsi']:.1f}</b>\n"
-                f"🎯 Tendência: <b>{bot_status_data['trend']}</b>\n"
-                f"⚡ Ação Atual: <i>{bot_status_data['action']}</i>"
+                f"⚡ <b>STATUS DO SPOTBOT PRO</b>\n"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"🎯 <b>Modo</b>: {bot_status_data['symbol']}\n"
+                f"🪙 <b>Foco Atual</b>: <b>{target_asset}</b>\n"
+                f"💵 <b>Preço</b>: <b>${bot_status_data['price']:.2f}</b>\n"
+                f"📊 <b>RSI</b>: <b>{bot_status_data['rsi']:.1f}</b>\n"
+                f"📈 <b>Tendência 4h</b>: <b>{bot_status_data['trend']}</b>\n"
+                f"⚡ <b>Estado</b>: <i>{bot_status_data['action']}</i>"
             )
+        
         elif cmd == '/saldo':
             c = None
             try:
                 c = await BinanceAsyncClient.create(api_key, api_secret)
+                await sync_binance_time(c, log=lambda m: None)
                 usdt = await get_usdt_balance(c)
                 bnb = await c.get_asset_balance(asset='BNB')
                 bnb_free = float(bnb['free'])
                 bnb_price = await get_bnb_price(c)
+                slots, val_slot = calculate_dynamic_position_slots(usdt)
                 return (
-                    f"💰 <b>Saldos da Carteira</b>\n\n"
-                    f"💵 USDT: <b>${usdt:.2f}</b>\n"
-                    f"🪙 BNB: <b>{bnb_free:.4f} (~${bnb_free*bnb_price:.2f})</b>"
+                    f"💰 <b>SALDOS & POSIÇÕES DA CARTEIRA</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━\n"
+                    f"💵 <b>USDT Disponível</b>: <b>${usdt:.2f}</b>\n"
+                    f"🪙 <b>Saldo BNB</b>: <b>{bnb_free:.4f} BNB</b> (~${bnb_free*bnb_price:.2f})\n"
+                    f"🏷️ <i>Desconto de 25% nas taxas em BNB ATIVO!</i>\n\n"
+                    f"🎰 <b>Slots Calculados</b>: <b>{slots} posições</b> de <b>${val_slot:.2f} USDT</b> cada."
                 )
             except Exception as e:
                 return f"Erro ao buscar saldo: {e}"
             finally:
                 if c: await c.close_connection()
+
+        elif cmd in ['/top20', '/scanner']:
+            c = None
+            try:
+                c = await BinanceAsyncClient.create(api_key, api_secret)
+                await sync_binance_time(c, log=lambda m: None)
+                multi_klines = await get_multi_klines(c, TOP_20_SYMBOLS[:10], TRADING_CONFIG['interval'], 50)
+                
+                ranking = []
+                for sym, k_data in multi_klines.items():
+                    if k_data and len(k_data) >= 20:
+                        c_closes = extract_closes(k_data)
+                        r_val = calculate_rsi(c_closes)
+                        ranking.append((sym, c_closes[-1], r_val))
+                
+                ranking.sort(key=lambda x: x[2]) # Ordena por RSI mais sobrevendido
+                
+                lines = [f"🔥 <b>TOP 5 OPORTUNIDADES DO SCANNER</b>\n━━━━━━━━━━━━━━━━━━━"]
+                for sym, prc, rsi_v in ranking[:5]:
+                    emoji = "🟢" if rsi_v <= 30 else ("🟡" if rsi_v <= 45 else "⚪")
+                    lines.append(f"{emoji} <b>{sym}</b>: ${prc:.2f} | RSI: <b>{rsi_v:.1f}</b>")
+                
+                return "\n".join(lines)
+            except Exception as e:
+                return f"Erro ao buscar scanner: {e}"
+            finally:
+                if c: await c.close_connection()
+
+        elif cmd in ['/lucro', '/perf']:
+            try:
+                stats = db.get_stats()
+                return (
+                    f"📈 <b>PERFORMANCE ACUMULADA</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━\n"
+                    f"💰 <b>Lucro Líquido Total</b>: <b>${stats['total_net_profit']:.2f} USDT</b>\n"
+                    f"🎯 <b>Taxa de Vitória</b>: <b>{stats['win_rate']:.1f}%</b>\n"
+                    f"📊 <b>Total de Operações</b>: <b>{stats['total_trades']} trades</b>"
+                )
+            except Exception as e:
+                return f"Erro ao ler estatísticas: {e}"
+
         elif cmd == '/ajuda':
             return (
-                "📚 <b>Comandos Disponíveis</b>:\n"
-                "/status - Exibe o preço, RSI e estado atual do bot\n"
-                "/saldo - Consulta os saldos em USDT e BNB\n"
-                "/stop - Para a execução remota do bot\n"
-                "/ajuda - Mostra esta mensagem de ajuda"
+                "📚 <b>COMANDOS DISPONÍVEIS (SPOTBOT PRO)</b>\n"
+                "━━━━━━━━━━━━━━━━━━━\n"
+                "/status - Exibe o ativo em foco, RSI e status do robô\n"
+                "/saldo - Exibe saldos USDT, BNB e cálculo de slots\n"
+                "/top20 ou /scanner - Varre as 5 maiores oportunidades do mercado\n"
+                "/lucro ou /perf - Exibe o lucro total líquido acumulado\n"
+                "/stop - Pausa a execução remota do robô\n"
+                "/ajuda - Exibe esta mensagem de ajuda"
             )
         return "❓ Comando não reconhecido. Digite /ajuda para ver as opções."
 
@@ -193,7 +268,6 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
     log("\n🚀 \033[5;33mBot SpotBot Pro iniciado!\033[0m 🚀\n")
     
     try:
-        db = DatabaseManager()
         db.create_tables()
         db.migrate_from_csv()
     except Exception as e:
@@ -203,6 +277,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
     client = None
     try:
         client = await BinanceAsyncClient.create(api_key, api_secret)
+        await sync_binance_time(client, log=log)
         bsm = BinanceSocketManager(client)
         
         saldo_inicial_usdt = await get_usdt_balance(client)
@@ -217,9 +292,8 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             symbol = selected_symbol
             display_symbol = selected_symbol
 
-        log(f"🪙 Símbolo selecionado: {display_symbol}\n")
+        log(f"🪙 Modo Selecionado: {display_symbol}\n")
 
-        # Notificação Telegram completa na inicialização
         if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
             asyncio.create_task(send_telegram_message(
                 TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
@@ -234,12 +308,19 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         tick_size = float(next(filter for filter in symbol_info['filters'] if filter['filterType'] == 'PRICE_FILTER')['tickSize'])
         quote_precision = int(symbol_info['quoteAssetPrecision'])
 
+        last_sync_hour = datetime.now().hour
+
         while bot_running:
             try:
+                # Sincroniza o relógio a cada 1 hora automaticamente
+                current_hour = datetime.now().hour
+                if current_hour != last_sync_hour:
+                    await sync_binance_time(client, log=log)
+                    last_sync_hour = current_hour
+
                 usdt_balance = await get_usdt_balance(client)
                 slots, slot_value = calculate_dynamic_position_slots(usdt_balance)
 
-                # Se estiver no modo Scanner Top 20, varre todos os 20 símbolos
                 active_target_symbol = symbol
                 if is_scanner_mode:
                     status("⚡ Scanner varrendo os Top 20 Criptoativos...")
@@ -259,8 +340,20 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     if best_candidate:
                         active_target_symbol = best_candidate
 
+                bot_status_data['target_asset'] = active_target_symbol
+
                 klines = await get_klines(client, active_target_symbol, TRADING_CONFIG['interval'], TRADING_CONFIG['limit'])
                 if not klines:
+                    await asyncio.sleep(5)
+                    continue
+            except BinanceAPIException as api_err:
+                if api_err.code == -1021:
+                    log("⏱️ Erro de dessincronização detectado. Ressincronizando com a Binance...")
+                    await sync_binance_time(client, log=log)
+                    await asyncio.sleep(2)
+                    continue
+                else:
+                    log(f"Erro na API Binance: {api_err}")
                     await asyncio.sleep(5)
                     continue
             except Exception as e:
@@ -298,7 +391,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             except Exception:
                 pass
 
-            bot_status_data['symbol'] = active_target_symbol
+            bot_status_data['symbol'] = display_symbol
             bot_status_data['price'] = closes[-1]
             bot_status_data['rsi'] = rsi
             bot_status_data['trend'] = "Alta" if check_trend(klines) else "Baixa/Neutro"
