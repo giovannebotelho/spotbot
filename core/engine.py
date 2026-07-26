@@ -16,8 +16,9 @@ from core.indicators import (
 )
 from core.decision import should_place_order, should_buy, should_sell, adjust_and_place_oco_order, get_min_notional, adjust_price_to_tick_size, get_precision, calculate_dynamic_position_slots
 from core.post_trade import process_order_details, log_and_notify_results, create_data_row, save_to_csv
-from services.telegram_notifier import send_telegram_message, TelegramBot
+from services.telegram_notifier import send_telegram_message, send_telegram_document, TelegramBot
 from services.database import DatabaseManager
+from services.pdf_generator import generate_weekly_telemetry_pdf
 from utils.formatting import remove_ansi_codes
 
 environment = os.getenv("BOT_ENVIRONMENT", "mainnet")
@@ -50,7 +51,6 @@ restart_attempts = 0
 last_operation_time = None
 
 async def sync_binance_time(client, log=print):
-    """Sincroniza o relógio do cliente com o horário do servidor da Binance para evitar erro -1021."""
     try:
         res = await client.get_server_time()
         server_time = res['serverTime']
@@ -249,6 +249,17 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             except Exception as e:
                 return f"Erro ao ler estatísticas: {e}"
 
+        elif cmd in ['/relatorio', '/pdf']:
+            try:
+                pdf_path = generate_weekly_telemetry_pdf(db, output_path="docs/Relatorio_Semanal_Telemetria.pdf")
+                asyncio.create_task(send_telegram_document(
+                    TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                    pdf_path, caption="📊 <b>Relatório Executivo de Telemetria Semanal (PDF) SpotBot Pro v3.0</b>"
+                ))
+                return "📄 <b>Relatório Executivo em PDF gerado com sucesso! Enviando arquivo no Telegram...</b>"
+            except Exception as e:
+                return f"Erro ao gerar relatório PDF: {e}"
+
         elif cmd == '/ajuda':
             return (
                 "📚 <b>COMANDOS DISPONÍVEIS (SPOTBOT PRO)</b>\n"
@@ -257,6 +268,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 "/saldo - Exibe saldos USDT, BNB e cálculo de slots\n"
                 "/top20 ou /scanner - Varre a força relativa dos Top 20 ativos\n"
                 "/lucro ou /perf - Exibe o lucro total líquido acumulado\n"
+                "/relatorio ou /pdf - Gera e envia o Relatório Executivo em PDF\n"
                 "/stop - Pausa a execução remota com segurança\n"
                 "/cancel ou /abort - Interrupção imediata de emergência (CTRL+C)\n"
                 "/ajuda - Exibe esta mensagem de ajuda"
@@ -316,17 +328,33 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         quote_precision = int(symbol_info['quoteAssetPrecision'])
 
         last_sync_hour = datetime.now().hour
+        last_pdf_sent_day = None
 
         while bot_running:
             try:
-                current_hour = datetime.now().hour
+                current_dt = datetime.now()
+                current_hour = current_dt.hour
+                
                 if current_hour != last_sync_hour:
                     await sync_binance_time(client, log=log)
                     last_sync_hour = current_hour
 
+                # Automação FASE D: Disparo do Relatório Semanal em PDF todo Domingo às 20:00
+                if current_dt.weekday() == 6 and current_hour == 20 and last_pdf_sent_day != current_dt.date():
+                    last_pdf_sent_day = current_dt.date()
+                    try:
+                        pdf_path = generate_weekly_telemetry_pdf(db, output_path="docs/Relatorio_Semanal_Telemetria.pdf")
+                        if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                            asyncio.create_task(send_telegram_document(
+                                TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                                pdf_path, caption="📊 <b>Relatório Executivo de Telemetria Semanal (PDF) SpotBot Pro v3.0</b>"
+                            ))
+                            log("📄 Relatório Semanal em PDF enviado automaticamente para o Telegram!")
+                    except Exception as pdf_err:
+                        log(f"⚠️ Erro ao gerar PDF automático de domingo: {pdf_err}")
+
                 usdt_balance = await get_usdt_balance(client)
                 
-                # FASE C (v3.0): Juros Compostos Automáticos baseados no Lucro Acumulado
                 db_stats = db.get_stats()
                 acc_pnl = db_stats['total_net_profit']
                 slots, slot_value = calculate_dynamic_position_slots(usdt_balance, accumulated_net_profit=acc_pnl)
@@ -491,7 +519,6 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                     
                                     profit_pct = (cur_price - price) / price
 
-                                    # Scalp Locking (Venda Parcial de 50% em +1.5% de Lucro + Mover Stop para Breakeven)
                                     if profit_pct >= 0.015 and not partial_take_done:
                                         try:
                                             step_size = float(next(f for f in target_symbol_info['filters'] if f['filterType'] == 'LOT_SIZE')['stepSize'])
@@ -533,7 +560,6 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                         except Exception as e_partial:
                                             log(f"Aviso ao executar Scalp Locking: {e_partial}")
 
-                                    # Trailing Stop Móvel por ATR
                                     if TRAILING_STOP_CONFIG['enabled'] and cur_price > highest_price:
                                         highest_price = cur_price
                                         if highest_price > price * (1 + TRAILING_STOP_CONFIG['activation_percent']):

@@ -1,5 +1,6 @@
 import aiohttp
 import asyncio
+from pathlib import Path
 
 async def send_telegram_message(bot_token, chat_id, message):
     """Envia uma mensagem assíncrona para o Telegram."""
@@ -18,6 +19,28 @@ async def send_telegram_message(bot_token, chat_id, message):
                 return await response.json()
     except Exception as e:
         print(f"🚨 Erro ao enviar mensagem no Telegram: {e}")
+        return None
+
+async def send_telegram_document(bot_token, chat_id, file_path, caption=""):
+    """Envia um arquivo PDF ou documento assíncrono para o Telegram."""
+    if not bot_token or not chat_id:
+        return None
+
+    url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
+    try:
+        data = aiohttp.FormData()
+        data.add_field('chat_id', str(chat_id))
+        if caption:
+            data.add_field('caption', caption)
+            data.add_field('parse_mode', 'HTML')
+        
+        with open(file_path, 'rb') as f:
+            data.add_field('document', f, filename=Path(file_path).name, content_type='application/pdf')
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, data=data) as response:
+                    return await response.json()
+    except Exception as e:
+        print(f"🚨 Erro ao enviar documento no Telegram: {e}")
         return None
 
 class TelegramBot:
@@ -59,26 +82,14 @@ class TelegramBot:
             return []
 
     async def process_update(self, update, session):
-        message = update.get('message')
-        if not message: return
-        
-        chat_id = str(message['chat']['id'])
-        text = message.get('text', '').strip()
-        
-        if chat_id != self.allowed_chat_id:
-            print(f"⛔ Comando ignorado de chat_id não autorizado: {chat_id}")
-            return
-        
-        if text.startswith('/'):
-            print(f"📩 Comando recebido no Telegram: {text}")
-            response = await self.command_handler(text)
-            if response:
-                await self.send_message(session, chat_id, response)
+        message = update.get('message', {})
+        chat_id = str(message.get('chat', {}).get('id', ''))
+        text = message.get('text', '')
 
-    async def send_message(self, session, chat_id, text):
-        try:
-            url = f"{self.base_url}/sendMessage"
-            payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'HTML'}
-            await session.post(url, json=payload)
-        except Exception as e:
-            print(f"Erro ao responder Telegram: {e}")
+        if chat_id != self.allowed_chat_id:
+            return
+
+        if text.startswith('/'):
+            response_text = await self.command_handler(text)
+            if response_text:
+                await send_telegram_message(self.token, chat_id, response_text)
