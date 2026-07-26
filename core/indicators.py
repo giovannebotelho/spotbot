@@ -221,6 +221,52 @@ def detect_liquidity_sweep(klines):
 
     return False, ""
 
+def calculate_relative_strength_rank(multi_klines):
+    """
+    Fase 3: Ranker de Força Relativa e Momentum (Relative Strength vs BTC).
+    Calcula a Força Relativa de cada altcoin contra o BTCUSDT e combina com RSI e ADX.
+    Retorna uma lista ordenada com os melhores criptoativos para operar no momento.
+    """
+    if not multi_klines:
+        return []
+
+    btc_klines = multi_klines.get('BTCUSDT', [])
+    btc_return_24h = 0.0
+    if btc_klines and len(btc_klines) >= 25:
+        b_closes = extract_closes(btc_klines)
+        b_start = b_closes[-25]
+        b_end = b_closes[-1]
+        btc_return_24h = ((b_end - b_start) / b_start) * 100 if b_start > 0 else 0.0
+
+    ranked_assets = []
+    for symbol, klines in multi_klines.items():
+        if not klines or len(klines) < 25:
+            continue
+
+        closes = extract_closes(klines)
+        start_p = closes[-25]
+        end_p = closes[-1]
+        asset_return_24h = ((end_p - start_p) / start_p) * 100 if start_p > 0 else 0.0
+
+        rs_ratio = asset_return_24h - btc_return_24h
+        rsi_val = calculate_rsi(closes)
+        adx_val = calculate_adx(klines)
+
+        combined_score = (rs_ratio * 0.4) + ((100 - rsi_val) * 0.4) + (adx_val * 0.2)
+
+        ranked_assets.append({
+            'symbol': symbol,
+            'price': end_p,
+            'return_24h': asset_return_24h,
+            'rs_ratio': rs_ratio,
+            'rsi': rsi_val,
+            'adx': adx_val,
+            'score': combined_score
+        })
+
+    ranked_assets.sort(key=lambda x: x['score'], reverse=True)
+    return ranked_assets
+
 def check_trend(klines):
     closes = extract_closes(klines)
     ema200 = calculate_ema(closes, 200)

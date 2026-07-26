@@ -11,7 +11,7 @@ from config.settings import API_KEYS, TELEGRAM_CONFIG, TRADING_CONFIG, RSI_CONFI
 from services.binance_client import extract_closes, extract_volumes, get_usdt_balance, get_order_details, get_klines, get_bnb_price, get_multi_klines
 from core.indicators import (
     calculate_rsi, calculate_macd, calculate_bollinger_bands, check_trend, check_candle_patterns,
-    calculate_vwap, get_candle_details, calculate_ema, is_market_downward
+    calculate_vwap, get_candle_details, calculate_ema, is_market_downward, calculate_relative_strength_rank
 )
 from core.decision import should_place_order, should_buy, should_sell, adjust_and_place_oco_order, get_min_notional, adjust_price_to_tick_size, get_precision, calculate_dynamic_position_slots
 from core.post_trade import process_order_details, log_and_notify_results, create_data_row, save_to_csv
@@ -208,21 +208,17 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             try:
                 c = await BinanceAsyncClient.create(api_key, api_secret)
                 await sync_binance_time(c, log=lambda m: None)
-                multi_klines = await get_multi_klines(c, TOP_20_SYMBOLS[:10], TRADING_CONFIG['interval'], 50)
+                multi_klines = await get_multi_klines(c, TOP_20_SYMBOLS, TRADING_CONFIG['interval'], 50)
+                ranked_assets = calculate_relative_strength_rank(multi_klines)
                 
-                ranking = []
-                for sym, k_data in multi_klines.items():
-                    if k_data and len(k_data) >= 20:
-                        c_closes = extract_closes(k_data)
-                        r_val = calculate_rsi(c_closes)
-                        ranking.append((sym, c_closes[-1], r_val))
-                
-                ranking.sort(key=lambda x: x[2]) # Ordena por RSI mais sobrevendido
-                
-                lines = [f"🔥 <b>TOP 5 OPORTUNIDADES DO SCANNER</b>\n━━━━━━━━━━━━━━━━━━━"]
-                for sym, prc, rsi_v in ranking[:5]:
-                    emoji = "🟢" if rsi_v <= 30 else ("🟡" if rsi_v <= 45 else "⚪")
-                    lines.append(f"{emoji} <b>{sym}</b>: ${prc:.2f} | RSI: <b>{rsi_v:.1f}</b>")
+                lines = [f"🔥 <b>TOP 5 FORÇA RELATIVA & MOMENTUM (SCANNER 2.0)</b>\n━━━━━━━━━━━━━━━━━━━"]
+                for item in ranked_assets[:5]:
+                    sym = item['symbol']
+                    prc = item['price']
+                    rsi_v = item['rsi']
+                    rs_v = item['rs_ratio']
+                    emoji = "🟢" if rsi_v <= 35 else ("🟡" if rsi_v <= 50 else "⚪")
+                    lines.append(f"{emoji} <b>{sym}</b>: ${prc:.2f} | RS: <b>{rs_v:+.1f}%</b> | RSI: <b>{rsi_v:.1f}</b>")
                 
                 return "\n".join(lines)
             except Exception as e:
@@ -249,7 +245,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 "━━━━━━━━━━━━━━━━━━━\n"
                 "/status - Exibe o ativo em foco, RSI e status do robô\n"
                 "/saldo - Exibe saldos USDT, BNB e cálculo de slots\n"
-                "/top20 ou /scanner - Varre as 5 maiores oportunidades do mercado\n"
+                "/top20 ou /scanner - Varre a força relativa dos Top 20 ativos\n"
                 "/lucro ou /perf - Exibe o lucro total líquido acumulado\n"
                 "/stop - Pausa a execução remota do robô\n"
                 "/ajuda - Exibe esta mensagem de ajuda"
@@ -323,22 +319,12 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
 
                 active_target_symbol = symbol
                 if is_scanner_mode:
-                    status("⚡ Scanner varrendo os Top 20 Criptoativos...")
+                    status("⚡ Scanner 2.0 avaliando Força Relativa (RS vs BTC) dos Top 20 Criptoativos...")
                     multi_klines = await get_multi_klines(client, TOP_20_SYMBOLS, TRADING_CONFIG['interval'], TRADING_CONFIG['limit'])
-                    
-                    best_candidate = None
-                    best_rsi = 100.0
-                    
-                    for sym, k_data in multi_klines.items():
-                        if k_data and len(k_data) >= 50:
-                            c_closes = extract_closes(k_data)
-                            r_val = calculate_rsi(c_closes)
-                            if r_val < best_rsi:
-                                best_rsi = r_val
-                                best_candidate = sym
-                    
-                    if best_candidate:
-                        active_target_symbol = best_candidate
+                    ranked_assets = calculate_relative_strength_rank(multi_klines)
+                    if ranked_assets:
+                        active_target_symbol = ranked_assets[0]['symbol']
+                        shared_market_data['scanner_results'] = ranked_assets
 
                 bot_status_data['target_asset'] = active_target_symbol
 
