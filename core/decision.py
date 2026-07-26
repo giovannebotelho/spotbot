@@ -15,6 +15,14 @@ from services.database import DatabaseManager
 
 db = DatabaseManager()
 
+def adjust_rsi_levels(trade_result):
+    if trade_result == 'profit':
+        for i in range(len(RSI_CONFIG['dynamic_low'])):
+            RSI_CONFIG['dynamic_low'][i] = min(RSI_CONFIG['levels'][i] + 5, 55)
+    elif trade_result == 'stop loss':
+        for i in range(len(RSI_CONFIG['dynamic_low'])):
+            RSI_CONFIG['dynamic_low'][i] = max(RSI_CONFIG['levels'][i] - 5, 20)
+
 def adjust_price_to_tick_size(price, tick_size):
     precision = get_precision(tick_size)
     return round(price, precision)
@@ -31,19 +39,27 @@ def get_min_notional(symbol_info):
             return float(f.get('minNotional', f.get('notional', 10.0)))
     return 10.0
 
-def calculate_dynamic_position_slots(usdt_balance, min_order_usdt=10.0):
-    if usdt_balance < min_order_usdt:
+def calculate_dynamic_position_slots(usdt_balance, min_order_usdt=10.0, accumulated_net_profit=0.0):
+    """
+    FASE C (v3.0): Calculador de Slots com Juros Compostos (Snowball Compounding Engine).
+    Soma o lucro líquido acumulado retido no histórico para redimensionar dinamicamente os slots de investimento.
+    """
+    total_effective_balance = usdt_balance
+    if accumulated_net_profit > 0:
+        total_effective_balance += accumulated_net_profit
+
+    if total_effective_balance < min_order_usdt:
         return 0, 0.0
     
-    if usdt_balance < 30.0:
-        return 1, round(usdt_balance, 2)
-    elif usdt_balance < 60.0:
-        return 2, round(usdt_balance / 2, 2)
-    elif usdt_balance < 100.0:
-        return 3, round(usdt_balance / 3, 2)
+    if total_effective_balance < 30.0:
+        return 1, round(total_effective_balance, 2)
+    elif total_effective_balance < 60.0:
+        return 2, round(total_effective_balance / 2, 2)
+    elif total_effective_balance < 100.0:
+        return 3, round(total_effective_balance / 3, 2)
     else:
-        num_slots = min(5, max(3, int(usdt_balance // 30)))
-        slot_value = round(usdt_balance / num_slots, 2)
+        num_slots = min(5, max(3, int(total_effective_balance // 30)))
+        slot_value = round(total_effective_balance / num_slots, 2)
         return num_slots, slot_value
 
 async def should_place_order(client, symbol, status_callback=None):

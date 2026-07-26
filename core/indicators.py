@@ -3,6 +3,16 @@ import numpy as np
 import pandas as pd
 from services.binance_client import extract_closes, extract_volumes
 
+def calculate_trade_result(price_bought, executed_qty, price_sold):
+    return (price_sold - price_bought) * executed_qty
+
+async def calculate_fee(client, symbol, executed_qty, price_sold):
+    try:
+        order_val = executed_qty * price_sold
+        return order_val * 0.00075
+    except Exception:
+        return (executed_qty * price_sold) * 0.001
+
 def calculate_rsi(closes, period=14):
     if len(closes) < period + 1:
         return 50.0
@@ -197,10 +207,6 @@ def analyze_futures_squeeze_potential(futures_data, smc_sweep_active=False):
         return False, f"Funding Rate neutro/positivo ({funding_pct:.4f}%)."
 
 def calculate_orderbook_imbalance(order_book):
-    """
-    FASE B (v3.0): Analisa o desequilíbrio entre ofertas de Compra (Bids) e Venda (Asks)
-    nos 20 primeiros níveis de profundidade do livro de ofertas.
-    """
     if not order_book or 'bids' not in order_book or 'asks' not in order_book:
         return 1.0, 0.0, 0.0, False, "Livro de ofertas indisponível."
         

@@ -194,13 +194,18 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 bnb = await c.get_asset_balance(asset='BNB')
                 bnb_free = float(bnb['free'])
                 bnb_price = await get_bnb_price(c)
-                slots, val_slot = calculate_dynamic_position_slots(usdt)
+                
+                db_stats = db.get_stats()
+                acc_pnl = db_stats['total_net_profit']
+                slots, val_slot = calculate_dynamic_position_slots(usdt, accumulated_net_profit=acc_pnl)
+                
                 return (
                     f"💰 <b>SALDOS & POSIÇÕES DA CARTEIRA</b>\n"
                     f"━━━━━━━━━━━━━━━━━━━\n"
                     f"💵 <b>USDT Disponível</b>: <b>${usdt:.2f}</b>\n"
                     f"🪙 <b>Saldo BNB</b>: <b>{bnb_free:.4f} BNB</b> (~${bnb_free*bnb_price:.2f})\n"
-                    f"🏷️ <i>Desconto de 25% nas taxas em BNB ATIVO!</i>\n\n"
+                    f"📈 <b>Lucro Acumulado</b>: <b>${acc_pnl:.2f} USDT</b>\n"
+                    f"❄️ <i>Motor de Juros Compostos (Snowball) Ativo!</i>\n\n"
                     f"🎰 <b>Slots Calculados</b>: <b>{slots} posições</b> de <b>${val_slot:.2f} USDT</b> cada."
                 )
             except Exception as e:
@@ -314,14 +319,17 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
 
         while bot_running:
             try:
-                # Sincroniza o relógio a cada 1 hora automaticamente
                 current_hour = datetime.now().hour
                 if current_hour != last_sync_hour:
                     await sync_binance_time(client, log=log)
                     last_sync_hour = current_hour
 
                 usdt_balance = await get_usdt_balance(client)
-                slots, slot_value = calculate_dynamic_position_slots(usdt_balance)
+                
+                # FASE C (v3.0): Juros Compostos Automáticos baseados no Lucro Acumulado
+                db_stats = db.get_stats()
+                acc_pnl = db_stats['total_net_profit']
+                slots, slot_value = calculate_dynamic_position_slots(usdt_balance, accumulated_net_profit=acc_pnl)
 
                 active_target_symbol = symbol
                 if is_scanner_mode:
@@ -452,7 +460,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                             f"🪙 Par: <b>{active_target_symbol}</b>\n"
                             f"💵 Preço: <b>${closes[-1]:.2f}</b>\n"
                             f"🎯 Motivo: <i>{executed_condition}</i>\n"
-                            f"💰 Valor: <b>${order_val_usdt:.2f} USDT</b>"
+                            f"💰 Valor: <b>${order_val_usdt:.2f} USDT</b> (Juros Compostos Ativo)"
                         ))
 
                     async with bsm.user_socket() as um:
