@@ -135,6 +135,56 @@ def calculate_adx(klines, period=14):
     adx = pd.Series(dx).ewm(alpha=1/period, min_periods=period, adjust=False).mean().iloc[-1]
     return float(adx)
 
+def calculate_hurst_exponent(closes, max_lag=20):
+    """
+    Calcula o Expoente de Hurst para determinar a dinâmica do mercado:
+      - H < 0.45: Reversão à Média (Range Bound / Consolidação)
+      - 0.45 <= H <= 0.55: Movimento Aleatório (Random Walk)
+      - H > 0.55: Tendência Persistente (Trending)
+    """
+    if len(closes) < 50:
+        return 0.50
+    
+    closes_arr = np.array(closes)
+    lags = range(2, min(max_lag, len(closes_arr) // 4))
+    tau = [np.sqrt(np.std(np.subtract(closes_arr[lag:], closes_arr[:-lag]))) for lag in lags]
+    
+    if len(tau) < 2 or np.all(tau[0] == tau):
+        return 0.50
+
+    poly = np.polyfit(np.log(lags), np.log(tau), 1)
+    hurst = poly[0] * 2.0
+    return float(np.clip(hurst, 0.0, 1.0))
+
+def detect_market_regime(klines):
+    """
+    Classifica o Regime de Mercado Atual:
+      - REGIME_CRASH_PANIC: Se houver queda brusca (> 3.5% em 24h)
+      - REGIME_BULL_TREND: Se Hurst > 0.55 e Preço > EMA50 > EMA200
+      - REGIME_RANGE_BOUND: Se Hurst < 0.48 (Reversão à média ativada)
+      - REGIME_NEUTRAL: Mercado equilibrado
+    """
+    closes = extract_closes(klines)
+    if len(closes) < 50:
+        return "REGIME_RANGE_BOUND", 0.45
+
+    first_price = closes[-24] if len(closes) >= 24 else closes[0]
+    price_change_24h = ((closes[-1] - first_price) / first_price) * 100
+    
+    if price_change_24h < -3.5:
+        return "REGIME_CRASH_PANIC", 0.30
+
+    hurst = calculate_hurst_exponent(closes)
+    ema50 = calculate_ema(closes, 50)
+    ema200 = calculate_ema(closes, 200)
+
+    if hurst > 0.55 and closes[-1] > ema50 and ema50 > ema200:
+        return "REGIME_BULL_TREND", hurst
+    elif hurst < 0.48:
+        return "REGIME_RANGE_BOUND", hurst
+    else:
+        return "REGIME_NEUTRAL", hurst
+
 def check_trend(klines):
     closes = extract_closes(klines)
     ema200 = calculate_ema(closes, 200)

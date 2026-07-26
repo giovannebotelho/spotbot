@@ -2,7 +2,7 @@ import asyncio
 import math
 import pandas as pd
 from binance.exceptions import BinanceAPIException
-from core.indicators import calculate_moving_average_sell_pressure, calculate_atr, calculate_adx, calculate_ema
+from core.indicators import calculate_moving_average_sell_pressure, calculate_atr, calculate_adx, calculate_ema, detect_market_regime
 from services.binance_client import get_order_book
 from services.telegram_notifier import send_telegram_message
 from config.settings import TRADING_CONFIG, RSI_CONFIG, OCO_CONFIG, TELEGRAM_CONFIG, ATR_CONFIG, API_KEYS
@@ -143,6 +143,12 @@ async def get_gemini_analysis(candle_data, candle_patterns, rsi, macd, bollinger
 
 async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_close, lower_band, middle_band, upper_band, vwap, candle_patterns, candle_open, candle_high, candle_low, 
                      candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, symbol, klines, silent=False, config_override=None, klines_4h=None):
+    
+    # 1. Validação de Regime de Mercado (Fase 1: Regime Switcher)
+    regime, hurst_val = detect_market_regime(klines)
+    if regime == "REGIME_CRASH_PANIC":
+        return {"buy": False, "message": "Modo Defesa Ativado: Pânico de Queda no Mercado", "candle_data": "", "gemini_response": None, "regime": regime}
+
     rsi_config = config_override.get('RSI_CONFIG', RSI_CONFIG) if config_override else RSI_CONFIG
     
     rsi_low_level0 = rsi <= rsi_config['dynamic_low'][0]
@@ -161,7 +167,7 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
         use_ema_filter = config_override['TRADING_CONFIG'].get('use_ema_filter', use_ema_filter)
 
     trend_confirmed = True
-    if use_ema_filter:
+    if use_ema_filter and regime != "REGIME_RANGE_BOUND":
         if klines_4h and len(klines_4h) >= 200:
             closes_4h = [float(k[4]) for k in klines_4h]
             ema200_4h = calculate_ema(closes_4h, 200)
@@ -172,7 +178,7 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
             trend_confirmed = False
 
     if not trend_confirmed:
-        return {"buy": False, "message": "Tendência Macro não confirmada (Preço < EMA200)", "candle_data": "", "gemini_response": None}
+        return {"buy": False, "message": "Tendência Macro não confirmada (Preço < EMA200)", "candle_data": "", "gemini_response": None, "regime": regime}
 
     # Validação de força de tendência via ADX
     adx_val = calculate_adx(klines, period=TRADING_CONFIG.get('adx_period', 14))
@@ -180,11 +186,11 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
     if config_override and 'TRADING_CONFIG' in config_override:
         min_adx = config_override['TRADING_CONFIG'].get('min_adx', min_adx)
 
-    if adx_val < min_adx:
-        return {"buy": False, "message": f"Mercado lateralizado (ADX={adx_val:.1f} < {min_adx})", "candle_data": "", "gemini_response": None}
+    if adx_val < min_adx and regime != "REGIME_RANGE_BOUND":
+        return {"buy": False, "message": f"Mercado lateralizado (ADX={adx_val:.1f} < {min_adx})", "candle_data": "", "gemini_response": None, "regime": regime}
 
     if rsi > 55:
-        return {"buy": False, "message": "RSI alto, compra descartada", "candle_data": "", "gemini_response": None}
+        return {"buy": False, "message": "RSI alto, compra descartada", "candle_data": "", "gemini_response": None, "regime": regime}
 
     gemini_response = await get_gemini_analysis(
         f"Open: {candle_open}, High: {candle_high}, Low: {candle_low}, Close: {candle_close}, Volume: {candle_volume}",
@@ -210,28 +216,28 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
 
     # Condição 0: Validação Direta da IA Gemini (Se IA aprovou com Confiança)
     if gemini_buy_signal is True and rsi <= 45:
-        return {"buy": True, "message": "Aprovado pela IA Gemini", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict}
+        return {"buy": True, "message": f"Aprovado pela IA Gemini ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
 
     # Condições Técnicas Tradicionais (Se IA for neutra ou indisponível)
     if rsi_low_level0 and trend_is_up and macd_bullish and price_below_vwap and ("Hammer" in candle_patterns or "Bullish Engulfing" in candle_patterns):
-        return {"buy": True, "message": "RSI L0 + Tendência + MACD + VWAP + Padrão Reversão", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict}
+        return {"buy": True, "message": f"RSI L0 + MACD + VWAP + Reversão ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
 
     if rsi_low_level1 and trend_is_up and macd_bullish and price_below_vwap:
-        return {"buy": True, "message": "RSI L1 + Tendência + MACD + VWAP", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict}
+        return {"buy": True, "message": f"RSI L1 + MACD + VWAP ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
 
-    if rsi_low_level2 and trend_is_up and price_below_vwap:
-        return {"buy": True, "message": "RSI L2 + Tendência + VWAP", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict}
+    if rsi_low_level2 and price_below_vwap:
+        return {"buy": True, "message": f"RSI L2 + VWAP ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
 
-    if rsi_low_level3 and trend_is_up and macd_bullish:
-        return {"buy": True, "message": "RSI L3 + Tendência + MACD", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict}
+    if rsi_low_level3 and macd_bullish:
+        return {"buy": True, "message": f"RSI L3 + MACD ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
 
     if rsi_low_level4 and trend_is_up:
-        return {"buy": True, "message": "RSI L4 + Tendência de Alta", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict}
+        return {"buy": True, "message": f"RSI L4 + Tendência ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
 
     if rsi_low_level5:
-        return {"buy": True, "message": "RSI L5 Sobre-vendido Extremo", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict}
+        return {"buy": True, "message": f"RSI L5 Sobre-vendido Extremo ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
 
-    return {"buy": False, "message": "Nenhuma condição de compra atendida", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict}
+    return {"buy": False, "message": f"Nenhuma condição atendida ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
 
 async def should_sell(rsi, macd_current, signal_line_current, last_close, upper_band, vwap, candle_patterns):
     rsi_high = rsi >= RSI_CONFIG['high']
