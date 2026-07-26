@@ -1,6 +1,7 @@
 import asyncio
 import os
 import time
+import math
 import pandas as pd
 from datetime import datetime, timedelta
 from binance import BinanceSocketManager
@@ -465,6 +466,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
 
                         highest_price = price
                         current_stop_loss = stop_loss
+                        partial_take_done = False
 
                         while True:
                             try:
@@ -474,6 +476,51 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                     cur_price = float((await client.get_symbol_ticker(symbol=active_target_symbol))['price'])
                                     status(f"⏳ Monitorando OCO ({active_target_symbol})... Preço: ${cur_price:.2f}")
                                     
+                                    profit_pct = (cur_price - price) / price
+
+                                    # Fase 5: Scalp Locking (Venda Parcial de 50% em +1.5% de Lucro + Mover Stop para Breakeven)
+                                    if profit_pct >= 0.015 and not partial_take_done:
+                                        try:
+                                            step_size = float(next(f for f in target_symbol_info['filters'] if f['filterType'] == 'LOT_SIZE')['stepSize'])
+                                            prec_qty = get_precision(step_size)
+                                            
+                                            half_qty = round(math.floor((executed_qty * 0.5) / step_size) * step_size, prec_qty)
+                                            rem_qty = round(executed_qty - half_qty, prec_qty)
+
+                                            if half_qty > 0 and rem_qty > 0:
+                                                await client.cancel_order(symbol=active_target_symbol, orderListId=oco_order['orderListId'])
+                                                venda_parcial = await client.order_market_sell(symbol=active_target_symbol, quantity=half_qty)
+                                                p_price = float(venda_parcial['fills'][0]['price'])
+                                                
+                                                log(f"💰 Scalp Locking: Venda parcial de 50% executada em {active_target_symbol} a ${p_price:.4f}! (+{profit_pct*100:.2f}%)")
+                                                
+                                                be_stop = adjust_price_to_tick_size(price, tick_size)
+                                                be_limit = adjust_price_to_tick_size(price * 0.999, tick_size)
+                                                
+                                                oco_order = await client.create_oco_order(
+                                                    symbol=active_target_symbol, side='SELL', quantity=rem_qty,
+                                                    price=f"{lucro_alvo:.{get_precision(tick_size)}f}",
+                                                    stopPrice=f"{be_stop:.{get_precision(tick_size)}f}",
+                                                    stopLimitPrice=f"{be_limit:.{get_precision(tick_size)}f}",
+                                                    stopLimitTimeInForce='GTC'
+                                                )
+                                                limit_order_id = oco_order['orders'][1]['orderId']
+                                                stop_order_id = oco_order['orders'][0]['orderId']
+                                                current_stop_loss = be_stop
+                                                partial_take_done = True
+
+                                                if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                                                    asyncio.create_task(send_telegram_message(
+                                                        TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                                                        f"💰 <b>Scalp Locking (+1.5% Lucro Garantido)!</b>\n\n"
+                                                        f"🪙 Par: <b>{active_target_symbol}</b>\n"
+                                                        f"🎯 50% da posição vendida a <b>${p_price:.2f}</b>!\n"
+                                                        f"🛡️ 50% restante protegido no <b>Breakeven (Zero a Zero em ${price:.2f})</b>!"
+                                                    ))
+                                        except Exception as e_partial:
+                                            log(f"Aviso ao executar Scalp Locking: {e_partial}")
+
+                                    # Trailing Stop Móvel por ATR
                                     if TRAILING_STOP_CONFIG['enabled'] and cur_price > highest_price:
                                         highest_price = cur_price
                                         if highest_price > price * (1 + TRAILING_STOP_CONFIG['activation_percent']):
@@ -483,7 +530,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                                 await client.cancel_order(symbol=active_target_symbol, orderListId=oco_order['orderListId'])
                                                 new_stop_limit = adjust_price_to_tick_size(new_stop * 0.999, tick_size)
                                                 oco_order = await client.create_oco_order(
-                                                    symbol=active_target_symbol, side='SELL', quantity=executed_qty,
+                                                    symbol=active_target_symbol, side='SELL', quantity=executed_qty if not partial_take_done else rem_qty,
                                                     price=f"{lucro_alvo:.{get_precision(tick_size)}f}",
                                                     stopPrice=f"{new_stop:.{get_precision(tick_size)}f}",
                                                     stopLimitPrice=f"{new_stop_limit:.{get_precision(tick_size)}f}",
