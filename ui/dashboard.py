@@ -1,42 +1,48 @@
-from nicegui import ui, app
-import os
 import asyncio
-from collections import deque
-from config.settings import DASHBOARD_CONFIG, RISK_PROFILES, TRADING_CONFIG, RSI_CONFIG, TOP_20_SYMBOLS
+import os
+from nicegui import ui, app
+import pandas as pd
+from datetime import datetime
+
+from config.settings import DASHBOARD_CONFIG, TRADING_CONFIG, RSI_CONFIG, RISK_PROFILES
 import config.settings as settings
 from services.database import DatabaseManager
-import core.engine as engine
 from utils.formatting import remove_ansi_codes
+import core.engine as engine
 
 db = DatabaseManager()
 
-log_buffer = deque(maxlen=1000)
 log_ui = None
 status_ui = None
-bot_task = None
-candle_chart = None
-recent_trades_table = None
-scanner_table = None
-ai_card = None
-ai_signal_label = None
-ai_reason_markdown = None
-ai_icon_container = None
 investment_input = None
 symbol_select = None
-risk_profile_select = None
-paper_trading_switch = None
 status_indicator = None
 
 bnb_val = None
 bnb_usdt_val = None
 usdt_val = None
+
 total_profit_val = None
 win_rate_val = None
+recent_trades_table = None
+
+candle_chart = None
+scanner_table = None
+
+ai_card = None
+ai_signal_label = None
+ai_reason_markdown = None
+ai_icon_container = None
+
+risk_profile_select = None
+paper_trading_switch = None
+
+chart_symbol_badge = None
+
+bot_task = None
 
 def log_handler(message):
-    print(message)
     clean_msg = remove_ansi_codes(message)
-    log_buffer.append(clean_msg)
     if log_ui:
         log_ui.push(clean_msg)
 
@@ -60,8 +66,23 @@ async def update_data():
         if win_rate_val:
             win_rate_val.text = f"{stats['win_rate']:.1f}%"
         
+        active_symbol = engine.bot_status_data.get('target_asset', 'BTCUSDT')
+        current_price = engine.bot_status_data.get('price', 0.0)
+        price_str = f"${current_price:.4f}" if (current_price > 0 and current_price < 1.0) else f"${current_price:.2f}"
+
+        if chart_symbol_badge:
+            chart_symbol_badge.text = f"🪙 {active_symbol} ({price_str})"
+
         market_data = engine.shared_market_data
         if market_data['dates'] and candle_chart:
+            candle_chart.options['title'] = {
+                'text': f'📈 {active_symbol} — Gráfico em Tempo Real ({price_str})',
+                'subtext': 'Alimentado por Binance WebSockets & Scanner 2.0 Quantitativo',
+                'left': 20,
+                'top': 10,
+                'textStyle': {'color': '#00E5FF', 'fontSize': 13, 'fontWeight': 'bold'},
+                'subtextStyle': {'color': '#64748b', 'fontSize': 9}
+            }
             candle_chart.options['xAxis'][0]['data'] = market_data['dates']
             candle_chart.options['xAxis'][1]['data'] = market_data['dates']
             candle_chart.options['series'][0]['data'] = market_data['klines']
@@ -231,6 +252,7 @@ async def index():
     global log_ui, status_ui, investment_input, symbol_select, bnb_val, bnb_usdt_val, usdt_val
     global total_profit_val, win_rate_val, recent_trades_table, status_indicator, candle_chart, scanner_table
     global ai_signal_label, ai_reason_markdown, ai_card, ai_icon_container, risk_profile_select, paper_trading_switch
+    global chart_symbol_badge
     
     ui.colors(primary='#00E5FF', secondary='#64748b', accent='#00F5A0', positive='#00F5A0', negative='#FF2E93', dark='#0B0E14')
     
@@ -248,195 +270,195 @@ async def index():
             .input-zinc .q-field__control:before { border-color: #1e293b !important; }
             .terminal-font { font-family: 'JetBrains Mono', monospace; }
 
-            /* Marquee Ticker CoinMarketCap Style */
-            @keyframes ticker {
-                0% { transform: translate3d(0, 0, 0); }
-                100% { transform: translate3d(-50%, 0, 0); }
+            @keyframes marquee {
+                0% { transform: translateX(0%); }
+                100% { transform: translateX(-50%); }
             }
-            .ticker-wrap {
-                width: 100%;
-                overflow: hidden;
-                white-space: nowrap;
-                box-sizing: border-box;
-                background: #080B10;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            .animate-marquee {
+                display: flex;
+                width: 200%;
+                animation: marquee 30s linear infinite;
             }
-            .ticker-move {
-                display: inline-block;
-                white-space: nowrap;
-                padding-right: 100%;
-                box-sizing: content-box;
-                animation: ticker 35s linear infinite;
-            }
-            .ticker-item {
-                display: inline-block;
-                padding: 0 1.25rem;
-                font-size: 0.7rem;
-                font-weight: 600;
+            .animate-marquee:hover {
+                animation-play-state: paused;
             }
         </style>
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     ''')
 
-    # Barra Marquee Estilo CoinMarketCap no Topo
-    with ui.element('div').classes('ticker-wrap py-1 flex items-center border-b border-slate-800/80'):
-        with ui.element('div').classes('ticker-move'):
-            ui.html('''
-                <span class="ticker-item text-slate-400">Market Cap: <b class="text-white">$2.38T</b> <span class="text-[#00F5A0]">(+0.62%)</span></span>
-                <span class="ticker-item text-slate-400">24h Vol: <b class="text-white">$78.4B</b></span>
-                <span class="ticker-item text-slate-400">Bitcoin Dominance: <b class="text-cyan-400">54.2%</b></span>
-                <span class="ticker-item text-slate-400">BTC: <b class="text-white">$64,340.00</b> <span class="text-[#00F5A0]">(+0.37%)</span></span>
-                <span class="ticker-item text-slate-400">ETH: <b class="text-white">$1,873.20</b> <span class="text-[#00F5A0]">(+0.81%)</span></span>
-                <span class="ticker-item text-slate-400">BNB: <b class="text-white">$568.49</b> <span class="text-[#00F5A0]">(+0.82%)</span></span>
-                <span class="ticker-item text-slate-400">SOL: <b class="text-white">$74.38</b> <span class="text-[#FF2E93]">(-1.44%)</span></span>
-                <span class="ticker-item text-slate-400">XRP: <b class="text-white">$1.09</b> <span class="text-[#00F5A0]">(+0.87%)</span></span>
-                
-                <span class="ticker-item text-slate-400">Market Cap: <b class="text-white">$2.38T</b> <span class="text-[#00F5A0]">(+0.62%)</span></span>
-                <span class="ticker-item text-slate-400">24h Vol: <b class="text-white">$78.4B</b></span>
-                <span class="ticker-item text-slate-400">Bitcoin Dominance: <b class="text-cyan-400">54.2%</b></span>
-                <span class="ticker-item text-slate-400">BTC: <b class="text-white">$64,340.00</b> <span class="text-[#00F5A0]">(+0.37%)</span></span>
-                <span class="ticker-item text-slate-400">ETH: <b class="text-white">$1,873.20</b> <span class="text-[#00F5A0]">(+0.81%)</span></span>
-                <span class="ticker-item text-slate-400">BNB: <b class="text-white">$568.49</b> <span class="text-[#00F5A0]">(+0.82%)</span></span>
-                <span class="ticker-item text-slate-400">SOL: <b class="text-white">$74.38</b> <span class="text-[#FF2E93]">(-1.44%)</span></span>
-                <span class="ticker-item text-slate-400">XRP: <b class="text-white">$1.09</b> <span class="text-[#00F5A0]">(+0.87%)</span></span>
-            ''')
-
-    # Topbar Header Futurista
-    with ui.header().classes('h-14 bg-[#0B0E14]/90 backdrop-blur-md border-b border-slate-800/80 flex items-center px-4 justify-between z-50'):
-        with ui.row().classes('items-center gap-3'):
-            ui.icon('token', size='1.6em', color='cyan-400').classes('drop-shadow-[0_0_8px_rgba(0,229,255,0.6)]')
-            with ui.column().classes('gap-0'):
-                ui.label('SPOTBOT PRO').classes('text-sm font-bold tracking-wider text-white leading-none')
-                ui.label('QUANTITATIVE ENGINE').classes('text-[0.55rem] font-semibold text-cyan-400/80 tracking-[0.2em] leading-none')
+    with ui.column().classes('w-full h-screen gap-0 bg-[#0B0E14] overflow-hidden'):
         
-        with ui.row().classes('items-center gap-3 bg-[#121722]/80 p-1.5 rounded-xl border border-slate-800'):
-            ui.button('START', on_click=start_bot).props('flat dense size=sm').classes('text-[#00F5A0] font-bold px-3 hover:bg-[#00F5A0]/10 rounded-lg')
-            with ui.element('div').classes('w-px h-4 bg-slate-800'): pass
-            ui.button('STOP', on_click=stop_bot).props('flat dense size=sm').classes('text-[#FF2E93] font-bold px-3 hover:bg-[#FF2E93]/10 rounded-lg')
-            with ui.element('div').classes('w-px h-4 bg-slate-800'): pass
-            def logout():
-                app.storage.user.clear()
-                ui.navigate.to('/login')
-            ui.button(icon='logout', on_click=logout).props('flat dense size=sm').classes('text-slate-400 hover:text-white px-2 rounded-lg')
+        # Header Ticker Neon Estilo CoinMarketCap
+        with ui.row().classes('w-full h-9 bg-[#080B10] border-b border-slate-800/80 items-center px-4 justify-between overflow-hidden relative text-xs'):
+            with ui.row().classes('items-center gap-2 z-10 bg-[#080B10] pr-4 border-r border-slate-800'):
+                ui.icon('token', size='sm', color='cyan-400')
+                ui.label('SPOTBOT PRO').classes('font-bold tracking-wider text-white text-xs')
+                ui.label('QUANTITATIVE ENGINE').classes('text-[0.55rem] font-bold text-cyan-400/80 tracking-widest')
+            
+            with ui.element('div').classes('flex-grow overflow-hidden relative h-full flex items-center'):
+                with ui.element('div').classes('animate-marquee items-center gap-8 text-[0.7rem] font-mono text-slate-300 whitespace-nowrap'):
+                    ui.label('🔥 MARKET TICKER').classes('font-bold text-cyan-400')
+                    ui.label('BTC: $64,340.00 (+0.37%)').classes('text-emerald-400 font-semibold')
+                    ui.label('ETH: $1,873.20 (+0.81%)').classes('text-emerald-400 font-semibold')
+                    ui.label('BNB: $568.49 (+0.82%)').classes('text-emerald-400 font-semibold')
+                    ui.label('SOL: $74.38 (-1.44%)').classes('text-rose-400 font-semibold')
+                    ui.label('XRP: $1.09 (+0.87%)').classes('text-emerald-400 font-semibold')
+                    ui.label('Market Cap: $2.38T (+1.2%)').classes('text-slate-400')
+                    ui.label('24h Vol: $78.4B').classes('text-slate-400')
+                    
+                    ui.label('🔥 MARKET TICKER').classes('font-bold text-cyan-400')
+                    ui.label('BTC: $64,340.00 (+0.37%)').classes('text-emerald-400 font-semibold')
+                    ui.label('ETH: $1,873.20 (+0.81%)').classes('text-emerald-400 font-semibold')
+                    ui.label('BNB: $568.49 (+0.82%)').classes('text-emerald-400 font-semibold')
+                    ui.label('SOL: $74.38 (-1.44%)').classes('text-rose-400 font-semibold')
+                    ui.label('XRP: $1.09 (+0.87%)').classes('text-emerald-400 font-semibold')
+                    ui.label('Market Cap: $2.38T (+1.2%)').classes('text-slate-400')
+                    ui.label('24h Vol: $78.4B').classes('text-slate-400')
 
-        with ui.row().classes('items-center gap-4'):
-            with ui.row().classes('items-center gap-2 hidden md:flex bg-[#121722] px-3 py-1 rounded-lg border border-slate-800'):
-                ui.label('USDT').classes('text-[0.6rem] font-bold text-slate-500')
-                usdt_val = ui.label('$0.00').classes('text-xs font-mono font-bold text-white')
-            # Pulso luminoso verde / rosa no cabeçalho
-            status_indicator = ui.element('div').classes('w-3 h-3 rounded-full bg-[#FF2E93] shadow-[0_0_10px_#FF2E93]')
-
-    # Layout Principal
-    with ui.row().classes('w-full min-h-[calc(100vh-3.5rem)] flex-nowrap gap-0 bg-[#0B0E14]'):
-        # Sidebar Esquerda
-        with ui.column().classes('w-64 flex-shrink-0 bg-[#0B0E14] border-r border-slate-800/80 h-full p-4 gap-4'):
-            with ui.column().classes('w-full gap-2'):
-                ui.label('MODO DE MONITORAMENTO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
-                symbol_select = ui.select(['⚡ SCANNER TOP 20'] + TOP_20_SYMBOLS, value='⚡ SCANNER TOP 20').props('outlined dense options-dense color=cyan-500').classes('w-full input-zinc font-mono text-xs')
-                investment_input = ui.input('Valor USDT por Ordem', value='Dinâmico (Min $10)').props('outlined dense color=cyan-500').classes('w-full input-zinc font-mono text-xs')
+            with ui.row().classes('items-center gap-3 z-10 bg-[#080B10] pl-4 border-l border-slate-800'):
+                ui.button('START', on_click=start_bot).props('unelevated dense').classes('bg-[#00F5A0] hover:bg-[#00E5FF] text-slate-950 font-bold px-3 py-1 text-xs rounded-md tracking-wider transition-all')
+                ui.button('STOP', on_click=stop_bot).props('unelevated dense').classes('bg-[#FF2E93] hover:bg-rose-600 text-white font-bold px-3 py-1 text-xs rounded-md tracking-wider transition-all')
                 
-                ui.label('PERFIL DE RISCO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
-                risk_profile_select = ui.select(['Conservador', 'Moderado', 'Agressivo'], value='Moderado', on_change=lambda e: set_risk_profile(e.value)).props('outlined dense options-dense color=cyan-500').classes('w-full input-zinc text-xs')
+                status_indicator = ui.element('div').classes('w-2.5 h-2.5 rounded-full bg-[#FF2E93] transition-all')
+                
+                def logout():
+                    app.storage.user['authenticated'] = False
+                    ui.navigate.to('/login')
+                ui.button(icon='logout', on_click=logout).props('flat dense size=sm color=slate-400')
 
-                ui.label('PAPER TRADING').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
-                paper_trading_switch = ui.switch('Simulação', value=False, on_change=toggle_paper_trading).props('dense color=cyan-500').classes('text-xs text-slate-400')
+        # Layout Principal Dashboard
+        with ui.row().classes('w-full flex-grow flex-nowrap gap-0 overflow-hidden'):
+            
+            # Painel Esquerdo de Configurações
+            with ui.column().classes('w-64 h-screen border-r border-slate-800 bg-[#0E121B] p-3 gap-3 flex-shrink-0 text-slate-300'):
+                with ui.column().classes('w-full gap-1'):
+                    ui.label('MODO DE MONITORAMENTO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
+                    symbol_select = ui.select(
+                        options=['⚡ SCANNER TOP 20', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'LINKUSDT', 'NEARUSDT'],
+                        value='⚡ SCANNER TOP 20'
+                    ).classes('w-full input-zinc bg-[#121722] rounded-lg').props('dark outlined dense')
 
-                ui.label('TIMEFRAME ADAPTATIVO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
-                ui.toggle(['Adaptativo (1h/15m)', '15m (Scalping)', '1h (Swing)'], value='Adaptativo (1h/15m)').props('unelevated dense spread size=xs color=slate-900 text-color=slate-400 toggle-color=cyan-600').classes('w-full border border-slate-800 rounded-lg overflow-hidden text-[0.6rem]')
+                with ui.column().classes('w-full gap-1'):
+                    ui.label('VALOR USDT POR ORDEM').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
+                    investment_input = ui.input(value='Dinâmico (Min $10)').classes('w-full input-zinc bg-[#121722] rounded-lg').props('dark outlined dense readonly')
 
-            with ui.column().classes('w-full gap-2 mt-2'):
-                ui.label('PERFORMANCE').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
-                with ui.row().classes('w-full justify-between items-center p-2.5 rounded-xl bg-[#121722] border border-slate-800'):
-                    ui.label('Lucro Total').classes('text-xs text-slate-400')
-                    total_profit_val = ui.label('$0.00').classes('font-mono text-sm font-bold text-[#00F5A0]')
-                with ui.row().classes('w-full justify-between items-center p-2.5 rounded-xl bg-[#121722] border border-slate-800'):
-                    ui.label('Taxa de Vitória').classes('text-xs text-slate-400')
-                    win_rate_val = ui.label('0.0%').classes('font-mono text-sm font-bold text-cyan-400')
+                with ui.column().classes('w-full gap-1'):
+                    ui.label('PERFIL DE RISCO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
+                    risk_profile_select = ui.select(
+                        options=list(RISK_PROFILES.keys()),
+                        value=settings.ACTIVE_RISK_PROFILE,
+                        on_change=lambda e: set_risk_profile(e.value)
+                    ).classes('w-full input-zinc bg-[#121722] rounded-lg').props('dark outlined dense')
 
-            with ui.column().classes('w-full gap-1 mt-1'):
-                ui.label('STATUS ATUAL').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
-                status_ui = ui.markdown('**Aguardando...**').classes('text-xs text-slate-300 leading-relaxed w-full break-words')
+                with ui.column().classes('w-full gap-1'):
+                    ui.label('PAPER TRADING').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
+                    paper_trading_switch = ui.switch('Simulação', value=False, on_change=toggle_paper_trading).props('dense color=cyan-500').classes('text-xs text-slate-400')
 
-        # Painel Central de Gráfico e Tabelas
-        with ui.column().classes('flex-grow h-screen p-0 overflow-hidden relative bg-[#0B0E14]'):
-             with ui.card().classes('w-full h-[65vh] p-0 rounded-none bg-[#0B0E14] border-b border-slate-800 gap-0 shadow-none relative'):
-                 # Card IA Holográfico Otimizado
-                 ai_card = ui.card().classes('absolute top-4 left-4 w-80 z-20 obsidian-card p-3.5 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] opacity-95 backdrop-blur-md transition-all duration-300')
-                 with ai_card:
-                     with ui.row().classes('w-full items-center justify-between mb-2'):
-                         with ui.row().classes('items-center gap-2'):
-                             ai_icon_container = ui.element('div').classes('p-1.5 rounded-lg bg-slate-800/80 text-slate-400')
-                             with ai_icon_container: ui.icon('psychology', size='sm')
-                             ai_signal_label = ui.label('NEUTRO').classes('text-xs font-bold tracking-wide text-slate-400')
+                    ui.label('TIMEFRAME ADAPTATIVO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
+                    ui.toggle(['Adaptativo (1h/15m)', '15m (Scalping)', '1h (Swing)'], value='Adaptativo (1h/15m)').props('unelevated dense spread size=xs color=slate-900 text-color=slate-400 toggle-color=cyan-600').classes('w-full border border-slate-800 rounded-lg overflow-hidden text-[0.6rem]')
+
+                with ui.column().classes('w-full gap-2 mt-2'):
+                    ui.label('PERFORMANCE').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
+                    with ui.row().classes('w-full justify-between items-center p-2.5 rounded-xl bg-[#121722] border border-slate-800'):
+                        ui.label('Lucro Total').classes('text-xs text-slate-400')
+                        total_profit_val = ui.label('$0.00').classes('font-mono text-sm font-bold text-[#00F5A0]')
+                    with ui.row().classes('w-full justify-between items-center p-2.5 rounded-xl bg-[#121722] border border-slate-800'):
+                        ui.label('Taxa de Vitória').classes('text-xs text-slate-400')
+                        win_rate_val = ui.label('0.0%').classes('font-mono text-sm font-bold text-cyan-400')
+
+                with ui.column().classes('w-full gap-1 mt-1'):
+                    ui.label('STATUS ATUAL').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
+                    status_ui = ui.markdown('**Aguardando...**').classes('text-xs text-slate-300 leading-relaxed w-full break-words')
+
+            # Painel Central de Gráfico e Tabelas
+            with ui.column().classes('flex-grow h-screen p-0 overflow-hidden relative bg-[#0B0E14]'):
+                 with ui.card().classes('w-full h-[65vh] p-0 rounded-none bg-[#0B0E14] border-b border-slate-800 gap-0 shadow-none relative'):
+                     # Badge Flutuante no Canto Superior Direito indicando o Ativo em Foco Atual
+                     chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('absolute top-4 right-6 z-20 obsidian-card px-4 py-2 rounded-xl text-xs font-bold font-mono text-[#00E5FF] border border-cyan-500/30 backdrop-blur-md shadow-lg')
+
+                     # Card IA Holográfico Otimizado
+                     ai_card = ui.card().classes('absolute top-4 left-4 w-80 z-20 obsidian-card p-3.5 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] opacity-95 backdrop-blur-md transition-all duration-300')
+                     with ai_card:
+                         with ui.row().classes('w-full items-center justify-between mb-2'):
+                             with ui.row().classes('items-center gap-2'):
+                                 ai_icon_container = ui.element('div').classes('p-1.5 rounded-lg bg-slate-800/80 text-slate-400')
+                                 with ai_icon_container: ui.icon('psychology', size='sm')
+                                 ai_signal_label = ui.label('NEUTRO').classes('text-xs font-bold tracking-wide text-slate-400')
+                             
+                             def toggle_ai_content():
+                                 is_visible = ai_reason_scroll.visible
+                                 ai_reason_scroll.set_visibility(not is_visible)
+                                 toggle_btn.props(f'icon={"keyboard_arrow_down" if is_visible else "keyboard_arrow_up"}')
+
+                             toggle_btn = ui.button(icon='keyboard_arrow_up', on_click=toggle_ai_content).props('flat dense round size=xs color=slate-400')
                          
-                         def toggle_ai_content():
-                             is_visible = ai_reason_scroll.visible
-                             ai_reason_scroll.set_visibility(not is_visible)
-                             toggle_btn.props(f'icon={"keyboard_arrow_down" if is_visible else "keyboard_arrow_up"}')
+                         ai_reason_scroll = ui.scroll_area().classes('h-28')
+                         with ai_reason_scroll:
+                             ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-[0.68rem] text-slate-300 leading-relaxed')
 
-                         toggle_btn = ui.button(icon='keyboard_arrow_up', on_click=toggle_ai_content).props('flat dense round size=xs color=slate-400')
-                     
-                     ai_reason_scroll = ui.scroll_area().classes('h-28')
-                     with ai_reason_scroll:
-                         ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-[0.68rem] text-slate-300 leading-relaxed')
+                     # ECharts com Cores Cyberpunk Neon
+                     with ui.element('div').classes('w-full h-full'):
+                         candle_chart = ui.echart({
+                            'backgroundColor': '#0B0E14',
+                            'title': {
+                                'text': '📈 BTCUSDT — Gráfico em Tempo Real',
+                                'subtext': 'Alimentado por Binance WebSockets & Scanner 2.0 Quantitativo',
+                                'left': 20,
+                                'top': 10,
+                                'textStyle': {'color': '#00E5FF', 'fontSize': 13, 'fontWeight': 'bold'},
+                                'subtextStyle': {'color': '#64748b', 'fontSize': 9}
+                            },
+                            'grid': [{'left': '50', 'right': '25', 'top': '55', 'height': '55%'}, {'left': '50', 'right': '25', 'top': '78%', 'height': '15%'}],
+                            'tooltip': {'trigger': 'axis', 'axisPointer': {'type': 'cross'}, 'backgroundColor': 'rgba(18, 23, 34, 0.95)', 'borderColor': '#00E5FF', 'textStyle': {'color': '#f8fafc'}},
+                            'dataZoom': [{'type': 'inside', 'xAxisIndex': [0, 1]}, {'type': 'slider', 'xAxisIndex': [0, 1], 'bottom': 5, 'height': 20, 'borderColor': '#1e293b', 'dataBackground': {'lineStyle': {'color': '#00E5FF'}, 'areaStyle': {'color': '#121722'}}}],
+                            'xAxis': [{'type': 'category', 'data': [], 'gridIndex': 0, 'axisLine': {'lineStyle': {'color': '#334155'}}}, {'type': 'category', 'data': [], 'gridIndex': 1, 'axisLabel': {'show': False}, 'axisTick': {'show': False}, 'axisLine': {'show': False}}],
+                            'yAxis': [{'type': 'value', 'scale': True, 'gridIndex': 0, 'splitLine': {'lineStyle': {'color': 'rgba(255, 255, 255, 0.05)'}}, 'position': 'right'}, {'type': 'value', 'scale': True, 'gridIndex': 1, 'splitLine': {'show': False}, 'axisLabel': {'show': False}, 'axisTick': {'show': False}}],
+                            'series': [
+                                {'type': 'candlestick', 'name': 'Preço', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'itemStyle': {'color': '#00F5A0', 'color0': '#FF2E93', 'borderColor': '#00F5A0', 'borderColor0': '#FF2E93'}},
+                                {'name': 'BB Upper', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'opacity': 0.4, 'color': '#FFB800', 'width': 1.5}},
+                                {'name': 'BB Lower', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'opacity': 0.4, 'color': '#FFB800', 'width': 1.5}},
+                                {'name': 'EMA 200', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'color': '#00E5FF', 'width': 2}},
+                                {'name': 'Volume', 'type': 'bar', 'xAxisIndex': 1, 'yAxisIndex': 1, 'data': [], 'itemStyle': {'color': '#00E5FF', 'opacity': 0.25}, 'large': True}
+                            ]
+                         }).classes('w-full h-full')
 
-                 # ECharts com Cores Cyberpunk Neon
-                 with ui.element('div').classes('w-full h-full'):
-                     candle_chart = ui.echart({
-                        'backgroundColor': '#0B0E14',
-                        'grid': [{'left': '50', 'right': '25', 'top': '45', 'height': '60%'}, {'left': '50', 'right': '25', 'top': '78%', 'height': '15%'}],
-                        'tooltip': {'trigger': 'axis', 'axisPointer': {'type': 'cross'}, 'backgroundColor': 'rgba(18, 23, 34, 0.95)', 'borderColor': '#00E5FF', 'textStyle': {'color': '#f8fafc'}},
-                        'dataZoom': [{'type': 'inside', 'xAxisIndex': [0, 1]}, {'type': 'slider', 'xAxisIndex': [0, 1], 'bottom': 5, 'height': 20, 'borderColor': '#1e293b', 'dataBackground': {'lineStyle': {'color': '#00E5FF'}, 'areaStyle': {'color': '#121722'}}}],
-                        'xAxis': [{'type': 'category', 'data': [], 'gridIndex': 0, 'axisLine': {'lineStyle': {'color': '#334155'}}}, {'type': 'category', 'data': [], 'gridIndex': 1, 'axisLabel': {'show': False}, 'axisTick': {'show': False}, 'axisLine': {'show': False}}],
-                        'yAxis': [{'type': 'value', 'scale': True, 'gridIndex': 0, 'splitLine': {'lineStyle': {'color': 'rgba(255, 255, 255, 0.05)'}}, 'position': 'right'}, {'type': 'value', 'scale': True, 'gridIndex': 1, 'splitLine': {'show': False}, 'axisLabel': {'show': False}, 'axisTick': {'show': False}}],
-                        'series': [
-                            {'type': 'candlestick', 'name': 'Preço', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'itemStyle': {'color': '#00F5A0', 'color0': '#FF2E93', 'borderColor': '#00F5A0', 'borderColor0': '#FF2E93'}},
-                            {'name': 'BB Upper', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'opacity': 0.4, 'color': '#FFB800', 'width': 1.5}},
-                            {'name': 'BB Lower', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'opacity': 0.4, 'color': '#FFB800', 'width': 1.5}},
-                            {'name': 'EMA 200', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'color': '#00E5FF', 'width': 2}},
-                            {'name': 'Volume', 'type': 'bar', 'xAxisIndex': 1, 'yAxisIndex': 1, 'data': [], 'itemStyle': {'color': '#00E5FF', 'opacity': 0.25}, 'large': True}
-                        ]
-                     }).classes('w-full h-full')
+                 # Painel Inferior (Execuções + Log Terminal)
+                 with ui.row().classes('w-full flex-grow flex-nowrap gap-0 bg-[#0B0E14]'):
+                     with ui.column().classes('w-3/5 h-full border-r border-slate-800/80 bg-[#0B0E14] p-0'):
+                         with ui.row().classes('w-full h-8 items-center px-4 border-b border-slate-800 bg-[#121722]/50 justify-between'):
+                             ui.label('HISTÓRICO DE EXECUÇÕES').classes('text-[0.6rem] font-bold text-slate-400 tracking-widest')
+                             ui.icon('history', size='xs', color='slate-500')
+                          
+                         recent_trades_table = ui.table(
+                             columns=[
+                                {'name': 'date', 'label': 'Horário', 'field': 'date', 'align': 'left'},
+                                {'name': 'pair', 'label': 'Par', 'field': 'pair', 'align': 'left'},
+                                {'name': 'type', 'label': 'Tipo', 'field': 'type', 'align': 'center'},
+                                {'name': 'pnl', 'label': 'PnL Líquido', 'field': 'pnl', 'align': 'right'},
+                             ],
+                             rows=[],
+                             pagination={'rowsPerPage': 5}
+                         ).classes('w-full h-full no-shadow bg-transparent text-slate-300').props('flat dense square')
+                         recent_trades_table.add_slot('header', r'''
+                            <q-tr :props="props" class="bg-[#121722] text-slate-400 text-xs font-semibold">
+                                <q-th v-for="col in props.cols" :key="col.name" :props="props">
+                                    {{ col.label }}
+                                </q-th>
+                            </q-tr>
+                         ''')
 
-             # Painel Inferior (Execuções + Log Terminal)
-             with ui.row().classes('w-full flex-grow flex-nowrap gap-0 bg-[#0B0E14]'):
-                 with ui.column().classes('w-3/5 h-full border-r border-slate-800/80 bg-[#0B0E14] p-0'):
-                     with ui.row().classes('w-full h-8 items-center px-4 border-b border-slate-800 bg-[#121722]/50 justify-between'):
-                         ui.label('HISTÓRICO DE EXECUÇÕES').classes('text-[0.6rem] font-bold text-slate-400 tracking-widest')
-                         ui.icon('history', size='xs', color='slate-500')
-                      
-                     recent_trades_table = ui.table(
-                         columns=[
-                            {'name': 'date', 'label': 'Horário', 'field': 'date', 'align': 'left'},
-                            {'name': 'pair', 'label': 'Par', 'field': 'pair', 'align': 'left'},
-                            {'name': 'type', 'label': 'Tipo', 'field': 'type', 'align': 'center'},
-                            {'name': 'pnl', 'label': 'PnL Líquido', 'field': 'pnl', 'align': 'right'},
-                         ],
-                         rows=[],
-                         pagination={'rowsPerPage': 5}
-                     ).classes('w-full h-full no-shadow bg-transparent text-slate-300').props('flat dense square')
-                     recent_trades_table.add_slot('header', r'''
-                        <q-tr :props="props" class="bg-[#121722] text-slate-400 text-xs font-semibold">
-                            <q-th v-for="col in props.cols" :key="col.name" :props="props">
-                                {{ col.label }}
-                            </q-th>
-                        </q-tr>
-                     ''')
+                     with ui.column().classes('w-2/5 h-full bg-[#0B0E14] p-0'):
+                         with ui.row().classes('w-full h-8 items-center px-4 border-b border-slate-800 bg-[#121722]/50 gap-2'):
+                            ui.icon('terminal', size='xs', color='cyan-400')
+                            ui.label('TERMINAL OUTPUT').classes('text-[0.6rem] font-bold text-slate-400 tracking-widest')
+                          
+                         log_ui = ui.log().classes('w-full h-full font-mono text-[0.65rem] bg-[#080B10] text-emerald-400 p-3 rounded-none border-none leading-tight')
 
-                 with ui.column().classes('w-2/5 h-full bg-[#0B0E14] p-0'):
-                     with ui.row().classes('w-full h-8 items-center px-4 border-b border-slate-800 bg-[#121722]/50 gap-2'):
-                        ui.icon('terminal', size='xs', color='cyan-400')
-                        ui.label('TERMINAL OUTPUT').classes('text-[0.6rem] font-bold text-slate-400 tracking-widest')
-                      
-                     log_ui = ui.log(max_lines=500).classes('w-full flex-grow bg-[#080B10] text-[#00F5A0] terminal-font text-[0.72rem] p-3 leading-relaxed border-0')
-                     for msg in log_buffer:
-                         log_ui.push(msg)
-
-    ui.timer(2.0, update_data)
+        ui.timer(2.0, update_data)
 
 def start_dashboard():
     port = DASHBOARD_CONFIG['port']
     secret = DASHBOARD_CONFIG['secret_key']
+    print(f"Iniciando SpotBot Pro em modo Dashboard Web (NiceGUI)...")
     ui.run(title='SpotBot Pro | Institutional Terminal', dark=True, reload=False, port=port, storage_secret=secret)
 
 if __name__ in {"__main__", "__mp_main__"}:
