@@ -430,7 +430,9 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     
                     target_symbol_info = await client.get_symbol_info(active_target_symbol)
                     min_notional = get_min_notional(target_symbol_info)
-                    order_val_usdt = max(min_notional, slot_value)
+                    
+                    pos_multiplier = buy_result.get('position_multiplier', 1.0)
+                    order_val_usdt = max(min_notional, round(slot_value * pos_multiplier, 2))
 
                     if usdt_balance < min_notional:
                         log(f"⚠️ Saldo insuficiente (${usdt_balance:.2f}) para o mínimo exigido (${min_notional}).")

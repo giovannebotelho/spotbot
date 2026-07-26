@@ -17,7 +17,6 @@ def analyze_with_gemini(
     global _last_429_time
     now = time.time()
     
-    # Se estivemos em cooldown por erro 429 recentemente, avisa de forma silenciosa e pula chamada
     if now - _last_429_time < COOLDOWN_429_SECONDS:
         return None
 
@@ -29,7 +28,6 @@ def analyze_with_gemini(
 
     current_datetime_str = datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
 
-    # Modelos recomendados na SDK moderna google-genai (gemini-2.5-flash é o mais rápido e com melhor custo-benefício)
     models_to_try = [
         "gemini-2.5-flash",
         "gemini-2.5-flash-lite",
@@ -40,12 +38,17 @@ def analyze_with_gemini(
         models_to_try.insert(0, model_name)
 
     prompt_system = (
-        "Você é um assistente especializado em negociação de criptomoedas, focado em análise técnica no gráfico da Binance.\n"
-        "Seu objetivo principal é identificar oportunidades de COMPRA de médio risco com ALTA probabilidade de sucesso para curto/médio prazo.\n\n"
+        "Você é um engenheiro de trading quantitativo sênior focado em criptomoedas no gráfico da Binance.\n"
+        "Seu objetivo é avaliar a qualidade técnica da oportunidade e atribuir uma NOTA DE CONFIANÇA QUANTITATIVA (0 a 100).\n\n"
+        "REGRAS DE PONTUAÇÃO (confidence_score):\n"
+        "- 80 a 100 (Oportunidade de Ouro): Reversão clara com volume forte, RSI muito baixo e suporte testado.\n"
+        "- 50 a 79 (Oportunidade Padrão): Configuração técnica favorável de risco moderado.\n"
+        "- 0 a 49 (Oportunidade Fraca): Mercado sem clareza, alta pressão vendedora ou consolidação estática.\n\n"
         "FORMATO DE RESPOSTA (JSON APENAS):\n"
         "{\n"
         '  "data_analise": "Data e Hora da Análise",\n'
         '  "sinal": "COMPRA", "VENDA" ou "NEUTRO",\n'
+        '  "confidence_score": 85,\n'
         '  "confianca": "Alta", "Media" ou "Baixa",\n'
         '  "justificativa": "Explicação detalhada da decisão...",\n'
         '  "regras_chave": ["Regra 1", "Regra 2"]\n'
@@ -87,7 +90,7 @@ def analyze_with_gemini(
             try:
                 config = types.GenerateContentConfig(
                     system_instruction=prompt_system,
-                    temperature=1.0,
+                    temperature=0.7,
                     top_p=0.95,
                     top_k=64,
                     max_output_tokens=8192,
@@ -107,7 +110,7 @@ def analyze_with_gemini(
                 err_str = str(model_err)
                 if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
                     _last_429_time = time.time()
-                    print(f"{YELLOW}⚠️ Cota da API Gemini excedida (ou sem créditos em AI Studio). O robô continuará operando normalmente com os Filtros Técnicos.{RESET}")
+                    print(f"{YELLOW}⚠️ Cota da API Gemini excedida. O robô continuará operando normalmente com Filtros Técnicos.{RESET}")
                     return None
                 elif "404" in err_str:
                     continue
@@ -139,19 +142,32 @@ def interpret_gemini_response(response_text):
 
         sinal = data.get("sinal", "").upper()
         justificativa = data.get("justificativa", "")
+        
+        # Fase 4: Extrai a pontuacao quantitativa de confianca (0 a 100)
+        try:
+            confidence_score = int(data.get("confidence_score", 70))
+        except (ValueError, TypeError):
+            confidence_score = 70
 
-        print(f"\n{CYAN}Resposta do Gemini (JSON):{RESET}")
+        print(f"\n{CYAN}Resposta do Gemini (JSON - Score: {confidence_score}/100):{RESET}")
         print(json.dumps(data, indent=2, ensure_ascii=False))
 
         if sinal == "COMPRA":
-            print(f"🟢 Sinal de {GREEN}COMPRA{RESET} recebido do Gemini.\n")
-            return {'action': True, 'signal': 'COMPRA', 'justification': justificativa}
+            if confidence_score >= 80:
+                print(f"🌟 {GREEN}Oportunidade de Ouro (Score {confidence_score}/100)! Dobrando a posição.{RESET}\n")
+                return {'action': True, 'signal': 'COMPRA', 'justification': justificativa, 'score': confidence_score, 'position_multiplier': 2.0}
+            elif confidence_score >= 50:
+                print(f"🟢 Sinal de {GREEN}COMPRA (Score {confidence_score}/100){RESET} recebido do Gemini.\n")
+                return {'action': True, 'signal': 'COMPRA', 'justification': justificativa, 'score': confidence_score, 'position_multiplier': 1.0}
+            else:
+                print(f"⚠️ {YELLOW}Sinal de COMPRA descartado por Score Baixo ({confidence_score}/100).{RESET}\n")
+                return {'action': None, 'signal': 'NEUTRO', 'justification': 'Score de confiança insuficiente', 'score': confidence_score, 'position_multiplier': 1.0}
         elif sinal == "VENDA":
-            print(f"🔴 Sinal de {RED}VENDA{RESET} recebido do Gemini.\n")
-            return {'action': False, 'signal': 'VENDA', 'justification': justificativa}
+            print(f"🔴 Sinal de {RED}VENDA (Score {confidence_score}/100){RESET} recebido do Gemini.\n")
+            return {'action': False, 'signal': 'VENDA', 'justification': justificativa, 'score': confidence_score, 'position_multiplier': 1.0}
         else:
-            print(f"🟡 Sinal {YELLOW}NEUTRO{RESET} recebido do Gemini.\n")
-            return {'action': None, 'signal': 'NEUTRO', 'justification': justificativa}
+            print(f"🟡 Sinal {YELLOW}NEUTRO (Score {confidence_score}/100){RESET} recebido do Gemini.\n")
+            return {'action': None, 'signal': 'NEUTRO', 'justification': justificativa, 'score': confidence_score, 'position_multiplier': 1.0}
 
     except Exception as e:
         print(f"Erro ao interpretar resposta da IA: {e}")

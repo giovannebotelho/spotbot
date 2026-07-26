@@ -152,7 +152,7 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
     # 2. Detecção de Varredura de Liquidez Institucional (Fase 2: SMC Liquidity Sweeps)
     is_sweep, sweep_msg = detect_liquidity_sweep(klines)
     if is_sweep and rsi <= 50:
-        return {"buy": True, "message": f"🦈 {sweep_msg} ({regime})", "candle_data": "", "gemini_response": None, "gemini_analysis": None, "regime": regime}
+        return {"buy": True, "message": f"🦈 {sweep_msg} ({regime})", "candle_data": "", "gemini_response": None, "gemini_analysis": None, "regime": regime, "position_multiplier": 1.0}
 
     rsi_config = config_override.get('RSI_CONFIG', RSI_CONFIG) if config_override else RSI_CONFIG
     
@@ -219,30 +219,33 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
         if gemini_analysis_dict:
             gemini_buy_signal = gemini_analysis_dict.get('action')
 
-    # Condição 0: Validação Direta da IA Gemini (Se IA aprovou com Confiança)
+    # Fase 4: Condição 0 (Validação Direta pela IA com Score Quantitativo 0-100)
     if gemini_buy_signal is True and rsi <= 45:
-        return {"buy": True, "message": f"Aprovado pela IA Gemini ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
+        mult = gemini_analysis_dict.get('position_multiplier', 1.0)
+        score_v = gemini_analysis_dict.get('score', 70)
+        msg_title = f"🌟 Oportunidade de Ouro IA Gemini (Score {score_v}/100 - Dobrando Posição)" if mult >= 1.5 else f"Aprovado pela IA Gemini (Score {score_v}/100)"
+        return {"buy": True, "message": f"{msg_title} ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime, "position_multiplier": mult}
 
     # Condições Técnicas Tradicionais (Se IA for neutra ou indisponível)
     if rsi_low_level0 and trend_is_up and macd_bullish and price_below_vwap and ("Hammer" in candle_patterns or "Bullish Engulfing" in candle_patterns):
-        return {"buy": True, "message": f"RSI L0 + MACD + VWAP + Reversão ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
+        return {"buy": True, "message": f"RSI L0 + MACD + VWAP + Reversão ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime, "position_multiplier": 1.0}
 
     if rsi_low_level1 and trend_is_up and macd_bullish and price_below_vwap:
-        return {"buy": True, "message": f"RSI L1 + MACD + VWAP ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
+        return {"buy": True, "message": f"RSI L1 + MACD + VWAP ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime, "position_multiplier": 1.0}
 
     if rsi_low_level2 and price_below_vwap:
-        return {"buy": True, "message": f"RSI L2 + VWAP ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
+        return {"buy": True, "message": f"RSI L2 + VWAP ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime, "position_multiplier": 1.0}
 
     if rsi_low_level3 and macd_bullish:
-        return {"buy": True, "message": f"RSI L3 + MACD ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
+        return {"buy": True, "message": f"RSI L3 + MACD ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime, "position_multiplier": 1.0}
 
     if rsi_low_level4 and trend_is_up:
-        return {"buy": True, "message": f"RSI L4 + Tendência ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
+        return {"buy": True, "message": f"RSI L4 + Tendência ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime, "position_multiplier": 1.0}
 
     if rsi_low_level5:
-        return {"buy": True, "message": f"RSI L5 Sobre-vendido Extremo ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
+        return {"buy": True, "message": f"RSI L5 Sobre-vendido Extremo ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime, "position_multiplier": 1.0}
 
-    return {"buy": False, "message": f"Nenhuma condição atendida ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime}
+    return {"buy": False, "message": f"Nenhuma condição atendida ({regime})", "candle_data": "", "gemini_response": gemini_response, "gemini_analysis": gemini_analysis_dict, "regime": regime, "position_multiplier": 1.0}
 
 async def should_sell(rsi, macd_current, signal_line_current, last_close, upper_band, vwap, candle_patterns):
     rsi_high = rsi >= RSI_CONFIG['high']
