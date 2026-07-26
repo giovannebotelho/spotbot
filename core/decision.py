@@ -1,6 +1,7 @@
 import asyncio
 import json
 import re
+import math
 from datetime import datetime
 import pandas as pd
 
@@ -42,25 +43,27 @@ def get_min_notional(symbol_info):
 def calculate_dynamic_position_slots(usdt_balance, min_order_usdt=10.0, accumulated_net_profit=0.0):
     """
     FASE C (v3.0): Calculador de Slots com Juros Compostos (Snowball Compounding Engine).
-    Soma o lucro líquido acumulado retido no histórico para redimensionar dinamicamente os slots de investimento.
+    Aplica margem de segurança de 1% (usable_balance = usdt_balance * 0.99) para evitar erro -2010 (Insufficient balance).
     """
-    total_effective_balance = usdt_balance
+    usable_usdt = math.floor(usdt_balance * 0.99 * 100) / 100.0
+    
+    total_effective_balance = usable_usdt
     if accumulated_net_profit > 0:
         total_effective_balance += accumulated_net_profit
 
-    if total_effective_balance < min_order_usdt:
+    if usable_usdt < min_order_usdt:
         return 0, 0.0
     
     if total_effective_balance < 30.0:
-        return 1, round(total_effective_balance, 2)
+        return 1, min(usable_usdt, round(total_effective_balance, 2))
     elif total_effective_balance < 60.0:
-        return 2, round(total_effective_balance / 2, 2)
+        return 2, min(usable_usdt, round(total_effective_balance / 2, 2))
     elif total_effective_balance < 100.0:
-        return 3, round(total_effective_balance / 3, 2)
+        return 3, min(usable_usdt, round(total_effective_balance / 3, 2))
     else:
         num_slots = min(5, max(3, int(total_effective_balance // 30)))
         slot_value = round(total_effective_balance / num_slots, 2)
-        return num_slots, slot_value
+        return num_slots, min(usable_usdt, slot_value)
 
 async def should_place_order(client, symbol, status_callback=None):
     try:
