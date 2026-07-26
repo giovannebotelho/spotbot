@@ -78,10 +78,10 @@ async def update_data():
             candle_chart.options['title'] = {
                 'text': f'📈 {active_symbol} — Gráfico em Tempo Real ({price_str})',
                 'subtext': 'Alimentado por Binance WebSockets & Scanner 2.0 Quantitativo',
-                'left': 20,
+                'left': 'center',
                 'top': 10,
-                'textStyle': {'color': '#00E5FF', 'fontSize': 13, 'fontWeight': 'bold'},
-                'subtextStyle': {'color': '#64748b', 'fontSize': 9}
+                'textStyle': {'color': '#00E5FF', 'fontSize': 14, 'fontWeight': 'bold'},
+                'subtextStyle': {'color': '#64748b', 'fontSize': 9.5}
             }
             candle_chart.options['xAxis'][0]['data'] = market_data['dates']
             candle_chart.options['xAxis'][1]['data'] = market_data['dates']
@@ -375,14 +375,14 @@ async def index():
                      # Badge Flutuante no Canto Superior Direito indicando o Ativo em Foco Atual
                      chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('absolute top-4 right-6 z-20 obsidian-card px-4 py-2 rounded-xl text-xs font-bold font-mono text-[#00E5FF] border border-cyan-500/30 backdrop-blur-md shadow-lg')
 
-                     # Card IA Holográfico Otimizado
-                     ai_card = ui.card().classes('absolute top-4 left-4 w-80 z-20 obsidian-card p-3.5 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] opacity-95 backdrop-blur-md transition-all duration-300')
+                     # Card IA Holográfico Otimizado (Posicionado levemente mais para baixo/esquerda sem cobrir o título centralizado)
+                     ai_card = ui.card().classes('absolute top-4 left-4 w-72 z-20 obsidian-card p-3 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] opacity-95 backdrop-blur-md transition-all duration-300')
                      with ai_card:
-                         with ui.row().classes('w-full items-center justify-between mb-2'):
+                         with ui.row().classes('w-full items-center justify-between mb-1.5'):
                              with ui.row().classes('items-center gap-2'):
-                                 ai_icon_container = ui.element('div').classes('p-1.5 rounded-lg bg-slate-800/80 text-slate-400')
-                                 with ai_icon_container: ui.icon('psychology', size='sm')
-                                 ai_signal_label = ui.label('NEUTRO').classes('text-xs font-bold tracking-wide text-slate-400')
+                                 ai_icon_container = ui.element('div').classes('p-1 rounded-lg bg-slate-800/80 text-slate-400')
+                                 with ai_icon_container: ui.icon('psychology', size='xs')
+                                 ai_signal_label = ui.label('NEUTRO').classes('text-[0.7rem] font-bold tracking-wide text-slate-400')
                              
                              def toggle_ai_content():
                                  is_visible = ai_reason_scroll.visible
@@ -391,23 +391,23 @@ async def index():
 
                              toggle_btn = ui.button(icon='keyboard_arrow_up', on_click=toggle_ai_content).props('flat dense round size=xs color=slate-400')
                          
-                         ai_reason_scroll = ui.scroll_area().classes('h-28')
+                         ai_reason_scroll = ui.scroll_area().classes('h-24')
                          with ai_reason_scroll:
-                             ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-[0.68rem] text-slate-300 leading-relaxed')
+                             ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-[0.65rem] text-slate-300 leading-relaxed')
 
-                     # ECharts com Cores Cyberpunk Neon
+                     # ECharts com Cores Cyberpunk Neon e Título Perfeitamente Centralizado
                      with ui.element('div').classes('w-full h-full'):
                          candle_chart = ui.echart({
                             'backgroundColor': '#0B0E14',
                             'title': {
                                 'text': '📈 BTCUSDT — Gráfico em Tempo Real',
                                 'subtext': 'Alimentado por Binance WebSockets & Scanner 2.0 Quantitativo',
-                                'left': 20,
-                                'top': 10,
-                                'textStyle': {'color': '#00E5FF', 'fontSize': 13, 'fontWeight': 'bold'},
-                                'subtextStyle': {'color': '#64748b', 'fontSize': 9}
+                                'left': 'center',
+                                'top': 12,
+                                'textStyle': {'color': '#00E5FF', 'fontSize': 14, 'fontWeight': 'bold'},
+                                'subtextStyle': {'color': '#64748b', 'fontSize': 9.5}
                             },
-                            'grid': [{'left': '50', 'right': '25', 'top': '55', 'height': '55%'}, {'left': '50', 'right': '25', 'top': '78%', 'height': '15%'}],
+                            'grid': [{'left': '50', 'right': '25', 'top': '65', 'height': '52%'}, {'left': '50', 'right': '25', 'top': '80%', 'height': '15%'}],
                             'tooltip': {'trigger': 'axis', 'axisPointer': {'type': 'cross'}, 'backgroundColor': 'rgba(18, 23, 34, 0.95)', 'borderColor': '#00E5FF', 'textStyle': {'color': '#f8fafc'}},
                             'dataZoom': [{'type': 'inside', 'xAxisIndex': [0, 1]}, {'type': 'slider', 'xAxisIndex': [0, 1], 'bottom': 5, 'height': 20, 'borderColor': '#1e293b', 'dataBackground': {'lineStyle': {'color': '#00E5FF'}, 'areaStyle': {'color': '#121722'}}}],
                             'xAxis': [{'type': 'category', 'data': [], 'gridIndex': 0, 'axisLine': {'lineStyle': {'color': '#334155'}}}, {'type': 'category', 'data': [], 'gridIndex': 1, 'axisLabel': {'show': False}, 'axisTick': {'show': False}, 'axisLine': {'show': False}}],
