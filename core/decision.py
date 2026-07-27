@@ -96,6 +96,12 @@ async def place_safe_oco_sell_order(client, symbol, quantity, price, stop_price,
 
 async def should_place_order(client, symbol, status_callback=None):
     try:
+        open_ocos = await client.get_open_oco_orders()
+        if len(open_ocos) > 0:
+            oco_sym = open_ocos[0]['symbol']
+            if status_callback: status_callback(f"⚠️ OCO ativa em {oco_sym}. Posição em andamento, aguardando resultado...")
+            return False
+
         orders = await client.get_open_orders(symbol=symbol)
         if len(orders) > 0:
             if status_callback: status_callback(f"⚠️ Já existem ordens abertas para {symbol}.")
