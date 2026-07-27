@@ -356,8 +356,24 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 f"🪙 Modo Selecionado: <b>{display_symbol}</b>"
             ))
         
-        await cancel_all_oco_orders(client, symbol)
-        
+        # Verificação e Adotação de Ordens OCO Ativas (State Recovery Engine v3.0)
+        open_ocos = await client.get_open_oco_orders()
+        if open_ocos:
+            oco_order = open_ocos[0]
+            active_target_symbol = oco_order['symbol']
+            log(f"🔄 \033[1;36mState Recovery Engine\033[0m: Ordem OCO ativa encontrada na Binance para \033[1;33m{active_target_symbol}\033[0m!")
+            log(f"🛡️ Retomando monitoramento de Scalp Locking (+1.5%) e Trailing Stop sem cancelar a operação...\n")
+            
+            if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                asyncio.create_task(send_telegram_message(
+                    TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                    f"🔄 <b>State Recovery Ativado!</b>\n\n"
+                    f"🪙 Par: <b>{active_target_symbol}</b>\n"
+                    f"🛡️ Ordem OCO recuperada da Binance. Retomando monitoramento de lucro e stop automaticamente!"
+                ))
+        else:
+            await cancel_all_oco_orders(client, symbol)
+
         symbol_info = await client.get_symbol_info(symbol)
         tick_size = float(next(filter for filter in symbol_info['filters'] if filter['filterType'] == 'PRICE_FILTER')['tickSize'])
         quote_precision = int(symbol_info['quoteAssetPrecision'])
