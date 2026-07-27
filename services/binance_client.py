@@ -82,3 +82,25 @@ async def get_futures_analytics(symbol):
         'open_interest': open_interest,
         'is_short_heavy': funding_rate < -0.0001 # Funding Rate < -0.01%
     }
+
+async def get_multi_timeframe_klines(client, symbol):
+    """
+    Obtém em paralelo ultra-rápido as klines de 3 horizontes de tempo (4h, 1h, 15m)
+    para o cálculo da Matriz de Confluência Multi-Timeframe (v4.0).
+    """
+    async def fetch(tf, limit):
+        try:
+            return await client.get_klines(symbol=symbol, interval=tf, limit=limit)
+        except Exception:
+            return []
+
+    res_4h, res_1h, res_15m = await asyncio.gather(
+        fetch('4h', 100),
+        fetch('1h', 100),
+        fetch('15m', 100)
+    )
+    return {
+        '4h': res_4h,
+        '1h': res_1h,
+        '15m': res_15m
+    }

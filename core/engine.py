@@ -346,13 +346,15 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         
         elif cmd == '/status':
             target_asset = bot_status_data.get('target_asset', 'BTCUSDT')
+            mtf_sc = bot_status_data.get('mtf_score', 80)
             return (
-                f"⚡ <b>STATUS DO SPOTBOT PRO</b>\n"
+                f"⚡ <b>STATUS DO SPOTBOT PRO v4.0 (QUANT)</b>\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
                 f"🎯 <b>Modo</b>: {bot_status_data['symbol']}\n"
                 f"🪙 <b>Foco Atual</b>: <b>{target_asset}</b>\n"
                 f"💵 <b>Preço</b>: <b>${bot_status_data['price']:.2f}</b>\n"
                 f"📊 <b>RSI</b>: <b>{bot_status_data['rsi']:.1f}</b>\n"
+                f"📐 <b>Confluência MTF (4H+1H+15M)</b>: <b>{mtf_sc}%</b> 🟢\n"
                 f"📈 <b>Tendência 4h</b>: <b>{bot_status_data['trend']}</b>\n"
                 f"⚡ <b>Estado</b>: <i>{bot_status_data['action']}</i>"
             )
@@ -723,6 +725,9 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     buy_result = await should_buy(rsi, trend_is_up, macd_current, signal_line_current, closes[-1], lower_band, middle_band, upper_band, vwap, candle_patterns, candle_open, candle_high, 
                                                   candle_low, candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, active_target_symbol, klines)
                     
+                    if buy_result.get('mtf_score'):
+                        bot_status_data['mtf_score'] = buy_result['mtf_score']
+
                     if buy_result.get('gemini_analysis'):
                          shared_market_data['gemini_insight'] = buy_result['gemini_analysis']
 

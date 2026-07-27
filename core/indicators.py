@@ -368,3 +368,61 @@ def get_candle_details(klines):
         'close': float(last_candle[4]),
         'volume': float(last_candle[5]),
     }
+
+def calculate_multi_timeframe_confluence(klines_4h, klines_1h, klines_15m):
+    """
+    FASE 2 (v4.0): Matriz de Confluência Multi-Timeframe Tridimensional.
+    Calcula a pontuação de confluência (0% a 100%) entre 4H (Macro), 1H (Estrutura) e 15M (Trigger).
+    Retorna: (score: int, is_confluent: bool, details: dict)
+    """
+    score = 0
+    details = {'4h_score': 0, '1h_score': 0, '15m_score': 0, 'reasons': []}
+
+    # 1. Avaliação 4H (Macro Trend - Peso 40 pontos)
+    if klines_4h and len(klines_4h) >= 20:
+        c4h = extract_closes(klines_4h)
+        last_price_4h = c4h[-1]
+        ema50_4h = calculate_ema(c4h, min(50, len(c4h)))
+        ema200_4h = calculate_ema(c4h, min(200, len(c4h)))
+
+        if last_price_4h > ema50_4h or len(c4h) < 50:
+            score += 20
+            details['4h_score'] += 20
+            details['reasons'].append("4H: Preço aci/ma da EMA (+20%)")
+        if ema50_4h >= ema200_4h or last_price_4h > ema200_4h:
+            score += 20
+            details['4h_score'] += 20
+            details['reasons'].append("4H: Tendência Macro de Alta (+20%)")
+
+    # 2. Avaliação 1H (Estrutura Intermediária & Regime - Peso 30 pontos)
+    if klines_1h and len(klines_1h) >= 20:
+        c1h = extract_closes(klines_1h)
+        rsi_1h = calculate_rsi(c1h)
+        regime_1h, _ = detect_market_regime(klines_1h)
+
+        if rsi_1h <= 55:
+            score += 15
+            details['1h_score'] += 15
+            details['reasons'].append(f"1H: RSI saudável ({rsi_1h:.1f}) (+15%)")
+        if regime_1h != "REGIME_CRASH_PANIC":
+            score += 15
+            details['1h_score'] += 15
+            details['reasons'].append("1H: Sem Pânico de Queda (+15%)")
+
+    # 3. Avaliação 15M (Gatilho de Execução - Peso 30 pontos)
+    if klines_15m and len(klines_15m) >= 15:
+        c15m = extract_closes(klines_15m)
+        rsi_15m = calculate_rsi(c15m)
+        macd_15m, sig_15m = calculate_macd(c15m)
+
+        if rsi_15m <= 45:
+            score += 15
+            details['15m_score'] += 15
+            details['reasons'].append(f"15M: Gatilho Sobrevendido (RSI={rsi_15m:.1f}) (+15%)")
+        if macd_15m >= sig_15m or rsi_15m <= 35:
+            score += 15
+            details['15m_score'] += 15
+            details['reasons'].append("15M: Crossover/Momentum Positivo (+15%)")
+
+    is_confluent = score >= 70
+    return score, is_confluent, details

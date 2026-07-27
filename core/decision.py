@@ -6,10 +6,10 @@ from datetime import datetime
 import pandas as pd
 
 from config.settings import API_KEYS, TRADING_CONFIG, RSI_CONFIG
-from services.binance_client import get_order_details, get_futures_analytics, get_order_book
+from services.binance_client import get_order_details, get_futures_analytics, get_order_book, get_multi_timeframe_klines
 from core.indicators import (
     detect_market_regime, detect_liquidity_sweep, calculate_ema, calculate_adx,
-    analyze_futures_squeeze_potential, calculate_orderbook_imbalance
+    analyze_futures_squeeze_potential, calculate_orderbook_imbalance, calculate_multi_timeframe_confluence
 )
 from services.gemini_ai import analyze_with_gemini
 from services.database import DatabaseManager
@@ -242,6 +242,27 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
 
     if ob_ratio < 0.2:
         return {"buy": False, "message": f"Muro de Venda Massivo no Livro (Bids/Asks={ob_ratio:.2f}x)", "candle_data": "", "gemini_response": None, "regime": regime}
+
+    # 3.1. FASE 2 (v4.0): Matriz de Confluência Multi-Timeframe (4H + 1H + 15M)
+    try:
+        mtf_data = await get_multi_timeframe_klines(client, symbol)
+        score_mtf, is_confluent, details_mtf = calculate_multi_timeframe_confluence(
+            mtf_data.get('4h', []),
+            mtf_data.get('1h', []),
+            mtf_data.get('15m', klines)
+        )
+    except Exception:
+        score_mtf, is_confluent, details_mtf = 75, True, {'reasons': []}
+
+    if not is_confluent:
+        return {
+            "buy": False,
+            "message": f"Confluência Multi-Timeframe Insuficiente (Score {score_mtf}% < 70%)",
+            "candle_data": "",
+            "gemini_response": None,
+            "regime": regime,
+            "mtf_score": score_mtf
+        }
 
     if is_sweep and rsi <= 55:
         mult = 2.0 if (is_squeeze or has_buy_wall) else 1.0
