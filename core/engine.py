@@ -14,7 +14,10 @@ from core.indicators import (
     calculate_rsi, calculate_macd, calculate_bollinger_bands, check_trend, check_candle_patterns,
     calculate_vwap, get_candle_details, calculate_ema, is_market_downward, calculate_relative_strength_rank
 )
-from core.decision import should_place_order, should_buy, should_sell, adjust_and_place_oco_order, get_min_notional, adjust_price_to_tick_size, get_precision, calculate_dynamic_position_slots, place_safe_oco_sell_order
+from core.decision import (
+    should_place_order, should_buy, should_sell, adjust_and_place_oco_order, get_min_notional,
+    adjust_price_to_tick_size, get_precision, calculate_dynamic_position_slots, place_safe_oco_sell_order
+)
 from core.post_trade import process_order_details, log_and_notify_results, create_data_row, save_to_csv
 from services.telegram_notifier import send_telegram_message, send_telegram_document, TelegramBot
 from services.database import DatabaseManager
@@ -136,6 +139,175 @@ async def get_account_balances():
     finally:
         if client:
             await client.close_connection()
+
+async def monitor_oco_lifecycle(
+    client, bsm, active_target_symbol, oco_order, limit_order_id, stop_order_id,
+    price, executed_qty, order_val_usdt, lucro_alvo, stop_loss, target_symbol_info,
+    tick_size, step_size, log, status, saldo_inicial_usdt, order_count, purchase_timestamp,
+    executed_condition, rsi, vwap, candle_open, candle_high, candle_low, candle_close,
+    candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100,
+    ema200, candle_patterns, amplitude, macd_current, signal_line_current, lower_band,
+    middle_band, upper_band, trend_is_up, gemini_response, db
+):
+    global stop_loss_count, last_stop_loss_time
+    total_difference = 0
+    total_difference_liquid = 0
+    highest_price = price
+    current_stop_loss = stop_loss
+    partial_take_done = False
+
+    use_ws_monitoring = True
+    try:
+        async with bsm.user_socket() as um:
+            while True:
+                try:
+                    msg = await asyncio.wait_for(um.recv(), timeout=5)
+                except asyncio.TimeoutError:
+                    try:
+                        cur_price = float((await client.get_symbol_ticker(symbol=active_target_symbol))['price'])
+                        status(f"⏳ Monitorando OCO ({active_target_symbol})... Preço: ${cur_price:.2f}")
+                        
+                        profit_pct = (cur_price - price) / price if price > 0 else 0
+
+                        if profit_pct >= 0.015 and not partial_take_done:
+                            try:
+                                prec_qty = get_precision(step_size)
+                                half_qty = round(math.floor((executed_qty * 0.5) / step_size) * step_size, prec_qty)
+                                rem_qty = round(executed_qty - half_qty, prec_qty)
+
+                                if half_qty > 0 and rem_qty > 0:
+                                    await client.cancel_order(symbol=active_target_symbol, orderListId=oco_order['orderListId'])
+                                    venda_parcial = await client.order_market_sell(symbol=active_target_symbol, quantity=half_qty)
+                                    p_price = float(venda_parcial['fills'][0]['price'])
+                                    
+                                    log(f"💰 Scalp Locking: Venda parcial de 50% executada em {active_target_symbol} a ${p_price:.4f}! (+{profit_pct*100:.2f}%)")
+                                    
+                                    be_stop = adjust_price_to_tick_size(price, tick_size)
+                                    be_limit = adjust_price_to_tick_size(price * 0.999, tick_size)
+                                    prec_p = get_precision(tick_size)
+                                    prec_q = get_precision(step_size)
+                                    
+                                    oco_order = await place_safe_oco_sell_order(
+                                        client, active_target_symbol, rem_qty, lucro_alvo, be_stop, be_limit, prec_p, prec_q
+                                    )
+                                    limit_order_id = oco_order['orders'][1]['orderId']
+                                    stop_order_id = oco_order['orders'][0]['orderId']
+                                    current_stop_loss = be_stop
+                                    partial_take_done = True
+
+                                    if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                                        asyncio.create_task(send_telegram_message(
+                                            TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                                            f"💰 <b>Scalp Locking (+1.5% Lucro Garantido)!</b>\n\n"
+                                            f"🪙 Par: <b>{active_target_symbol}</b>\n"
+                                            f"🎯 50% da posição vendida a <b>${p_price:.2f}</b>!\n"
+                                            f"🛡️ 50% restante protegido no <b>Breakeven (Zero a Zero em ${price:.2f})</b>!"
+                                        ))
+                            except Exception as e_partial:
+                                log(f"Aviso ao executar Scalp Locking: {e_partial}")
+
+                        if TRAILING_STOP_CONFIG['enabled'] and cur_price > highest_price:
+                            highest_price = cur_price
+                            if highest_price > price * (1 + TRAILING_STOP_CONFIG['activation_percent']):
+                                new_stop = adjust_price_to_tick_size(highest_price * (1 - TRAILING_STOP_CONFIG['callback_percent']), tick_size)
+                                if new_stop > current_stop_loss * 1.001:
+                                    log(f"🔄 Trailing Stop acionado! Movendo stop para ${new_stop:.4f}")
+                                    await client.cancel_order(symbol=active_target_symbol, orderListId=oco_order['orderListId'])
+                                    new_stop_limit = adjust_price_to_tick_size(new_stop * 0.999, tick_size)
+                                    prec_p = get_precision(tick_size)
+                                    prec_q = get_precision(step_size)
+                                    qty_to_sell = executed_qty if not partial_take_done else rem_qty
+                                    
+                                    oco_order = await place_safe_oco_sell_order(
+                                        client, active_target_symbol, qty_to_sell, lucro_alvo, new_stop, new_stop_limit, prec_p, prec_q
+                                    )
+                                    limit_order_id = oco_order['orders'][1]['orderId']
+                                    stop_order_id = oco_order['orders'][0]['orderId']
+                                    current_stop_loss = new_stop
+                    except Exception:
+                        pass
+                    continue
+
+                if msg.get('e') == 'listStatus' and msg.get('s') == active_target_symbol and msg.get('g') == oco_order['orderListId']:
+                    if 'ALL_DONE' in msg.get('l'):
+                        limit_details = await get_order_details(client, active_target_symbol, limit_order_id)
+                        stop_details = await get_order_details(client, active_target_symbol, stop_order_id)
+
+                        active_target_symbol, order_result, trade_result, novo_saldo_usdt, oco_timestamp, fee, trade_result_liquid = await process_order_details(
+                            active_target_symbol, client, limit_details, stop_details, price, executed_qty, order_val_usdt
+                        )
+
+                        total_difference += trade_result
+                        total_difference_liquid += trade_result_liquid
+                        
+                        bnb_balance_free = float((await client.get_asset_balance(asset='BNB'))['free'])
+                        bnb_price = await get_bnb_price(client)
+                        
+                        if order_result:
+                            log_and_notify_results(order_result, active_target_symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_free * bnb_price, log=log)
+                            data_row = create_data_row(
+                                order_count, saldo_inicial_usdt, novo_saldo_usdt, active_target_symbol,
+                                executed_qty, price, purchase_timestamp, lucro_alvo, stop_loss, stop_loss,
+                                order_result, oco_timestamp, trade_result, total_difference, novo_saldo_usdt,
+                                rsi, executed_condition, vwap, candle_open, candle_high, candle_low, candle_close, candle_volume, 
+                                variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, TRADING_CONFIG['volume_avg'], 
+                                amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid,
+                                total_difference_liquid, gemini_response, bnb_balance_free * bnb_price
+                            )
+                            save_to_csv(data_row)
+                            
+                            if stop_details['status'] == 'FILLED':
+                                stop_loss_count += 1
+                                last_stop_loss_time = datetime.now()
+                                await check_stop_losses(last_stop_loss_time, log=log)
+                            else:
+                                stop_loss_count = 0
+                            return
+    except Exception as ws_err:
+        use_ws_monitoring = False
+        log(f"⚠️ Conexão WebSocket instável ({ws_err}). Alternando automaticamente para monitoramento de ordem por REST Polling...")
+
+    # Fallback REST Polling se o WebSocket instabilizar
+    if not use_ws_monitoring:
+        while True:
+            await asyncio.sleep(3)
+            try:
+                limit_details = await get_order_details(client, active_target_symbol, limit_order_id)
+                stop_details = await get_order_details(client, active_target_symbol, stop_order_id)
+
+                if limit_details['status'] in ['FILLED', 'CANCELED'] or stop_details['status'] in ['FILLED', 'CANCELED']:
+                    active_target_symbol, order_result, trade_result, novo_saldo_usdt, oco_timestamp, fee, trade_result_liquid = await process_order_details(
+                        active_target_symbol, client, limit_details, stop_details, price, executed_qty, order_val_usdt
+                    )
+
+                    total_difference += trade_result
+                    total_difference_liquid += trade_result_liquid
+                    
+                    bnb_balance_free = float((await client.get_asset_balance(asset='BNB'))['free'])
+                    bnb_price = await get_bnb_price(client)
+                    
+                    if order_result:
+                        log_and_notify_results(order_result, active_target_symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_free * bnb_price, log=log)
+                        data_row = create_data_row(
+                            order_count, saldo_inicial_usdt, novo_saldo_usdt, active_target_symbol,
+                            executed_qty, price, purchase_timestamp, lucro_alvo, stop_loss, stop_loss,
+                            order_result, oco_timestamp, trade_result, total_difference, novo_saldo_usdt,
+                            rsi, executed_condition, vwap, candle_open, candle_high, candle_low, candle_close, candle_volume, 
+                            variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, TRADING_CONFIG['volume_avg'], 
+                            amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid,
+                            total_difference_liquid, gemini_response, bnb_balance_free * bnb_price
+                        )
+                        save_to_csv(data_row)
+                        
+                        if stop_details['status'] == 'FILLED':
+                            stop_loss_count += 1
+                            last_stop_loss_time = datetime.now()
+                            await check_stop_losses(last_stop_loss_time, log=log)
+                        else:
+                            stop_loss_count = 0
+                        return
+            except Exception as poll_err:
+                status(f"⚠️ Polling de Ordem: {poll_err}")
 
 async def run_bot(log_callback=None, investment_amount=None, selected_symbol=None, status_callback=None):
     global restart_attempts, bot_running, last_operation_time, stop_loss_count, last_stop_loss_time
@@ -328,11 +500,6 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         tg_bot = TelegramBot(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], handle_telegram_command)
         asyncio.create_task(tg_bot.start())
 
-    total_difference = 0
-    total_difference_liquid = 0
-    gemini_response = None
-    order_count = 0
-
     log("\n🚀 \033[5;33mBot SpotBot Pro iniciado!\033[0m 🚀\n")
     
     try:
@@ -385,6 +552,33 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     f"🪙 Par: <b>{active_target_symbol}</b>\n"
                     f"🛡️ Ordem OCO recuperada da Binance. Retomando monitoramento de lucro e stop automaticamente!"
                 ))
+            
+            limit_order_id = oco_order['orders'][1]['orderId']
+            stop_order_id = oco_order['orders'][0]['orderId']
+            target_symbol_info = await client.get_symbol_info(active_target_symbol)
+            tick_size = float(next(f for f in target_symbol_info['filters'] if f['filterType'] == 'PRICE_FILTER')['tickSize'])
+            step_size = float(next(f for f in target_symbol_info['filters'] if f['filterType'] == 'LOT_SIZE')['stepSize'])
+            
+            limit_details = await get_order_details(client, active_target_symbol, limit_order_id)
+            stop_details = await get_order_details(client, active_target_symbol, stop_order_id)
+            
+            executed_qty = float(limit_details.get('origQty', stop_details.get('origQty', 0)))
+            lucro_alvo = float(limit_details.get('price', 0))
+            stop_loss = float(stop_details.get('stopPrice', stop_details.get('price', 0)))
+            stop_limit = float(stop_details.get('price', 0))
+            
+            ticker_cur = await client.get_symbol_ticker(symbol=active_target_symbol)
+            price = float(ticker_cur['price'])
+            order_val_usdt = round(executed_qty * price, 2)
+            purchase_timestamp = datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
+            
+            await monitor_oco_lifecycle(
+                client, bsm, active_target_symbol, oco_order, limit_order_id, stop_order_id,
+                price, executed_qty, order_val_usdt, lucro_alvo, stop_loss, target_symbol_info,
+                tick_size, step_size, log, status, saldo_inicial_usdt, 1, purchase_timestamp,
+                "State Recovery (Posição Retomada)", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                [], 0, 0, 0, 0, 0, 0, True, None, db
+            )
         else:
             await cancel_all_oco_orders(client, symbol)
 
@@ -394,6 +588,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
 
         last_sync_hour = datetime.now().hour
         last_pdf_sent_day = None
+        order_count = 0
 
         while bot_running:
             try:
@@ -578,160 +773,15 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                             ))
                         last_operation_time = datetime.now()
 
-                        highest_price = price
-                        current_stop_loss = stop_loss
-                        partial_take_done = False
-
-                        # Loop Resiliente de Monitoramento da Ordem (WebSocket com Fallback automático para REST Polling)
-                        use_ws_monitoring = True
-                        try:
-                            async with bsm.user_socket() as um:
-                                while True:
-                                    try:
-                                        msg = await asyncio.wait_for(um.recv(), timeout=5)
-                                    except asyncio.TimeoutError:
-                                        try:
-                                            cur_price = float((await client.get_symbol_ticker(symbol=active_target_symbol))['price'])
-                                            status(f"⏳ Monitorando OCO ({active_target_symbol})... Preço: ${cur_price:.2f}")
-                                            
-                                            profit_pct = (cur_price - price) / price
-
-                                            if profit_pct >= 0.015 and not partial_take_done:
-                                                try:
-                                                    step_size = float(next(f for f in target_symbol_info['filters'] if f['filterType'] == 'LOT_SIZE')['stepSize'])
-                                                    prec_qty = get_precision(step_size)
-                                                    
-                                                    half_qty = round(math.floor((executed_qty * 0.5) / step_size) * step_size, prec_qty)
-                                                    rem_qty = round(executed_qty - half_qty, prec_qty)
-
-                                                    if half_qty > 0 and rem_qty > 0:
-                                                        await client.cancel_order(symbol=active_target_symbol, orderListId=oco_order['orderListId'])
-                                                        venda_parcial = await client.order_market_sell(symbol=active_target_symbol, quantity=half_qty)
-                                                        p_price = float(venda_parcial['fills'][0]['price'])
-                                                        
-                                                        log(f"💰 Scalp Locking: Venda parcial de 50% executada em {active_target_symbol} a ${p_price:.4f}! (+{profit_pct*100:.2f}%)")
-                                                        
-                                                        be_stop = adjust_price_to_tick_size(price, tick_size)
-                                                        be_limit = adjust_price_to_tick_size(price * 0.999, tick_size)
-                                                        
-                                                        prec_p = get_precision(tick_size)
-                                                        prec_q = get_precision(step_size)
-                                                        oco_order = await place_safe_oco_sell_order(
-                                                            client, active_target_symbol, rem_qty, lucro_alvo, be_stop, be_limit, prec_p, prec_q
-                                                        )
-                                                        limit_order_id = oco_order['orders'][1]['orderId']
-                                                        stop_order_id = oco_order['orders'][0]['orderId']
-                                                        current_stop_loss = be_stop
-                                                        partial_take_done = True
-
-                                                        if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
-                                                            asyncio.create_task(send_telegram_message(
-                                                                TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
-                                                                f"💰 <b>Scalp Locking (+1.5% Lucro Garantido)!</b>\n\n"
-                                                                f"🪙 Par: <b>{active_target_symbol}</b>\n"
-                                                                f"🎯 50% da posição vendida a <b>${p_price:.2f}</b>!\n"
-                                                                f"🛡️ 50% restante protegido no <b>Breakeven (Zero a Zero em ${price:.2f})</b>!"
-                                                            ))
-                                                except Exception as e_partial:
-                                                    log(f"Aviso ao executar Scalp Locking: {e_partial}")
-
-                                            if TRAILING_STOP_CONFIG['enabled'] and cur_price > highest_price:
-                                                highest_price = cur_price
-                                                if highest_price > price * (1 + TRAILING_STOP_CONFIG['activation_percent']):
-                                                    new_stop = adjust_price_to_tick_size(highest_price * (1 - TRAILING_STOP_CONFIG['callback_percent']), tick_size)
-                                                    if new_stop > current_stop_loss * 1.001:
-                                                        log(f"🔄 Trailing Stop acionado! Movendo stop para ${new_stop:.4f}")
-                                                        await client.cancel_order(symbol=active_target_symbol, orderListId=oco_order['orderListId'])
-                                                        new_stop_limit = adjust_price_to_tick_size(new_stop * 0.999, tick_size)
-                                                        
-                                                        prec_p = get_precision(tick_size)
-                                                        prec_q = get_precision(step_size)
-                                                        qty_to_sell = executed_qty if not partial_take_done else rem_qty
-                                                        
-                                                        oco_order = await place_safe_oco_sell_order(
-                                                            client, active_target_symbol, qty_to_sell, lucro_alvo, new_stop, new_stop_limit, prec_p, prec_q
-                                                        )
-                                                        
-                                                        limit_order_id = oco_order['orders'][1]['orderId']
-                                                        stop_order_id = oco_order['orders'][0]['orderId']
-                                                        current_stop_loss = new_stop
-                                        except Exception:
-                                            pass
-                                        continue
-
-                                    if msg.get('e') == 'listStatus' and msg.get('s') == active_target_symbol and msg.get('g') == oco_order['orderListId']:
-                                        if 'ALL_DONE' in msg.get('l'):
-                                            limit_details = await get_order_details(client, active_target_symbol, limit_order_id)
-                                            stop_details = await get_order_details(client, active_target_symbol, stop_order_id)
-
-                                            active_target_symbol, order_result, trade_result, novo_saldo_usdt, oco_timestamp, fee, trade_result_liquid = await process_order_details(
-                                                active_target_symbol, client, limit_details, stop_details, price, executed_qty, order_val_usdt
-                                            )
-
-                                            total_difference += trade_result
-                                            total_difference_liquid += trade_result_liquid
-                                            
-                                            bnb_balance_free = float((await client.get_asset_balance(asset='BNB'))['free'])
-                                            bnb_price = await get_bnb_price(client)
-                                            
-                                            if order_result:
-                                                log_and_notify_results(order_result, active_target_symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_free * bnb_price, log=log)
-                                                data_row = create_data_row(
-                                                    order_count, saldo_inicial_usdt, novo_saldo_usdt, active_target_symbol,
-                                                    executed_qty, price, purchase_timestamp, lucro_alvo, stop_loss, stop_limit,
-                                                    order_result, oco_timestamp, trade_result, total_difference, novo_saldo_usdt,
-                                                    rsi, executed_condition, vwap, candle_open, candle_high, candle_low, candle_close, candle_volume, 
-                                                    variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, TRADING_CONFIG['volume_avg'], 
-                                                    amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid,
-                                                    total_difference_liquid, gemini_response, bnb_balance_free * bnb_price
-                                                )
-                                                save_to_csv(data_row)
-                                                
-                                                if stop_details['status'] == 'FILLED':
-                                                    stop_loss_count += 1
-                                                    last_stop_loss_time = datetime.now()
-                                                    await check_stop_losses(last_stop_loss_time, log=log)
-                                                else:
-                                                    stop_loss_count = 0
-                                                break
-                        except Exception as ws_err:
-                            use_ws_monitoring = False
-                            log(f"⚠️ Conexão WebSocket instável ({ws_err}). Alternando automaticamente para monitoramento de ordem por REST Polling...")
-
-                        # Robust Fallback REST Polling se o WebSocket instabilizar
-                        if not use_ws_monitoring:
-                            while True:
-                                await asyncio.sleep(3)
-                                try:
-                                    limit_details = await get_order_details(client, active_target_symbol, limit_order_id)
-                                    stop_details = await get_order_details(client, active_target_symbol, stop_order_id)
-
-                                    if limit_details['status'] in ['FILLED', 'CANCELED'] or stop_details['status'] in ['FILLED', 'CANCELED']:
-                                        active_target_symbol, order_result, trade_result, novo_saldo_usdt, oco_timestamp, fee, trade_result_liquid = await process_order_details(
-                                            active_target_symbol, client, limit_details, stop_details, price, executed_qty, order_val_usdt
-                                        )
-
-                                        total_difference += trade_result
-                                        total_difference_liquid += trade_result_liquid
-                                        
-                                        bnb_balance_free = float((await client.get_asset_balance(asset='BNB'))['free'])
-                                        bnb_price = await get_bnb_price(client)
-                                        
-                                        if order_result:
-                                            log_and_notify_results(order_result, active_target_symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_free * bnb_price, log=log)
-                                            data_row = create_data_row(
-                                                order_count, saldo_inicial_usdt, novo_saldo_usdt, active_target_symbol,
-                                                executed_qty, price, purchase_timestamp, lucro_alvo, stop_loss, stop_limit,
-                                                order_result, oco_timestamp, trade_result, total_difference, novo_saldo_usdt,
-                                                rsi, executed_condition, vwap, candle_open, candle_high, candle_low, candle_close, candle_volume, 
-                                                variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, TRADING_CONFIG['volume_avg'], 
-                                                amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid,
-                                                total_difference_liquid, gemini_response, bnb_balance_free * bnb_price
-                                            )
-                                            save_to_csv(data_row)
-                                            break
-                                except Exception as poll_err:
-                                    status(f"⚠️ Polling de Ordem: {poll_err}")
+                        await monitor_oco_lifecycle(
+                            client, bsm, active_target_symbol, oco_order, limit_order_id, stop_order_id,
+                            price, executed_qty, order_val_usdt, lucro_alvo, stop_loss, target_symbol_info,
+                            tick_size, step_size, log, status, saldo_inicial_usdt, order_count, purchase_timestamp,
+                            executed_condition, rsi, vwap, candle_open, candle_high, candle_low, candle_close,
+                            candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100,
+                            ema200, candle_patterns, amplitude, macd_current, signal_line_current, lower_band,
+                            middle_band, upper_band, trend_is_up, gemini_response, db
+                        )
             except Exception as trade_exec_err:
                 log(f"⚠️ Erro recuperável na execução de ordem: {trade_exec_err}")
 
