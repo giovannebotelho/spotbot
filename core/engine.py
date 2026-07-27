@@ -265,29 +265,43 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             try:
                 c = await BinanceAsyncClient.create(api_key, api_secret)
                 await sync_binance_time(c, log=lambda m: None)
-                open_ocos = await c.get_open_oco_orders()
                 open_orders = await c.get_open_orders()
                 
-                if not open_ocos and not open_orders:
+                if not open_orders:
                     return "ℹ️ <b>Nenhuma ordem OCO ou posição em aberto no momento.</b>\nO SpotBot Pro está varrendo o mercado em busca de novas oportunidades!"
                 
+                grouped = {}
+                for o in open_orders:
+                    sym = o.get('symbol', 'N/A')
+                    list_id = o.get('orderListId', -1)
+                    key = (sym, list_id)
+                    if key not in grouped:
+                        grouped[key] = {'symbol': sym, 'tp': 'N/A', 'sl': 'N/A', 'qty': '0'}
+                    
+                    qty_v = float(o.get('origQty', 0))
+                    if qty_v > 0:
+                        grouped[key]['qty'] = f"{qty_v:.2f}"
+                        
+                    o_type = o.get('type', '')
+                    if o_type == 'LIMIT_MAKER':
+                        price_v = float(o.get('price', 0))
+                        if price_v > 0:
+                            grouped[key]['tp'] = f"${price_v:.4f}"
+                    elif 'STOP' in o_type:
+                        stop_v = float(o.get('stopPrice', 0))
+                        if stop_v == 0:
+                            stop_v = float(o.get('price', 0))
+                        if stop_v > 0:
+                            grouped[key]['sl'] = f"${stop_v:.4f}"
+
                 lines = ["🎯 <b>ORDENS OCO & POSIÇÕES ATIVAS</b>\n━━━━━━━━━━━━━━━━━━━"]
-                if open_ocos:
-                    for oco in open_ocos:
-                        sym = oco.get('symbol', 'N/A')
-                        orders = oco.get('orders', [])
-                        limit_price = "N/A"
-                        stop_price = "N/A"
-                        for o in orders:
-                            if o.get('type') == 'LIMIT_MAKER':
-                                limit_price = f"${float(o.get('price', 0)):.4f}"
-                            elif 'STOP' in o.get('type', ''):
-                                stop_price = f"${float(o.get('stopPrice', o.get('price', 0))):.4f}"
-                        lines.append(f"🪙 Par: <b>{sym}</b>\n🟢 Take Profit (TP): <b>{limit_price}</b> (+4.0%)\n🔴 Stop Loss (SL): <b>{stop_price}</b> (-2.0%)\n")
-                elif open_orders:
-                    for o in open_orders:
-                        lines.append(f"🪙 Par: <b>{o['symbol']}</b> | Tipo: <b>{o['type']}</b> | Preço: <b>${float(o['price']):.4f}</b>")
-                
+                for (sym, list_id), data in grouped.items():
+                    lines.append(
+                        f"🪙 Par: <b>{data['symbol']}</b>\n"
+                        f"📦 Quantidade: <b>{data['qty']}</b>\n"
+                        f"🟢 Take Profit (TP): <b>{data['tp']}</b> (+4.0%)\n"
+                        f"🔴 Stop Loss (SL): <b>{data['sl']}</b> (-2.0%)\n"
+                    )
                 return "\n".join(lines)
             except Exception as e:
                 return f"Erro ao buscar ordens OCO: {e}"
