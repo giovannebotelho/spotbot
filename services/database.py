@@ -1,8 +1,11 @@
 import sqlite3
 import json
 import pandas as pd
+import warnings
 from pathlib import Path
 from config.settings import DATABASE_URL, BASE_DIR
+
+warnings.filterwarnings("ignore", category=UserWarning)
 
 class DatabaseManager:
     def __init__(self, db_url=None):

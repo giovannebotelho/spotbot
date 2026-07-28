@@ -59,7 +59,7 @@ async def update_data():
             if bnb_usdt_val: bnb_usdt_val.text = f"~${balances['bnb_usdt']:.2f}"
             if usdt_val: usdt_val.text = f"${balances['usdt']:.2f}"
         
-        stats = db.get_stats()
+        stats = await asyncio.to_thread(db.get_stats)
         if total_profit_val:
             total_profit_val.text = f"${stats['total_net_profit']:.2f}"
             total_profit_val.classes(remove='text-emerald-400 text-rose-400', add='text-[#00F5A0]' if stats['total_net_profit'] >= 0 else 'text-[#FF2E93]')
@@ -471,7 +471,7 @@ async def index():
                           
                          log_ui = ui.log().classes('w-full h-full font-mono text-[0.65rem] bg-[#080B10] text-emerald-400 p-3 rounded-none border-none leading-tight')
 
-        ui.timer(3.0, update_data)
+        ui.timer(5.0, update_data)
 
 def start_dashboard():
     port = DASHBOARD_CONFIG['port']
