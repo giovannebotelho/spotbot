@@ -172,3 +172,53 @@ def interpret_gemini_response(response_text):
     except Exception as e:
         print(f"Erro ao interpretar resposta da IA: {e}")
         return None
+
+def analyze_news_sentiment_with_gemini(headlines, api_key=None):
+    """
+    FASE 5 (v4.0): Classificador de Sentimento e Pânico Noticioso via IA Gemini.
+    Avalia manchetes de notícias do mercado cripto e atribui uma nota de sentimento de 0 (Pânico) a 100 (Extase).
+    Retorna: (sentiment_score: int, is_panic: bool, summary: str)
+    """
+    global _last_429_time
+    if time.time() - _last_429_time < COOLDOWN_429_SECONDS:
+        return 75, False, "Mercado estável (Gemini Cooldown)."
+
+    if not api_key:
+        api_key = API_KEYS.get('gemini')
+    if not api_key:
+        return 75, False, "Sem chave Gemini configurada."
+
+    if not headlines:
+        return 75, False, "Sem notícias relevantes."
+
+    news_text = "\n".join([f"- {h}" for h in headlines[:5]])
+    prompt = (
+        "Você é um classificador quantitativo de sentimento de mercado cripto.\n"
+        "Avalie as manchetes recentes abaixo e determine se há PÂNICO CATASTRÓFICO de mercado.\n\n"
+        "Retorne APENAS um JSON com o formato:\n"
+        '{"sentiment_score": 85, "is_panic": false, "summary": "Descrição concisa em português"}\n\n'
+        "Regras:\n"
+        "- sentiment_score de 0 a 29: Pânico Extremo (Processo regulatório grave, hack massivo, falência).\n"
+        "- sentiment_score de 30 a 100: Sentimento Neutro ou Positivo.\n\n"
+        f"MANCHETES:\n{news_text}"
+    )
+
+    try:
+        from google import genai
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        if response and response.text:
+            text = response.text.replace('```json', '').replace('```', '').strip()
+            data = json.loads(text)
+            score = int(data.get('sentiment_score', 75))
+            is_panic = bool(data.get('is_panic', False) or score < 30)
+            summary = str(data.get('summary', 'Análise concluída.'))
+            return score, is_panic, summary
+    except Exception as e:
+        if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+            _last_429_time = time.time()
+
+    return 75, False, "Sentimento Neutro (Sem pânico detectado)."

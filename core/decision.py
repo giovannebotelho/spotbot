@@ -12,7 +12,8 @@ from core.indicators import (
     analyze_futures_squeeze_potential, calculate_orderbook_imbalance, calculate_multi_timeframe_confluence,
     detect_orderbook_whale_walls, calculate_atr
 )
-from services.gemini_ai import analyze_with_gemini
+from services.gemini_ai import analyze_with_gemini, analyze_news_sentiment_with_gemini
+from services.news_scanner import fetch_crypto_news
 from services.database import DatabaseManager
 
 db = DatabaseManager()
@@ -224,6 +225,21 @@ def interpret_gemini_response(response_text):
 async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_close, lower_band, middle_band, upper_band, vwap, candle_patterns, candle_open, candle_high, candle_low, 
                      candle_close, candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, client, symbol, klines, silent=False, config_override=None, klines_4h=None):
     
+    # 0. FASE 5 (v4.0): AI Sentiment & Market Panic Scanner
+    try:
+        headlines = await fetch_crypto_news(symbol)
+        news_score, is_panic_news, panic_summary = analyze_news_sentiment_with_gemini(headlines)
+        if is_panic_news or news_score < 30:
+            return {
+                "buy": False,
+                "message": f"Modo Defesa Ativado: Pânico Noticioso IA (Score {news_score}/100 - {panic_summary})",
+                "candle_data": "",
+                "gemini_response": None,
+                "regime": "REGIME_CRASH_PANIC"
+            }
+    except Exception:
+        news_score, is_panic_news, panic_summary = 75, False, "Estável"
+
     # 1. Validação de Regime de Mercado (Fase 1: Regime Switcher)
     regime, hurst_val = detect_market_regime(klines)
     if regime == "REGIME_CRASH_PANIC":

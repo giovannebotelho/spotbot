@@ -20,6 +20,8 @@ from core.decision import (
 )
 from core.post_trade import process_order_details, log_and_notify_results, create_data_row, save_to_csv
 from services.telegram_notifier import send_telegram_message, send_telegram_document, TelegramBot
+from services.news_scanner import fetch_crypto_news
+from services.gemini_ai import analyze_news_sentiment_with_gemini
 from services.database import DatabaseManager
 from services.pdf_generator import generate_weekly_telemetry_pdf
 from utils.formatting import remove_ansi_codes
@@ -482,12 +484,32 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             finally:
                 if c: await c.close_connection()
 
+        elif cmd in ['/noticias', '/sentimento', '/news']:
+            try:
+                target_asset = bot_status_data.get('target_asset', 'BTCUSDT')
+                headlines = await fetch_crypto_news(target_asset)
+                score, is_panic, summary = analyze_news_sentiment_with_gemini(headlines)
+                status_emoji = "🚨 PÂNICO" if is_panic else "🟢 ESTÁVEL"
+                
+                lines = [
+                    f"📰 <b>SENTIMENTO DE MERCADO & NOTÍCIAS (IA)</b>\n━━━━━━━━━━━━━━━━━━━",
+                    f"🎯 <b>Status</b>: <b>{status_emoji}</b> | <b>Score IA</b>: <b>{score}/100</b>",
+                    f"💡 <b>Análise IA Gemini</b>: <i>{summary}</i>\n",
+                    f"<b>Manchetes Recentes (CryptoPanic)</b>:"
+                ]
+                for h in headlines[:4]:
+                    lines.append(f"• <i>{h}</i>")
+                return "\n".join(lines)
+            except Exception as e:
+                return f"Erro ao buscar notícias: {e}"
+
         elif cmd == '/ajuda':
             return (
                 "📚 <b>COMANDOS DISPONÍVEIS (SPOTBOT PRO)</b>\n"
                 "━━━━━━━━━━━━━━━━━━━\n"
                 "/status - Exibe o ativo em foco, RSI e status do robô\n"
                 "/saldo - Exibe saldos USDT, BNB e cálculo de slots\n"
+                "/noticias - Exibe o sentimento de mercado e manchetes em tempo real via IA\n"
                 "/ocos ou /ordens - Exibe as ordens OCO e posições ativas em tempo real\n"
                 "/top20 ou /scanner - Varre a força relativa dos Top 20 ativos\n"
                 "/lucro ou /perf - Exibe o lucro total líquido acumulado\n"
