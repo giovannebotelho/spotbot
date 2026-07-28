@@ -508,3 +508,25 @@ def calculate_atr(klines, period=14):
     atr_pct = (atr_value / last_close) if last_close > 0 else 0.02
 
     return atr_value, atr_pct
+
+def calculate_fibonacci_supports(klines, period=50):
+    """
+    FASE 1 (v5.0): Cálculo de Suportes de Fibonacci Institucionais.
+    Identifica a máxima e a mínima recente da tendência e calcula os níveis de retração de 61.8% e 78.6%.
+    Retorna: (fib_618: float, fib_786: float, swing_high: float, swing_low: float)
+    """
+    if not klines or len(klines) < 20:
+        return 0.0, 0.0, 0.0, 0.0
+
+    recent_klines = klines[-period:] if len(klines) >= period else klines
+    highs = [float(k[2]) for k in recent_klines]
+    lows = [float(k[3]) for k in recent_klines]
+
+    swing_high = max(highs)
+    swing_low = min(lows)
+    diff = swing_high - swing_low
+
+    fib_618 = swing_high - (diff * 0.618)
+    fib_786 = swing_high - (diff * 0.786)
+
+    return fib_618, fib_786, swing_high, swing_low

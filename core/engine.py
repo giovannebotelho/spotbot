@@ -12,7 +12,8 @@ from config.settings import API_KEYS, TELEGRAM_CONFIG, TRADING_CONFIG, RSI_CONFI
 from services.binance_client import extract_closes, extract_volumes, get_usdt_balance, get_order_details, get_klines, get_bnb_price, get_multi_klines
 from core.indicators import (
     calculate_rsi, calculate_macd, calculate_bollinger_bands, check_trend, check_candle_patterns,
-    calculate_vwap, get_candle_details, calculate_ema, is_market_downward, calculate_relative_strength_rank
+    calculate_vwap, get_candle_details, calculate_ema, is_market_downward, calculate_relative_strength_rank,
+    calculate_fibonacci_supports
 )
 from core.decision import (
     should_place_order, should_buy, should_sell, adjust_and_place_oco_order, get_min_notional,
@@ -157,6 +158,7 @@ async def monitor_oco_lifecycle(
     highest_price = price
     current_stop_loss = stop_loss
     partial_take_done = False
+    dca_done = False
 
     use_ws_monitoring = True
     try:
@@ -170,6 +172,62 @@ async def monitor_oco_lifecycle(
                         status(f"⏳ Monitorando OCO ({active_target_symbol})... Preço: ${cur_price:.2f}")
                         
                         profit_pct = (cur_price - price) / price if price > 0 else 0
+
+                        # FASE 1 (v5.0): Smart Recovery DCA em Suporte de Fibonacci para Flash Dumps
+                        if not dca_done and not partial_take_done and cur_price < price * 0.988:
+                            try:
+                                klines_dca = await get_klines(client, active_target_symbol, '15m', 50)
+                                fib_618, fib_786, _, _ = calculate_fibonacci_supports(klines_dca)
+                                
+                                if cur_price <= fib_618 * 1.002 or cur_price <= fib_786 * 1.002:
+                                    usdt_avail = await get_usdt_balance(client)
+                                    min_not = get_min_notional(target_symbol_info)
+                                    dca_val_usdt = max(min_not, min(usdt_avail * 0.98, order_val_usdt * 0.5))
+                                    
+                                    if usdt_avail >= min_not and dca_val_usdt >= min_not:
+                                        await client.cancel_order(symbol=active_target_symbol, orderListId=oco_order['orderListId'])
+                                        dca_buy = await client.order_market_buy(symbol=active_target_symbol, quoteOrderQty=round(dca_val_usdt, 2))
+                                        dca_qty = float(dca_buy['executedQty'])
+                                        dca_price = float(dca_buy['fills'][0]['price'])
+                                        
+                                        total_qty = executed_qty + dca_qty
+                                        new_pm = ((executed_qty * price) + (dca_qty * dca_price)) / total_qty
+                                        
+                                        log(f"🧪 \033[1;36mSmart Recovery DCA Executado\033[0m em \033[1;33m{active_target_symbol}\033[0m no Suporte de Fibonacci 61.8% (${dca_price:.4f})!")
+                                        log(f"📉 Preço Médio ajustado de ${price:.4f} para \033[1;32m${new_pm:.4f}\033[0m! Re-posicionando TP/SL de recuperação...")
+                                        
+                                        prec_p = get_precision(tick_size)
+                                        prec_q = get_precision(step_size)
+                                        prec_qty_val = round(math.floor(total_qty / step_size) * step_size, prec_q)
+                                        
+                                        new_tp = adjust_price_to_tick_size(new_pm * 1.008, tick_size)
+                                        new_sl = adjust_price_to_tick_size(new_pm * 0.985, tick_size)
+                                        new_sl_limit = adjust_price_to_tick_size(new_sl * 0.999, tick_size)
+                                        
+                                        oco_order = await place_safe_oco_sell_order(
+                                            client, active_target_symbol, prec_qty_val, new_tp, new_sl, new_sl_limit, prec_p, prec_q
+                                        )
+                                        limit_order_id = oco_order['orders'][1]['orderId']
+                                        stop_order_id = oco_order['orders'][0]['orderId']
+                                        
+                                        price = new_pm
+                                        executed_qty = prec_qty_val
+                                        lucro_alvo = new_tp
+                                        stop_loss = new_sl
+                                        current_stop_loss = new_sl
+                                        dca_done = True
+                                        
+                                        if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                                            asyncio.create_task(send_telegram_message(
+                                                TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                                                f"🧪 <b>Smart Recovery DCA Executado!</b>\n\n"
+                                                f"🪙 Par: <b>{active_target_symbol}</b>\n"
+                                                f"📉 Recompra efetuada no Suporte Fibonacci 61.8% (<b>${dca_price:.4f}</b>)\n"
+                                                f"🎯 <b>Novo Preço Médio: ${new_pm:.4f}</b>\n"
+                                                f"🛡️ Take Profit de recuperação ajustado para <b>${new_tp:.4f} (+0.8%)</b>!"
+                                            ))
+                            except Exception as e_dca:
+                                log(f"Aviso no Smart Recovery DCA: {e_dca}")
 
                         if profit_pct >= 0.015 and not partial_take_done:
                             try:
