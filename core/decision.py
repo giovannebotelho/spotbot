@@ -6,11 +6,11 @@ from datetime import datetime
 import pandas as pd
 
 from config.settings import API_KEYS, TRADING_CONFIG, RSI_CONFIG
-from services.binance_client import get_order_details, get_futures_analytics, get_order_book, get_multi_timeframe_klines, get_lead_lag_btc_klines
+from services.binance_client import get_order_details, get_futures_analytics, get_order_book, get_multi_timeframe_klines, get_lead_lag_btc_klines, get_recent_trades_cvd
 from core.indicators import (
     detect_market_regime, detect_liquidity_sweep, calculate_ema, calculate_adx,
     analyze_futures_squeeze_potential, calculate_orderbook_imbalance, calculate_multi_timeframe_confluence,
-    detect_orderbook_whale_walls, calculate_atr, calculate_lead_lag_alpha
+    detect_orderbook_whale_walls, calculate_atr, calculate_lead_lag_alpha, calculate_cvd_trend
 )
 from services.gemini_ai import analyze_with_gemini, analyze_news_sentiment_with_gemini
 from services.news_scanner import fetch_crypto_news
@@ -294,6 +294,26 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
                 "gemini_analysis": None,
                 "regime": regime,
                 "position_multiplier": 1.5,
+                "futures_data": futures_data,
+                "orderbook_imbalance": ob_ratio
+            }
+    except Exception:
+        pass
+
+    # 3.3. FASE 3 (v5.0): Order Flow Cumulative Volume Delta (CVD Tape Reading)
+    try:
+        recent_trades = await get_recent_trades_cvd(client, symbol, limit=500)
+        cvd_val_usdt, buy_ratio_pct, is_bullish_cvd = calculate_cvd_trend(recent_trades)
+        if is_bullish_cvd and rsi <= 55:
+            mult = 2.0 if cvd_val_usdt >= 50000 else 1.0
+            return {
+                "buy": True,
+                "message": f"📊 TAPE READING CVD: AGRESSÃO COMPRADORA ({buy_ratio_pct:.1f}% Buys | +${cvd_val_usdt:,.0f} USDT) ({regime})",
+                "candle_data": "",
+                "gemini_response": None,
+                "gemini_analysis": None,
+                "regime": regime,
+                "position_multiplier": mult,
                 "futures_data": futures_data,
                 "orderbook_imbalance": ob_ratio
             }

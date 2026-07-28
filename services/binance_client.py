@@ -114,3 +114,13 @@ async def get_lead_lag_btc_klines(client):
         return await client.get_klines(symbol="BTCUSDT", interval="1m", limit=15)
     except Exception:
         return []
+
+async def get_recent_trades_cvd(client, symbol, limit=500):
+    """
+    FASE 3 (v5.0): Obtém as últimas 500 negociações a mercado para cálculo do
+    Cumulative Volume Delta (CVD Tape Reading Engine).
+    """
+    try:
+        return await client.get_recent_trades(symbol=symbol, limit=limit)
+    except Exception:
+        return []

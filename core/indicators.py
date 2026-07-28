@@ -564,3 +564,34 @@ def calculate_lead_lag_alpha(btc_klines, altcoin_klines):
         return True, btc_change_pct, f"🔥 LEAD-LAG ALPHA: BTC IMPULSE (+{btc_change_pct:.2f}% em 3m)"
 
     return False, btc_change_pct, "Sem impulso de antecipação BTC"
+
+def calculate_cvd_trend(trades_data):
+    """
+    FASE 3 (v5.0): Cumulative Volume Delta (CVD Tape Reading Engine).
+    Calcula a diferença acumulada entre o volume de compras a mercado e vendas a mercado.
+    Retorna: (cvd_usdt: float, buy_ratio_pct: float, is_bullish_cvd: bool)
+    """
+    if not trades_data:
+        return 0.0, 50.0, False
+
+    buy_vol_usdt = 0.0
+    sell_vol_usdt = 0.0
+
+    for t in trades_data:
+        p = float(t.get('price', 0))
+        q = float(t.get('qty', 0))
+        val = p * q
+        is_buyer_maker = t.get('isBuyerMaker', False)
+
+        if is_buyer_maker:
+            sell_vol_usdt += val
+        else:
+            buy_vol_usdt += val
+
+    total_vol = buy_vol_usdt + sell_vol_usdt
+    cvd_usdt = buy_vol_usdt - sell_vol_usdt
+    buy_ratio_pct = (buy_vol_usdt / total_vol) * 100.0 if total_vol > 0 else 50.0
+
+    is_bullish_cvd = (buy_ratio_pct >= 60.0) and (cvd_usdt > 0)
+
+    return cvd_usdt, buy_ratio_pct, is_bullish_cvd
