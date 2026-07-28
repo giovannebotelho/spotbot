@@ -168,31 +168,38 @@ class DatabaseManager:
         self.close()
 
     def get_recent_trades(self, limit=20):
-        self.connect()
-        query = f"SELECT * FROM trades ORDER BY id DESC LIMIT {limit}"
-        df = pd.read_sql_query(query, self.conn)
-        self.close()
-        
-        if df.empty:
-            return pd.DataFrame()
+        try:
+            self.connect()
+            query = f"SELECT * FROM trades ORDER BY id DESC LIMIT {limit}"
+            df = pd.read_sql_query(query, self.conn)
+            self.close()
             
-        df = df.sort_values('id', ascending=True)
-        restored_rows = []
-        for _, row in df.iterrows():
-            raw = row.get('raw_data')
-            if raw:
-                try:
-                    data = json.loads(raw)
-                    restored_rows.append(data)
-                except Exception:
-                    pass
-        
-        return pd.DataFrame(restored_rows)
+            if df.empty:
+                return pd.DataFrame()
+                
+            df = df.sort_values('id', ascending=True)
+            restored_rows = []
+            for _, row in df.iterrows():
+                raw = row.get('raw_data')
+                if raw:
+                    try:
+                        data = json.loads(raw)
+                        restored_rows.append(data)
+                    except Exception:
+                        pass
+            
+            return pd.DataFrame(restored_rows)
+        except Exception:
+            try:
+                self.create_tables()
+            except Exception:
+                pass
+            return pd.DataFrame()
 
     def get_stats(self):
-        self.connect()
-        cursor = self.conn.cursor()
         try:
+            self.connect()
+            cursor = self.conn.cursor()
             cursor.execute("SELECT COUNT(*) as total FROM trades")
             row = cursor.fetchone()
             total_trades = row['total'] if self.is_postgres else row[0]
@@ -216,7 +223,10 @@ class DatabaseManager:
                 "total_net_profit": total_net_profit
             }
         except Exception as e:
-            print(f"Erro ao obter estatísticas do banco: {e}")
+            try:
+                self.create_tables()
+            except Exception:
+                pass
             return {
                 "total_trades": 0, "wins": 0, "losses": 0, "win_rate": 0, "total_net_profit": 0.0
             }
