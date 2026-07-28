@@ -415,8 +415,8 @@ async def index():
                     status_ui = ui.markdown('**Aguardando...**').classes('text-xs text-slate-300 leading-relaxed w-full break-words')
 
             # Painel Central de Gráfico e Tabelas
-            with ui.column().classes('w-full lg:flex-grow h-auto lg:h-screen p-0 overflow-hidden relative bg-[#0B0E14]'):
-                 chart_card = ui.card().classes('w-full h-[320px] lg:h-[60vh] p-0 rounded-none bg-[#0B0E14] border-b border-slate-800 gap-0 shadow-none relative transition-all')
+            with ui.column().classes('w-full lg:flex-grow h-auto p-0 relative bg-[#0B0E14]'):
+                 chart_card = ui.card().classes('w-full h-[360px] lg:h-[480px] p-0 rounded-none bg-[#0B0E14] border-b border-slate-800 gap-0 shadow-none relative flex-shrink-0')
                  with chart_card:
                      # Badge Flutuante no Canto Superior Direito
                      chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('absolute top-3 right-4 z-20 obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-[#00E5FF] border border-cyan-500/30 backdrop-blur-md shadow-lg')
@@ -441,8 +441,8 @@ async def index():
                          with ai_reason_scroll:
                              ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-[0.65rem] text-slate-300 leading-relaxed')
 
-                     # ECharts com Cores Cyberpunk Neon
-                     with ui.element('div').classes('w-full h-full'):
+                     # ECharts com Cores Cyberpunk Neon e Altura Fixa Garantida
+                     with ui.element('div').classes('w-full h-[360px] lg:h-[480px]'):
                          candle_chart = ui.echart({
                             'backgroundColor': '#0B0E14',
                             'title': {

@@ -912,5 +912,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
     except Exception as e:
         log(f"\n⚠️ Erro de execução: {e}")
     finally:
+        bot_running = False
+        bot_status_data['is_running'] = False
         if client:
             await client.close_connection()
