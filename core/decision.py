@@ -9,7 +9,8 @@ from config.settings import API_KEYS, TRADING_CONFIG, RSI_CONFIG
 from services.binance_client import get_order_details, get_futures_analytics, get_order_book, get_multi_timeframe_klines
 from core.indicators import (
     detect_market_regime, detect_liquidity_sweep, calculate_ema, calculate_adx,
-    analyze_futures_squeeze_potential, calculate_orderbook_imbalance, calculate_multi_timeframe_confluence
+    analyze_futures_squeeze_potential, calculate_orderbook_imbalance, calculate_multi_timeframe_confluence,
+    detect_orderbook_whale_walls
 )
 from services.gemini_ai import analyze_with_gemini
 from services.database import DatabaseManager
@@ -413,8 +414,27 @@ async def adjust_and_place_oco_order(client, symbol, quantity, price_tick_size, 
     stop_loss_pct = 0.02
     take_profit_pct = 0.04
 
-    take_profit_price = current_price * (1 + take_profit_pct)
-    stop_loss_price = current_price * (1 - stop_loss_pct)
+    raw_tp = current_price * (1 + take_profit_pct)
+    raw_sl = current_price * (1 - stop_loss_pct)
+
+    # FASE 3 (v4.0): Proteção de Muro de Baleias no Orderbook (Depth 50)
+    try:
+        ob_50 = await get_order_book(client, symbol, depth=50)
+        adj_tp, adj_sl, wall_detected, wall_info = detect_orderbook_whale_walls(
+            ob_50, current_price, raw_tp, raw_sl, tick_size
+        )
+        if wall_detected and wall_info:
+            w_p = wall_info['wall_price']
+            w_usdt = wall_info['wall_usdt']
+            log(f"🛡️ \033[1;36mWhale Wall Protection\033[0m: Muro de Venda detectado em \033[1;33m${w_p:.4f}\033[0m (~${w_usdt:,.0f} USDT)!")
+            log(f"🎯 Take Profit antecipado de ${raw_tp:.4f} para \033[1;32m${adj_tp:.4f}\033[0m (0.15% antes do muro da baleia).")
+            take_profit_price = adj_tp
+        else:
+            take_profit_price = raw_tp
+    except Exception:
+        take_profit_price = raw_tp
+
+    stop_loss_price = raw_sl
     stop_limit_price = stop_loss_price * 0.999
 
     take_profit_price = adjust_price_to_tick_size(take_profit_price, tick_size)

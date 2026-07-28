@@ -426,3 +426,55 @@ def calculate_multi_timeframe_confluence(klines_4h, klines_1h, klines_15m):
 
     is_confluent = score >= 70
     return score, is_confluent, details
+
+def detect_orderbook_whale_walls(orderbook, current_price, raw_tp_price, raw_sl_price, tick_size=0.0001):
+    """
+    FASE 3 (v4.0): Orderbook 50 Depth & Whale Wall TP/SL Protection.
+    Escaneia os 50 níveis do Livro de Ofertas da Binance e ajusta o Take Profit
+    para ficar 0.15% ANTES de muros de venda massivos de baleias.
+    Retorna: (adjusted_tp, adjusted_sl, wall_detected, wall_info)
+    """
+    if not orderbook or 'asks' not in orderbook or not orderbook['asks']:
+        return raw_tp_price, raw_sl_price, False, None
+
+    asks = orderbook.get('asks', [])
+    if len(asks) < 5:
+        return raw_tp_price, raw_sl_price, False, None
+
+    ask_levels = []
+    total_qty = 0.0
+    for p_str, q_str in asks[:50]:
+        p = float(p_str)
+        q = float(q_str)
+        val = p * q
+        ask_levels.append({'price': p, 'qty': q, 'usdt': val})
+        total_qty += q
+
+    avg_qty = total_qty / len(ask_levels) if ask_levels else 1.0
+    wall_threshold = avg_qty * 3.0
+
+    adjusted_tp = raw_tp_price
+    adjusted_sl = raw_sl_price
+    wall_detected = False
+    wall_info = None
+
+    for level in ask_levels:
+        wall_p = level['price']
+        wall_q = level['qty']
+        
+        if wall_p > current_price and wall_p <= raw_tp_price * 1.002:
+            if wall_q >= wall_threshold or level['usdt'] >= 25000:
+                safe_tp = wall_p * 0.9985
+                if safe_tp > current_price * 1.01:
+                    adjusted_tp = safe_tp
+                    wall_detected = True
+                    wall_info = {
+                        'wall_price': wall_p,
+                        'wall_qty': wall_q,
+                        'wall_usdt': level['usdt'],
+                        'original_tp': raw_tp_price,
+                        'adjusted_tp': adjusted_tp
+                    }
+                    break
+
+    return adjusted_tp, adjusted_sl, wall_detected, wall_info
