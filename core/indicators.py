@@ -478,3 +478,33 @@ def detect_orderbook_whale_walls(orderbook, current_price, raw_tp_price, raw_sl_
                     break
 
     return adjusted_tp, adjusted_sl, wall_detected, wall_info
+
+def calculate_atr(klines, period=14):
+    """
+    FASE 4 (v4.0): Indicador ATR (Average True Range).
+    Calcula o True Range e o ATR percentual para medição da volatilidade real do ativo.
+    Retorna: (atr_value: float, atr_pct: float)
+    """
+    if not klines or len(klines) < period + 1:
+        return 0.0, 0.02
+
+    highs = [float(k[2]) for k in klines]
+    lows = [float(k[3]) for k in klines]
+    closes = [float(k[4]) for k in klines]
+
+    tr_list = []
+    for i in range(1, len(klines)):
+        h = highs[i]
+        l = lows[i]
+        prev_c = closes[i-1]
+        tr = max(h - l, abs(h - prev_c), abs(l - prev_c))
+        tr_list.append(tr)
+
+    if not tr_list:
+        return 0.0, 0.02
+
+    atr_value = float(pd.Series(tr_list).rolling(window=period).mean().iloc[-1])
+    last_close = closes[-1]
+    atr_pct = (atr_value / last_close) if last_close > 0 else 0.02
+
+    return atr_value, atr_pct
