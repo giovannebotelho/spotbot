@@ -17,7 +17,8 @@ from core.indicators import (
 )
 from core.decision import (
     should_place_order, should_buy, should_sell, adjust_and_place_oco_order, get_min_notional,
-    adjust_price_to_tick_size, get_precision, calculate_dynamic_position_slots, place_safe_oco_sell_order
+    adjust_price_to_tick_size, get_precision, calculate_dynamic_position_slots, place_safe_oco_sell_order,
+    calculate_kelly_position_size
 )
 from core.post_trade import process_order_details, log_and_notify_results, create_data_row, save_to_csv
 from services.telegram_notifier import send_telegram_message, send_telegram_document, TelegramBot
@@ -432,6 +433,8 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 db_stats = db.get_stats()
                 acc_pnl = db_stats['total_net_profit']
                 slots, val_slot = calculate_dynamic_position_slots(usdt, accumulated_net_profit=acc_pnl)
+                kelly_val, kelly_pct, is_k_active = calculate_kelly_position_size(db, usdt)
+                kelly_str = f"${kelly_val:.2f} USDT ({kelly_pct*100:.1f}% Half-Kelly)" if is_k_active else f"${val_slot:.2f} USDT (Padrão)"
                 
                 return (
                     f"💰 <b>SALDOS & POSIÇÕES DA CARTEIRA</b>\n"
@@ -439,6 +442,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     f"💵 <b>USDT Disponível</b>: <b>${usdt:.2f}</b>\n"
                     f"🪙 <b>Saldo BNB</b>: <b>{bnb_free:.4f} BNB</b> (~${bnb_free*bnb_price:.2f})\n"
                     f"📈 <b>Lucro Acumulado</b>: <b>${acc_pnl:.2f} USDT</b>\n"
+                    f"🏆 <b>Lote Kelly Criterion</b>: <b>{kelly_str}</b>\n"
                     f"❄️ <i>Motor de Juros Compostos (Snowball) Ativo!</i>\n\n"
                     f"🎰 <b>Slots Calculados</b>: <b>{slots} posições</b> de <b>${val_slot:.2f} USDT</b> cada."
                 )
@@ -820,7 +824,14 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         
                         pos_multiplier = buy_result.get('position_multiplier', 1.0)
                         safe_usdt_limit = math.floor(usdt_balance * 0.99 * 100) / 100.0
-                        order_val_usdt = max(min_notional, min(safe_usdt_limit, round(slot_value * pos_multiplier, 2)))
+                        
+                        # FASE 5 (v5.0): Kelly Criterion Position Sizing Engine
+                        k_val, k_pct, is_k_act = calculate_kelly_position_size(db, usdt_balance, default_slot_value=slot_value)
+                        target_slot = k_val if is_k_act else slot_value
+                        if is_k_act:
+                            log(f"🏆 \033[1;36mKelly Criterion Sizing\033[0m: Lote dimensionado em \033[1;32m${target_slot:.2f} USDT\033[0m ({k_pct*100:.1f}% Half-Kelly).")
+
+                        order_val_usdt = max(min_notional, min(safe_usdt_limit, round(target_slot * pos_multiplier, 2)))
 
                         if usdt_balance < min_notional:
                             log(f"⚠️ Saldo insuficiente (${usdt_balance:.2f}) para o mínimo exigido (${min_notional}).")

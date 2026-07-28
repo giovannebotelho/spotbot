@@ -538,3 +538,34 @@ async def adjust_and_place_oco_order(client, symbol, quantity, price_tick_size, 
     except Exception as e:
         log(f"❌ Erro ao enviar ordem OCO: {e}")
         return None, None, None, None, None, None
+
+def calculate_kelly_position_size(db, usdt_balance, default_slot_value=20.0):
+    """
+    FASE 5 (v5.0): Kelly Criterion Position Sizing Engine.
+    Calcula o tamanho matematicamente ótimo da posição em USDT com base na Taxa de Vitória (Win Rate)
+    e no Payoff Ratio das últimas operações do banco de dados SQLite.
+    Aplica o "Half-Kelly" (50% de f*) para conter volatilidade e evitar risco de ruína.
+    Retorna: (slot_val_usdt: float, kelly_pct: float, is_kelly_active: bool)
+    """
+    try:
+        stats = db.get_stats()
+        total_trades = stats.get('total_trades', 0)
+        win_rate_pct = stats.get('win_rate', 60.0)
+
+        if total_trades < 5:
+            return default_slot_value, 0.20, False
+
+        p = win_rate_pct / 100.0
+        q = 1.0 - p
+        b = 2.0
+
+        f_kelly = (p * b - q) / b
+        half_kelly = max(0.10, min(0.40, f_kelly * 0.5))
+
+        slot_val_usdt = round(math.floor((usdt_balance * half_kelly) * 100) / 100.0, 2)
+        safe_min_notional = 6.0
+        slot_val_usdt = max(safe_min_notional, min(usdt_balance * 0.98, slot_val_usdt))
+
+        return slot_val_usdt, half_kelly, True
+    except Exception:
+        return default_slot_value, 0.20, False
