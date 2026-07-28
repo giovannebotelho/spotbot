@@ -595,3 +595,41 @@ def calculate_cvd_trend(trades_data):
     is_bullish_cvd = (buy_ratio_pct >= 60.0) and (cvd_usdt > 0)
 
     return cvd_usdt, buy_ratio_pct, is_bullish_cvd
+
+def calculate_pair_cointegration_zscore(klines_a, klines_b, period=50):
+    """
+    FASE 4 (v5.0): Cointegration Pair Trading & Statistical Arbitrage.
+    Calcula o Z-Score do spread da razão de preços entre o Ativo A e o Ativo B de referência.
+    Retorna: (z_score: float, is_stat_arb_buy: bool, ratio_mean: float, ratio_std: float)
+    """
+    if not klines_a or not klines_b or len(klines_a) < period or len(klines_b) < period:
+        return 0.0, False, 0.0, 0.0
+
+    closes_a = extract_closes(klines_a[-period:])
+    closes_b = extract_closes(klines_b[-period:])
+
+    min_len = min(len(closes_a), len(closes_b))
+    closes_a = closes_a[-min_len:]
+    closes_b = closes_b[-min_len:]
+
+    ratios = []
+    for ca, cb in zip(closes_a, closes_b):
+        if cb > 0:
+            ratios.append(ca / cb)
+
+    if not ratios or len(ratios) < 20:
+        return 0.0, False, 0.0, 0.0
+
+    series_ratios = pd.Series(ratios)
+    mean_val = series_ratios.mean()
+    std_val = series_ratios.std()
+
+    if std_val == 0:
+        return 0.0, False, mean_val, 0.0
+
+    current_ratio = ratios[-1]
+    z_score = (current_ratio - mean_val) / std_val
+
+    is_stat_arb_buy = (z_score <= -2.0)
+
+    return float(z_score), is_stat_arb_buy, float(mean_val), float(std_val)

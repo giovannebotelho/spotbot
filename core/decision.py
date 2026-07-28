@@ -10,7 +10,8 @@ from services.binance_client import get_order_details, get_futures_analytics, ge
 from core.indicators import (
     detect_market_regime, detect_liquidity_sweep, calculate_ema, calculate_adx,
     analyze_futures_squeeze_potential, calculate_orderbook_imbalance, calculate_multi_timeframe_confluence,
-    detect_orderbook_whale_walls, calculate_atr, calculate_lead_lag_alpha, calculate_cvd_trend
+    detect_orderbook_whale_walls, calculate_atr, calculate_lead_lag_alpha, calculate_cvd_trend,
+    calculate_pair_cointegration_zscore
 )
 from services.gemini_ai import analyze_with_gemini, analyze_news_sentiment_with_gemini
 from services.news_scanner import fetch_crypto_news
@@ -314,6 +315,26 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
                 "gemini_analysis": None,
                 "regime": regime,
                 "position_multiplier": mult,
+                "futures_data": futures_data,
+                "orderbook_imbalance": ob_ratio
+            }
+    except Exception:
+        pass
+
+    # 3.4. FASE 4 (v5.0): Cointegration Pair Trading & Statistical Arbitrage
+    try:
+        ref_symbol = "BTCUSDT" if symbol != "BTCUSDT" else "ETHUSDT"
+        ref_klines = await get_klines(client, ref_symbol, TRADING_CONFIG['interval'], 50)
+        z_score, is_stat_arb_buy, r_mean, r_std = calculate_pair_cointegration_zscore(klines, ref_klines)
+        if is_stat_arb_buy and rsi <= 55:
+            return {
+                "buy": True,
+                "message": f"⚖️ STATISTICAL ARBITRAGE: REVERSÃO À MÉDIA (Z-Score: {z_score:.2f}σ vs {ref_symbol}) ({regime})",
+                "candle_data": "",
+                "gemini_response": None,
+                "gemini_analysis": None,
+                "regime": regime,
+                "position_multiplier": 1.5,
                 "futures_data": futures_data,
                 "orderbook_imbalance": ob_ratio
             }
