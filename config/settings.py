@@ -6,32 +6,38 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+def clean_env(key, default=''):
+    val = os.getenv(key)
+    if not val:
+        return default
+    return str(val).strip().strip('"').strip("'").strip()
+
 API_KEYS = {
     'mainnet': {
-        'key': os.getenv('mainnet_api_key', ''),
-        'secret': os.getenv('mainnet_secret_key', ''),
+        'key': clean_env('mainnet_api_key', ''),
+        'secret': clean_env('mainnet_secret_key', ''),
     },
     'testnet_spot': {
-        'key': os.getenv('testnet_spot_api_key', ''),
-        'secret': os.getenv('testnet_spot_secret_key', ''),
+        'key': clean_env('testnet_spot_api_key', ''),
+        'secret': clean_env('testnet_spot_secret_key', ''),
     },
-    'gemini': os.getenv('GEMINI_API_KEY') or os.getenv('gemini_api_key') or os.getenv('gemini_api') or os.getenv('GEMINI_KEY') or os.getenv('gemini') or ''
+    'gemini': clean_env('GEMINI_API_KEY') or clean_env('gemini_api_key') or clean_env('gemini_api') or clean_env('GEMINI_KEY') or clean_env('gemini') or ''
 }
 
 TELEGRAM_CONFIG = {
-    'bot_token': os.getenv('bot_token', ''),
-    'chat_id': os.getenv('chat_id', '')
+    'bot_token': clean_env('bot_token', ''),
+    'chat_id': clean_env('chat_id', '')
 }
 
 DASHBOARD_CONFIG = {
-    'user': os.getenv('DASHBOARD_USER', 'admin'),
-    'password': os.getenv('DASHBOARD_PASSWORD', 'admin123'),
-    'port': int(os.getenv('PORT', '8080')),
-    'secret_key': os.getenv('SECRET_KEY', 'spotbot_secret_key_change_me')
+    'user': clean_env('DASHBOARD_USER', 'admin'),
+    'password': clean_env('DASHBOARD_PASSWORD', 'admin123'),
+    'port': int(clean_env('PORT', '8080')),
+    'secret_key': clean_env('SECRET_KEY') or clean_env('DASHBOARD_SECRET_KEY', 'spotbot_secret_key_change_me')
 }
 
 DB_CONFIG = {
-    'url': os.getenv('DATABASE_URL', 'sqlite:///spotbot.db')
+    'url': clean_env('DATABASE_URL', 'sqlite:///spotbot.db')
 }
 DATABASE_URL = DB_CONFIG['url']
 
