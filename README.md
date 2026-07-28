@@ -1,84 +1,95 @@
-# SpotBot Pro 🤖📈 — Institutional Quantitative AI Engine (v3.0-HEDGE_FUND)
+# SpotBot Pro 🤖📈 — Institutional Quantitative AI Engine (v5.0-WALL_STREET_QUANT)
 
-[![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Python Version](https://img.shields.io/badge/python-3.10%2B%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Binance Spot](https://img.shields.io/badge/Binance-Spot%20API-yellow.svg)](https://www.binance.com/)
 [![Google Gemini](https://img.shields.io/badge/Google-Gemini%202.5--Flash-4285F4.svg)](https://aistudio.google.com/)
-[![Architecture](https://img.shields.io/badge/Architecture-Hedge%20Fund%20v3.0-purple.svg)](docs/MASTER_ROADMAP_V3.md)
-[![Documentation PDF](https://img.shields.io/badge/Documentation-17%20Pages%20PDF-red.svg)](docs/SpotBot_Pro_Documentacao_Tecnica.pdf)
+[![Architecture](https://img.shields.io/badge/Architecture-Wall%20Street%20Quant%20v5.0-purple.svg)](https://github.com/giovannebotelho/spotbot-pro-hedgefund)
 
-**SpotBot Pro v3.0** é um sistema de negociação quantitativa de nível institucional no mercado **Spot e Futuros da Binance**, projetado com microestrutura de mercado (**Market Microstructure, Orderbook Imbalance, Futures Funding Squeeze, Smart Money Concepts - SMC**) e potencializado pela **Inteligência Artificial Generativa do Google Gemini (SDK `google-genai`)**.
+**SpotBot Pro v5.0** é um algoritmo de negociação quantitativa de nível institucional projetado com os pilares da microestrutura de mercado das grandes mesas de Wall Street (**Order Flow CVD Tape Reading, Cointegration Pair Trading, Correlation Lead-Lag Alpha, Smart Recovery DCA em Suportes de Fibonacci e Kelly Criterion Position Sizing**), integrado à **Inteligência Artificial Generativa do Google Gemini (SDK `google-genai`)**.
 
 ---
 
-## 🏛️ Arquitetura Quantitativa de Élite v3.0 (Hedge Fund Edition)
+## 🏛️ Arquitetura Quantitativa v5.0 (Wall Street Edition)
 
-O SpotBot Pro opera alimentado por um **Motor Quantitativo Multicamada v3.0**:
-
-```text
-  🟢 FASE 1: Motor de Regimes de Mercado (Hurst Exponent & Regime Switcher)
-     ↓
-  🔵 FASE 2: Caçador de Varredura de Liquidez (Smart Money Liquidity Sweeps - SMC)
-     ↓
-  📊 FASE A (v3.0): Futures Analytics (Funding Rate & Open Interest Squeeze Hunter)
-     ↓
-  📖 FASE B (v3.0): Orderbook Imbalance Scanner (Profundidade de Livro & Muros de Baleias)
-     ↓
-  🟣 FASE 3: Scanner 2.0 com Ranker de Força Relativa (Relative Strength vs BTC)
-     ↓
-  🟡 FASE 4: IA Gemini Score Quantitativo (Pontuação 0-100 & Dobrar Posição em Ouro 2x)
-     ↓
-  ❄️ FASE C (v3.0): Gestor Dinâmico de Juros Compostos (Snowball Compounding Engine)
-     ↓
-  🔴 FASE 5: Gestor de Saídas Dinâmicas (Realização Parcial Scalp Locking 50% + Breakeven)
-     ↓
-  📊 FASE D (v3.0): Relatório Semanal de Telemetria com PDF Automático no Telegram
+```mermaid
+graph TD
+    subgraph Quant_Engine_v5 ["🚀 SpotBot Pro v5.0 Wall Street Architecture"]
+        F5["📰 FASE 5 (v4.0): AI Panic News Scanner<br/>CryptoPanic + IA Gemini 2.5 Flash (Score 0-100)"] --> F1
+        F1["🧪 FASE 1 (v5.0): Smart Recovery DCA & Flash Dump Protection<br/>Recompra em Suporte Fibonacci 61.8% e TP em +0.8%"] --> F2
+        F2["⚡ FASE 2 (v5.0): Correlation Lead-Lag Alpha Engine<br/>Antecipação de impulso do BTC 1m em Altcoins (1.5x)"] --> F3
+        F3["📊 FASE 3 (v5.0): Order Flow CVD Tape Reading<br/>Análise de agressão a mercado em 500 trades (Buys >= 60%)"] --> F4
+        F4["⚖️ FASE 4 (v5.0): Cointegration Pair Trading & Stat-Arb<br/>Reversão à Média quando Z-Score <= -2.0 sigma"] --> KC
+        KC["🏆 FASE 5 (v5.0): Kelly Criterion Position Sizing<br/>Dimensionamento ótimo (Half-Kelly) via estatísticas do SQLite"] --> OCO["🎯 Ordem OCO Institucional Enviada para a Binance"]
+    end
 ```
 
 ---
 
-## 🚀 Novas Armas Quantitativas da Versão v3.0
+## 🚀 Armas Quantitativas da Versão v5.0
 
-### 1. 📊 Futures Analytics (Funding Rate & Open Interest Squeeze Hunter)
-- **Detecção de Short Squeeze**: Escanear em tempo real o *Funding Rate* ($<-0.01\%$) e *Open Interest* nos Futuros Perpétuos da Binance.
-- **Dobra de Posição**: Quando o mercado futuro está supersaturado de *Shorts* e ocorre um *SMC Liquidity Sweep*, o robô autoriza **dobrar a posição para 2.0x USDT**.
+### 1. 🧪 Smart Recovery DCA em Suportes de Fibonacci
+- **Proteção Contra Pavios**: Em *flash dumps* causados por liquidações de derivativos na Binance, o robô efetua uma única recompra de 50% no Suporte Institucional de Fibonacci (61.8% / 78.6%).
+- **Recuperação de PM**: Puxa o Preço Médio ($PM$) para baixo e re-posiciona a ordem OCO com Take Profit em apenas **+0.8% acima do novo $PM$**, garantindo saída no lucro no primeiro repique!
 
-### 2. 📖 Orderbook Imbalance Scanner (Muros de Baleias no Livro)
-- **Análise de Profundidade**: Soma o volume nos 20 primeiros níveis de ofertas ($Ratio = \frac{\sum Qty_{Bids}}{\sum Qty_{Asks}}$).
-- **Proteção Anti-Armadilha**: Cancela a compra se houver muro de vendas opressivo ($Ratio < 0.2$).
-- **Suporte Institucional**: Confirma *Buy Walls* de suporte de grandes players ($Ratio \ge 1.5$).
+### 2. ⚡ Correlation Lead-Lag Alpha Engine (Motor de Antecipação BTC/ETH)
+- **Arbitragem Temporal**: Detecta quando o `BTCUSDT` sofre um surto de volume e preço ($\ge +0.25\%$ em 3m) no gráfico de 1 minuto.
+- **Entrada Antecipada**: Entra na altcoin do Top 20 que ainda está em atraso estatístico (*Lag*) **antes** que o movimento se espalhe, alocando multiplicador **1.5x**.
 
-### 3. ❄️ Gestor Dinâmico de Juros Compostos (Snowball Compounding Engine)
-- Reinveste automaticamente os lucros líquidos acumulados do banco SQLite.
-- O calculador de slots expande dinamicamente a alocação de capital por ordem de forma exponencial (*Compound Interest*).
+### 3. 📊 Order Flow Cumulative Volume Delta (CVD Tape Reading)
+- **Leitura de Agressão**: Analisa as últimas 500 negociações executadas a mercado (*Market Orders*) na Binance Spot.
+- **Confirmador de Volume**: Dispara compras quando a agressão compradora atinge $\ge 60\%$ e **dobra o lote (2.0x)** se o delta acumulado ultrapassar **+$50.000 USDT**.
 
-### 4. 📊 Relatório Semanal em PDF no Telegram
-- Calcula o **Sharpe Ratio (Anualizado)**, **Profit Factor**, **Win Rate** e **Max Drawdown**.
-- Disparo automático todo domingo às 20:00 ou sob demanda enviando **`/relatorio`** ou **`/pdf`** no Telegram.
+### 4. ⚖️ Cointegration Pair Trading & Statistical Arbitrage
+- **Reversão à Média**: Monitora o Z-Score da razão de preço entre o ativo atual e o Bitcoin (`Price_Alt / Price_BTC`).
+- **Desvio Estatístico**: Abre compras por arbitragem estatística quando o ativo estiver a $Z \le -2.0\sigma$ de desvio-padrão abaixo da média histórica.
 
----
-
-## ✨ Recursos da Interface e Comandos Telegram
-
-- 🖥️ **Terminal Web Institucional (NiceGUI & ECharts)**:
-  - Gráfico K-Line em tempo real com Badge Dinâmico do Ativo Ativo, painel holográfico da IA Gemini e Ticker Bar contínuo responsivo.
-  - Botão de Emergência **CANCEL (CTRL+C)** para parada imediata de segurança.
-- 📱 **Bot Telegram Completo**:
-  - `/status`: Estado atual, ativo em foco, RSI e tendência.
-  - `/saldo`: Saldos USDT, BNB e slots com Juros Compostos.
-  - `/top20` ou `/scanner`: Top 5 oportunidades de Força Relativa.
-  - `/lucro` ou `/perf`: Lucro líquido total e Win Rate.
-  - `/relatorio` ou `/pdf`: Envia o PDF de Telemetria Executiva.
-  - `/cancel` ou `/abort`: Interrupção imediata de emergência.
+### 5. 🏆 Kelly Criterion & Monte Carlo Position Sizing
+- **Dimensionamento Matemático**: Substitui valores estáticos de ordem pela Fórmula do **Critério de Kelly** ($f^* = \frac{p \cdot b - q}{b}$), onde $p$ é a taxa de vitória real calculada a partir das operações salvas no banco SQLite.
+- **Half-Kelly Safety**: Aplica 50% de $f^*$ para manter a banca totalmente imune ao risco de ruína.
 
 ---
 
-## 📚 Documentação Técnica de Nível Dispositivos Médicos
+## 📱 Bot Telegram & Interface Web Dashboard
 
-Consulte a documentação completa e formal de arquitetura do projeto:
-- 📄 **Manual Técnico Completo (PDF 17 Páginas)**: [docs/SpotBot_Pro_Documentacao_Tecnica.pdf](docs/SpotBot_Pro_Documentacao_Tecnica.pdf)
-- 📝 **Documentação de Código e Módulos (Markdown)**: [docs/DOCUMENTATION.md](docs/DOCUMENTATION.md)
-- 🎯 **Plano Mestre v3.0**: [docs/MASTER_ROADMAP_V3.md](docs/MASTER_ROADMAP_V3.md)
+- 🖥️ **Dashboard Web Profissional (NiceGUI & Plotly)**:
+  - Gráficos K-Line interativos em tempo real com suporte a múltiplos timeframes.
+  - Ticker bar contínuo, cards de métricas em tempo real e botão de emergência **CANCEL (CTRL+C)**.
+- 📱 **Comandos Telegram Interativos**:
+  - `/status`: Exibe o ativo em foco, RSI, tendência e **Confluência MTF Score (4H+1H+15M)**.
+  - `/noticias` ou `/sentimento`: Exibe a classificação de pânico e notícias via **IA Gemini 2.5 Flash**.
+  - `/ocos` ou `/ordens`: Exibe os valores exatos de Take Profit, Stop Loss e posições ativas.
+  - `/saldo`: Saldos USDT, BNB e cálculo do **Lote Máximo do Critério de Kelly**.
+  - `/top20` ou `/scanner`: Varre o Rank de Força Relativa (RS vs BTC) dos 20 maiores criptoativos.
+  - `/lucro` ou `/perf`: Lucro líquido acumulado e Win Rate acumulado do banco SQLite.
+  - `/relatorio` ou `/pdf`: Gera e envia o **Relatório Executivo em PDF** no Telegram.
+
+---
+
+## ⚙️ Variáveis de Ambiente (`.env`)
+
+Configure o arquivo `.env` na raiz do projeto:
+
+```env
+# --- Configuração do Ambiente ---
+BOT_ENVIRONMENT=mainnet
+
+# --- Chaves Binance (Spot API) ---
+mainnet_api_key=SUA_CHAVE_API_BINANCE
+mainnet_secret_key=SEU_SECRET_KEY_BINANCE
+
+# --- Google Gemini IA ---
+gemini_api=SUA_CHAVE_API_GEMINI
+
+# --- Telegram Bot ---
+bot_token=SEU_TOKEN_TELEGRAM_BOT
+chat_id=SEU_CHAT_ID_TELEGRAM
+
+# --- Dashboard Web NiceGUI ---
+DASHBOARD_USER=admin
+DASHBOARD_PASSWORD=admin123
+SECRET_KEY=spotbot_secured_key_8823
+```
 
 ---
 
@@ -87,49 +98,51 @@ Consulte a documentação completa e formal de arquitetura do projeto:
 ```text
 spotbot/
 │
-├── config/                  # Configurações centralizadas e leitura do .env
+├── config/                  # Configurações centralizadas e resolução de variáveis .env
 │   └── settings.py
-├── core/                    # Núcleo quantitativo de trading
-│   ├── engine.py            # Loop principal assíncrono & Telegram Bot
-│   ├── decision.py          # Decisão SMC, Orderbook Imbalance, Futures Squeeze e Slots
-│   ├── indicators.py        # Hurst Exponent, Orderbook Ratio, Funding Rate, RSI, ADX, MACD
-│   ├── patterns.py          # Reconhecimento de 17 padrões de velas (Candlesticks)
+├── core/                    # Núcleo quantitativo de trading v5.0
+│   ├── engine.py            # Loop principal assíncrono, Telegram Bot & OCO Lifecycle
+│   ├── decision.py          # SMC, Whale Walls, ATR, Lead-Lag Alpha, Stat-Arb & Kelly Sizing
+│   ├── indicators.py        # MTF Matrix, Fibonacci Supports, CVD, Z-Score, ATR, RSI, MACD
+│   ├── patterns.py          # Reconhecimento de padrões de velas (Candlesticks)
 │   └── post_trade.py        # Processamento de ordens e estatísticas
-├── services/                # Integrações externas
+├── services/                # Serviços e Integrações
 │   ├── binance_client.py    # Cliente assíncrono Binance (Spot & Futures API)
-│   ├── database.py          # Banco de Dados Híbrido (SQLite / PostgreSQL)
-│   ├── gemini_ai.py         # Conector oficial google-genai (Gemini 2.5-Flash)
+│   ├── database.py          # Gerenciador de Banco de Dados SQLite
+│   ├── gemini_ai.py         # Classificador de Sentimento e Pânico Noticioso via IA Gemini
+│   ├── news_scanner.py      # Coletor de manchetes em tempo real (CryptoPanic API)
 │   ├── pdf_generator.py     # Gerador de Relatório Semanal em PDF ReportLab
-│   └── telegram_notifier.py # Envio de mensagens e PDFs via Telegram
-├── ui/                      # Interface Web Gráfica
+│   └── telegram_notifier.py # Notificador e manipulador Telegram
+├── ui/                      # Interface Web NiceGUI
 │   └── dashboard.py         # Terminal Web Institucional NiceGUI
-├── docs/                    # Manuais e Documentação Médica ISO/IEC 25010
-│   ├── DOCUMENTATION.md
-│   ├── MASTER_ROADMAP_V3.md
-│   ├── SpotBot_Pro_Documentacao_Tecnica.pdf
-│   └── Relatorio_Semanal_Telemetria.pdf
-├── requirements.txt         # Dependências do projeto
+├── scratch/                 # Scripts de Teste e Validação Quantitativa
+│   ├── test_smart_recovery_dca.py
+│   ├── test_lead_lag_alpha.py
+│   ├── test_order_flow_cvd.py
+│   ├── test_stat_arb_pairs.py
+│   └── test_kelly_sizing.py
+├── requirements.txt         # Dependências do projeto Python
 └── run.py                   # Ponto de entrada unificado
 ```
 
 ---
 
-## 🚀 Como Rodar o Robô
+## 🚀 Como Executar Localmente
 
 ```powershell
 # 1. Clonar o repositório
-git clone https://github.com/giovannebotelho/spotbot.git
-cd spotbot
+git clone https://github.com/giovannebotelho/spotbot-pro-hedgefund.git
+cd spotbot-pro-hedgefund
 
 # 2. Ativar o ambiente virtual e instalar dependências
 .\env_spotbot\Scripts\activate
 pip install -r requirements.txt
 
-# 3. Executar o Terminal Web e Robô SpotBot Pro
+# 3. Executar o Dashboard Web e Robô SpotBot Pro v5.0
 python run.py --mode dashboard
 ```
 
-Acesse a interface no navegador em **`http://localhost:8080`**.
+Acesse a interface gráfica no navegador em **`http://localhost:8080`**.
 
 ---
 

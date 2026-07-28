@@ -1,166 +1,174 @@
 # 📖 DOCUMENTAÇÃO TÉCNICA DE ARQUITETURA E ENGENHARIA DE SOFTWARE
-## SPOTBOT PRO v3.0.0-HEDGE_FUND — SISTEMA INSTITUCIONAL DE TRADING ALGORÍTMICO QUANTITATIVO E INTELIGÊNCIA ARTIFICIAL
+## SPOTBOT PRO v5.0.0-WALL_STREET_QUANT — SISTEMA INSTITUCIONAL DE TRADING ALGORÍTMICO QUANTITATIVO E INTELIGÊNCIA ARTIFICIAL
 
 ---
 
 ### 📋 SUMÁRIO EXECUTIVO
-- **Nome do Sistema**: SpotBot Pro (Quantitative Engine)
-- **Versão de Software**: `v3.0.0-HEDGE_FUND`
+- **Nome do Sistema**: SpotBot Pro (Wall Street Quantitative Engine)
+- **Versão de Software**: `v5.0.0-WALL_STREET_QUANT`
 - **Classificação de Confiabilidade**: *Critical Fault-Tolerant System (Medical-Grade Standard ISO/IEC 25010)*
 - **Arquitetura**: Multi-threaded Async I/O (Python `asyncio`), Event-Driven WebSockets & Neural AI Synthesis
 - **Exchange Suportada**: Binance Spot & Binance Futures (API REST v3/v1 & WebSocket User/Market Streams)
-- **Modelos Matemáticos**: Hurst Exponent, Smart Money Concepts (SMC), Futures Funding Rate Squeeze Hunter, Orderbook Bid/Ask Imbalance Ratio, Snowball Compounding Engine, Gemini 2.5 Flash Confidence Scoring (0-100), Scalp Locking & Dynamic Slot Allocation.
+- **Modelos Quantitativos Integrados**:
+  - Kelly Criterion & Monte Carlo Position Sizing ($f^*$)
+  - Cointegration Pair Trading & Statistical Arbitrage ($Z\text{-Score} \le -2.0\sigma$)
+  - Order Flow Cumulative Volume Delta (CVD Tape Reading em 500 Trades)
+  - Correlation Lead-Lag Alpha Engine (BTC 1m Momentum Lead)
+  - Smart Recovery DCA em Suportes de Fibonacci (61.8% e 78.6%)
+  - AI Sentiment & Market Panic Scanner (CryptoPanic + Gemini 2.5 Flash)
+  - Multi-Timeframe Confluence Matrix (4H + 1H + 15M $\ge 70\%$)
+  - Orderbook 50 Depth & Whale Wall Protection
+  - Dynamic ATR Volatility SL/TP Protection
 
 ---
 
-# CAPÍTULO 1: FILOSOFIA QUANTITATIVA E ARQUITETURA DE SISTEMAS
+# CAPÍTULO 1: FILOSOFIA QUANTITATIVA E CASCATA DE VALIDAÇÃO v5.0
 
-## 1.1 Visão Geral do Sistema
-O **SpotBot Pro v3.0** é uma plataforma de trading algorítmico quantitativo projetada para operar no mercado Spot e Futuros da Binance com execução autônoma, controle rigoroso de risco e adaptação dinâmica de regime de mercado. O sistema combina análise estatística avançada, reconhecimento de padrões de liquidez de grandes players institucionais (*Smart Money Concepts*), microestrutura do livro de ofertas (*Orderbook Imbalance*), liquidações de derivativos (*Futures Funding Squeeze*) e inteligência artificial generativa baseada em LLMs (*Google Gemini AI*) para validar ou rejeitar sinais operacionais com alta probabilidade de acerto (*Win Rate > 75%*).
+O **SpotBot Pro v5.0** opera sob o conceito de **Filtros Quantitativos Hierárquicos v5.0** (Cascata de Validação em 9 Camadas), onde cada sinal deve passar por todos os filtros de proteção antes da execução na Binance:
 
-Diferente de robôs convencionais baseados unicamente em cruzamentos de médias móveis ou osciladores simples, o SpotBot Pro opera sob o conceito de **Filtros Quantitativos Hierárquicos v3.0** (Cascata de Validação), onde cada camada de análise deve aprovar a operação antes da emissão de qualquer ordem de compra à exchange:
-
-```
+```text
 [Dados de Mercado em Tempo Real (WebSockets & REST Spot/Futures)]
                        │
                        ▼
-    [Camada 1: Filtro de Regime de Mercado (Hurst Exponent)]
-                       │ (Aprovado se H > 0.55 ou SMC Sweep)
+  [Camada 0: AI Panic News Scanner (CryptoPanic + Gemini IA)]
+                       │ (Trava compras se Sentiment Score < 30)
                        ▼
-  [Camada 2: Futures Analytics (Funding Rate & Open Interest Squeeze)]
-                       │ (Detecta acúmulo de shorts e potencial de Squeeze)
+  [Camada 1: Matriz Multi-Timeframe (4H + 1H + 15M)]
+                       │ (Exige Confluência Score >= 70%)
                        ▼
- [Camada 3: Orderbook Imbalance Scanner (Bids/Asks & Muros de Baleia)]
-                       │ (Exige suporte de compra e cancela sob muro de vendas)
+  [Camada 2: Lead-Lag Alpha Engine (BTC 1m Lead Momentum)]
+                       │ (Antecipa impulso de volume do BTC em altcoins)
                        ▼
-  [Camada 4: Ranker de Força Relativa (Relative Strength vs BTC)]
-                       │ (Seleciona a Altcoin mais forte do Top 20)
+  [Camada 3: Order Flow CVD Tape Reading (500 Market Trades)]
+                       │ (Confirma agressão compradora >= 60% e CVD > 0)
                        ▼
-   [Camada 5: Validação de Indicadores (RSI, ADX, VWAP, EMA200)]
-                       │ (Identifica compressão e exaustão)
+  [Camada 4: Cointegration Stat-Arb Z-Score (Spread vs BTC)]
+                       │ (Captura reversão à média quando Z <= -2.0 sigma)
                        ▼
-    [Camada 6: Scoring Quantitativo por IA (Gemini AI 0-100)]
-                       │ (Score >= 50 aprova; Squeeze/Wall eleva para 2.0x)
+  [Camada 5: Whale Wall Protection (Livro 50 Depth)]
+                       │ (Recua TP em 0.15% antes de muros de venda >= $25k)
                        ▼
-  [Camada 7: Gestor Dinâmico de Juros Compostos (Snowball Compounding)]
-                       │ (Reinveste lucros líquidos acumulados)
+  [Camada 6: Dynamic ATR Volatility SL/TP Protection]
+                       │ (Ajusta Stop Loss entre -1.2% e -3.0% por ATR)
                        ▼
- [Camada 8: Ordem OCO, Scalp Locking (50% TP + Breakeven) & PDF Telegram]
+  [Camada 7: Kelly Criterion Position Sizing Engine]
+                       │ (Dimensiona lote ótimo Half-Kelly com base no SQLite)
+                       ▼
+  [Camada 8: Ordem OCO, Smart Recovery DCA em Fibonacci 61.8% & Telegram]
 ```
 
-## 1.2 Princípios de Engenharia de Confiabilidade (Medical-Grade Standard)
-O software foi desenvolvido seguindo as diretrizes da norma ISO/IEC 25010 para sistemas críticos de missão contínua (*Mission-Critical Continuous Systems*), garantindo:
-1. **Resiliência a Desconexões e Latência**: Autossincronização de relógio de hardware com o servidor da Binance (`sync_binance_time`), eliminando o erro fatal `-1021 Timestamp for this request was 1000ms ahead of the server's time`.
-2. **Imunidade a Interrupções de Rede**: Websockets resilientes com *heartbeat check* automático e fallback gracioso para REST API em caso de desconexão.
-3. **Proteção Total de Capital & Botão Emergency CANCEL**: Gerenciador de Risco com trava de segurança em tempo real (*Circuit Breaker*). Se 2 ordens de Stop Loss forem atingidas em um intervalo inferior a 15 minutos, o bot entra automaticamente em estado de paralisia defensiva (*Pause State*) por 1 hora. Botão Emergency `CANCEL` (CTRL+C equivalente) no Dashboard e no Telegram (`/cancel` ou `/abort`) para encerramento limpo imediato.
-4. **Snowball Compounding Engine & Regra Institucional dos $10 USDT**: Calculador dinâmico de capital por ordem (`calculate_dynamic_position_slots`), que soma os lucros líquidos acumulados para aplicar juros compostos automáticos garantindo a conformidade estrita com o limite mínimo de notional da Binance (mínimo obrigatório de $10.00 USDT por transação).
+---
+
+# CAPÍTULO 2: EQUAÇÕES MATEMÁTICAS E MODELOS QUANTITATIVOS
+
+## 2.1 Critério de Kelly & Dimensionamento por Probabilidade (Kelly Position Sizing)
+Em vez de lotes intuitivos, a alocação ótima $f^*$ de capital por operação é calculada matematicamente via **Fórmula do Critério de Kelly**:
+
+$$f^* = \frac{p \cdot b - (1 - p)}{b}$$
+
+Onde:
+- $p$: Taxa de Vitória real (*Win Rate*) extraída do banco de dados SQLite (`db.get_stats()`).
+- $b$: Payoff Ratio da estratégia ($b = \frac{\text{Take Profit \%}}{\text{Stop Loss \%}} \approx 2.0$).
+- **Half-Kelly Safety**: Para eliminar qualquer risco de ruína, o robô aplica a fração defensiva:
+  $$\text{Kelly}_{\text{Lote}} = \text{Saldo}_{\text{USDT}} \times \max\left(0.10, \min\left(0.40, 0.5 \cdot f^*\right)\right)$$
 
 ---
 
-# CAPÍTULO 2: MODELOS MATEMÁTICOS E ALGORITMOS QUANTITATIVOS
+## 2.2 Cointegração e Arbitragem Estatística de Pares (Pair Trading Z-Score)
+Para dois ativos cointegrados $A$ e $B$ (ex: `SOLUSDT` vs `BTCUSDT`), a razão de preço instantânea é definida como $R_t = \frac{P_{A, t}}{P_{B, t}}$.
 
-## 2.1 Fase 1: Motor de Detecção de Regimes de Mercado (Hurst Exponent $H$)
-O Expoente de Hurst ($H$) é uma medida estatística de memória de longo prazo em séries temporais financeiras. Ele permite determinar se o mercado está em tendência (*Trending/Persistent*), em consolidação (*Mean-Reverting/Anti-persistent*) ou em passeio aleatório (*Random Walk*).
+O **Z-Score** do spread em relação à média móvel $\mu_R$ e desvio-padrão $\sigma_R$ dos últimos 50 períodos é dado por:
 
-A fórmula do Rescaled Range ($R/S$) aplicada sobre os preços de fechamento $C_t$ é dada por:
+$$Z_t = \frac{R_t - \mu_R}{\sigma_R}$$
 
-$$\frac{R(n)}{S(n)} = c \cdot n^H$$
-
-- $H > 0.55$: Mercado em tendência definida (*BULL_TREND*).
-- $H < 0.48$: Mercado lateralizado (*RANGE_BOUND*).
-- Queda abrupta $> 3.5\%$ em 24h: Ativa automaticamente o modo de pânico (*REGIME_CRASH_PANIC*).
+- **Condição de Entrada**: Se $Z_t \le -2.0\sigma$, o Ativo $A$ está estatisticamente subavaliado em relação ao Ativo $B$. O algoritmo autoriza a compra por **Reversão à Média (Mean Reversion)**.
 
 ---
 
-## 2.2 Fase A (v3.0): Futures Analytics (Funding Rate & Open Interest Squeeze Hunter)
-Nos mercados de futuros perpétuos da Binance, a taxa de financiamento (*Funding Rate*) equilibra os preços entre os contratos futuros e o mercado spot.
+## 2.3 Order Flow Cumulative Volume Delta (CVD Tape Reading)
+Mede a agressão das ordens executadas a mercado (*Market Orders*) nas últimas 500 transações spot:
 
-- **Funding Rate Negativo ($<-0.01\%$)**: Significa que a maioria dos traders está vendida (*Short Heavy*), pagando taxas aos compradores.
-- **Short Squeeze Setup**: Quando $Funding\ Rate < -0.01\%$ ocorre junto a uma varredura de liquidez *SMC Sweep*, a probabilidade de um movimento altista violento supera 85%. O bot autoriza **dobrar a posição para 2.0x USDT**.
+$$\text{CVD} = \sum V_{\text{Market Buy}} - \sum V_{\text{Market Sell}}$$
 
----
+$$\text{Buy Ratio \%} = \frac{\sum V_{\text{Market Buy}}}{\sum V_{\text{Market Buy}} + \sum V_{\text{Market Sell}}} \times 100$$
 
-## 2.3 Fase B (v3.0): Orderbook Imbalance Scanner (Profundidade de Livro & Buy Walls)
-Avalia a microestrutura do livro de ordens somando os volumes nos 20 primeiros níveis de profundidade (*Depth Level 20*):
-
-$$Imbalance\ Ratio = \frac{\sum_{i=1}^{20} Qty_{Bids, i}}{\sum_{i=1}^{20} Qty_{Asks, i}}$$
-
-- **$Ratio < 0.2$ (Muro de Venda Massivo)**: Cancela a compra para evitar entrada sob forte resistência institucional.
-- **$Ratio \ge 1.5$ (Muro de Compra de Baleia)**: Confirma a presença de liquidez de suporte garantida por grandes players.
+- **Gatilho Bullish**: Ativado se $\text{Buy Ratio \%} \ge 60.0\%$ e $\text{CVD} > 0$.
+- **Multiplicador de Ouro (2.0x)**: Ativado se $\text{CVD} \ge +\$50.000\text{ USDT}$.
 
 ---
 
-## 2.4 Fase C (v3.0): Gestor Dinâmico de Juros Compostos (Snowball Compounding Engine)
-O calculador de slots recalcula dinamicamente a alocação de capital com base no patrimônio líquido total acumulado:
+## 2.4 Correlation Lead-Lag Alpha Engine (Impulso BTC 1m)
+Avalia a variação percentual de preço e volume do `BTCUSDT` nas velas de 1 minuto:
 
-$$Capital_{Efetivo} = Saldo_{USDT\_Livre} + \max(0, Lucro_{Líquido\_Acumulado})$$
+$$\Delta P_{\text{BTC}} = \frac{P_{\text{BTC, t}} - P_{\text{BTC, t-3}}}{P_{\text{BTC, t-3}}} \times 100$$
 
-$$Slot_{Value} = \max\left(10.0, \frac{Capital_{Efetivo}}{Slots_{Ativos}}\right)$$
-
-Conforme a carteira gera resultados positivos ($100 \rightarrow 110 \rightarrow 125$), o tamanho de cada ordem cresce proporcionalmente, gerando um efeito **Bola de Neve (Compound Interest)**!
+- **Sinal de Antecipação**: Se $\Delta P_{\text{BTC}} \ge +0.25\%$ em 3m com volume $1.5\times$ acima da média e a altcoin do Top 20 ainda não acompanhou ($\Delta P_{\text{Alt}} \le 0.7 \times \Delta P_{\text{BTC}}$), entra comprado antecipadamente na altcoin com multiplicador **1.5x**.
 
 ---
 
-## 2.5 Fase D (v3.0): Relatório Semanal de Telemetria com PDF Automático no Telegram
-Calcula as principais métricas de gestão quantitativa de risco e gera um relatório profissional em PDF via ReportLab:
+## 2.5 Smart Recovery DCA em Suportes de Fibonacci
+Identifica a oscilação recente de preço ($\text{Swing High}$ e $\text{Swing Low}$) nas últimas 50 velas de 15m:
 
-- **Índice de Sharpe (Anualizado)**:
-  $$Sharpe = \frac{\bar{R}_p}{\sigma_p} \cdot \sqrt{365}$$
-- **Fator de Lucro (Profit Factor)**:
-  $$Profit\ Factor = \frac{\sum Lucros}{\sum |Perdas|}$$
-- **Rebaixamento Máximo (Max Drawdown)**:
-  $$Max\ Drawdown = \max_{t} (Peak_t - Equity_t)$$
+$$\text{Diff} = \text{Swing High} - \text{Swing Low}$$
 
-Disparado automaticamente todo domingo às 20:00 ou sob demanda pelo comando **`/relatorio`** ou **`/pdf`** no Telegram.
+$$\text{Fib}_{61.8\%} = \text{Swing High} - (\text{Diff} \times 0.618)$$
+
+$$\text{Fib}_{786\%} = \text{Swing High} - (\text{Diff} \times 0.786)$$
+
+- **Execução do DCA**: Se a altcoin sofrer um *flash dump* de pavio atingindo $\text{Fib}_{61.8\%}$, executa recompra de 50%, recalcula o Preço Médio ($PM = \frac{q_1 p_1 + q_2 p_2}{q_1 + q_2}$) e re-posiciona a ordem OCO com Take Profit em apenas **$+0.8\%$ acima do novo $PM$**.
 
 ---
 
-# CAPÍTULO 3: MAPEAMENTO DE MÓDULOS E ESTRUTURA DE CÓDIGO
+# CAPÍTULO 3: ESTRUTURA MODULAR DO CÓDIGO
 
 ```text
 spotbot/
 │
 ├── config/                  # Configurações centralizadas e leitura do .env
-│   └── settings.py          # Dicionários de API_KEYS, TRADING_CONFIG, RSI_CONFIG e TELEGRAM_CONFIG.
+│   └── settings.py          # API_KEYS, TELEGRAM_CONFIG, TRADING_CONFIG, RSI_CONFIG, TOP_20_SYMBOLS.
 │
-├── core/                    # Núcleo de Engenharia Quantitativa
-│   ├── engine.py            # Loop principal assíncrono, relógio Binance, Telegram Bot e Cron Semanal PDF.
-│   ├── decision.py          # Tomada de decisão (should_buy, should_sell, Orderbook Ratio, Futures Squeeze e Slots).
-│   ├── indicators.py        # Cálculo de Hurst, Orderbook Imbalance, Funding Rate, RSI, ADX, MACD, VWAP, SMC.
-│   ├── patterns.py          # Reconhecimento de 17 padrões de velas japonesas.
-│   └── post_trade.py        # Processamento de ordens OCO, cálculo de taxas BNB e persistência de dados.
+├── core/                    # Núcleo de Engenharia Quantitativa v5.0
+│   ├── engine.py            # Loop principal assíncrono, Telegram Bot, OCO Lifecycle & Smart Recovery DCA.
+│   ├── decision.py          # Decision engine: MTF, Whale Walls, ATR, Lead-Lag, Stat-Arb, CVD & Kelly Sizing.
+│   ├── indicators.py        # Algoritmos quantitativos: MTF Score, Fibonacci, CVD, Z-Score, ATR, RSI, MACD.
+│   ├── patterns.py          # Reconhecimento de padrões de velas de alta precisão.
+│   └── post_trade.py        # Processamento de ordens OCO, taxas BNB e registro de dados.
 │
-├── services/                # Conectores e Serviços Externos
-│   ├── binance_client.py    # Cliente assíncrono para Binance Spot REST/WebSockets & Futures API.
-│   ├── database.py          # Gerenciador de Banco de Dados Híbrido (SQLite / PostgreSQL).
-│   ├── gemini_ai.py         # Conector da SDK oficial google-genai (Gemini 2.5-Flash Score 0-100).
-│   ├── pdf_generator.py     # Gerador de Relatório Semanal de Telemetria em PDF com ReportLab.
-│   └── telegram_notifier.py # Conector assíncrono Telegram (Mensagens e Envio de Documentos PDF).
+├── services/                # Conectores e Serviços de Dados
+│   ├── binance_client.py    # Cliente assíncrono Binance (Spot & Futures API, Klines 3-Timeframe, Trades 500).
+│   ├── database.py          # Gerenciador de Banco de Dados SQLite transacional.
+│   ├── gemini_ai.py         # Classificador de Sentimento e Pânico Noticioso via IA Gemini 2.5 Flash.
+│   ├── news_scanner.py      # Coletor de manchetes de notícias em tempo real (CryptoPanic API).
+│   ├── pdf_generator.py     # Gerador de Relatório Semanal de Telemetria em PDF ReportLab.
+│   └── telegram_notifier.py # Conector assíncrono Telegram Bot API.
 │
-├── ui/                      # Interface Web de Alta Performance
-│   └── dashboard.py         # Terminal Web NiceGUI, ECharts K-Line, Holograma Gemini, Badge Dinâmico e Botões.
+├── ui/                      # Interface Web NiceGUI
+│   └── dashboard.py         # Terminal Web Institucional NiceGUI, gráficos Plotly e cards holográficos.
 │
-├── docs/                    # Repositório de Documentação Médica e Técnica
-│   ├── DOCUMENTATION.md
-│   ├── MASTER_ROADMAP_V3.md
-│   ├── SpotBot_Pro_Documentacao_Tecnica.pdf
-│   └── Relatorio_Semanal_Telemetria.pdf
+├── scratch/                 # Scripts de Testes Quantitativos
+│   ├── test_smart_recovery_dca.py
+│   ├── test_lead_lag_alpha.py
+│   ├── test_order_flow_cvd.py
+│   ├── test_stat_arb_pairs.py
+│   └── test_kelly_sizing.py
 │
 └── run.py                   # Ponto de entrada unificado com CLI argparse (--mode dashboard).
 ```
 
 ---
 
-# CAPÍTULO 4: REQUISITOS ISO/IEC 25010 E PROCEDIMENTOS DE OPERAÇÃO
+# CAPÍTULO 4: PROCEDIMENTOS DE OPERAÇÃO E INSTALAÇÃO
 
-1. **Instalação de Dependências**:
+1. **Ativação do Ambiente Virtual**:
    ```powershell
-   python -m venv env_spotbot
    .\env_spotbot\Scripts\activate
+   ```
+2. **Instalação de Dependências**:
+   ```powershell
    pip install -r requirements.txt
    ```
-2. **Execução**:
+3. **Execução do Robô com Interface Web**:
    ```powershell
    python run.py --mode dashboard
    ```
-3. **Endereço de Acesso**: `http://localhost:8080`
+4. **Navegador**: `http://localhost:8080`

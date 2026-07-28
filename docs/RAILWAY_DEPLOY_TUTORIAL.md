@@ -1,78 +1,83 @@
-# ☁️ Tutorial Passo a Passo: Deploy 24/7 do SpotBot Pro no Railway
+# ☁️ GUIA DE INFRAESTRUTURA & DEPLOY: SPOTBOT PRO v5.0 (LOCAL & NUVEM)
 
-Este guia ensina como colocar o seu **SpotBot Pro** rodando 24 horas por dia, 7 dias por semana na nuvem usando a plataforma **Railway**, com banco de dados **PostgreSQL** e sem precisar deixar o seu computador ligado.
-
----
-
-## 📋 Pré-requisitos
-
-1. Uma conta no [Railway.app](https://railway.app) (pode fazer login direto com seu GitHub).
-2. Seu repositório `spotbot` no GitHub (pode ser privado ou público).
-3. Suas chaves da Binance (`mainnet_api_key` e `mainnet_secret_key`) e do Gemini (`gemini_api`).
+Este guia documenta como rodar o **SpotBot Pro v5.0 (Wall Street Edition)** com 100% de estabilidade e baixa latência, tanto **localmente no seu computador (recomendado)** quanto na **nuvem 24/7 (Railway / Render / VPS)**.
 
 ---
 
-## 🛠️ Passo 1: Criar o Projeto no Railway
+## 💻 Opção 1: Execução Local (Recomendado para Testes & Operações de Baixa Latência)
 
-1. Acesse o painel do [Railway](https://railway.app/dashboard).
-2. Clique no botão **+ New Project**.
-3. Selecione a opção **Deploy from GitHub repo**.
-4. Procure e escolha o seu repositório `spotbot`.
+Rodar localmente no seu computador garante **latência mínima com os servidores da Binance**, zero custo de infraestrutura e controle total do banco de dados SQLite.
 
----
+### 🛠️ Passo a Passo (Windows / Linux / macOS):
 
-## 🐘 Passo 2: Adicionar o Banco de Dados PostgreSQL
+1. **Clonar o Repositório**:
+   ```powershell
+   git clone https://github.com/giovannebotelho/spotbot-pro-hedgefund.git
+   cd spotbot-pro-hedgefund
+   ```
 
-1. No canvas do seu projeto no Railway, clique em **+ New** (ou aperte `Ctrl + K` e digite *Database*).
-2. Escolha a opção **Add PostgreSQL**.
-3. O Railway criará uma instância de PostgreSQL em instantes.
-4. **Pronto!** O Railway irá injetar automaticamente a variável `DATABASE_URL` no seu bot. O SpotBot Pro detectará o PostgreSQL de forma 100% automática!
+2. **Criar e Ativar o Ambiente Virtual**:
+   ```powershell
+   python -m venv env_spotbot
+   .\env_spotbot\Scripts\activate
+   ```
 
----
+3. **Instalar as Dependências**:
+   ```powershell
+   pip install -r requirements.txt
+   ```
 
-## 🔑 Passo 3: Configurar as Variáveis de Ambiente (Environment Variables)
+4. **Configurar o Arquivo `.env`**:
+   Crie ou edite o arquivo `.env` na raiz do projeto:
+   ```env
+   BOT_ENVIRONMENT=mainnet
+   mainnet_api_key=SUA_CHAVE_API_BINANCE
+   mainnet_secret_key=SEU_SECRET_KEY_BINANCE
+   gemini_api=SUA_CHAVE_API_GEMINI
+   bot_token=SEU_TOKEN_TELEGRAM_BOT
+   chat_id=SEU_CHAT_ID_TELEGRAM
+   DASHBOARD_USER=admin
+   DASHBOARD_PASSWORD=admin123
+   SECRET_KEY=spotbot_secured_key_8823
+   ```
 
-1. Clique no card do seu serviço `spotbot` no Railway.
-2. Acesse a aba **Variables**.
-3. Clique em **Raw Editor** (ou adicione uma a uma) e cole suas configurações:
-
-```env
-# Binance API (Chaves reais da sua conta)
-mainnet_api_key=SUA_CHAVE_REAL_BINANCE
-mainnet_secret_key=SEU_SECRET_REAL_BINANCE
-
-# Google Gemini API Key
-gemini_api=SUA_CHAVE_GEMINI_API
-
-# Telegram Config (Para receber notificações no celular)
-bot_token=SEU_BOT_TOKEN_TELEGRAM
-chat_id=SEU_CHAT_ID_TELEGRAM
-
-# Autenticação do Dashboard Web NiceGUI
-DASHBOARD_USER=admin
-DASHBOARD_PASSWORD=sua_senha_segura
-DASHBOARD_SECRET_KEY=spotbot_secret_railway_2026
-
-# Ambiente (mainnet / testnet)
-BOT_ENVIRONMENT=mainnet
-```
-
-4. Clique em **Save Changes**.
+5. **Iniciar o Robô e Dashboard Web**:
+   ```powershell
+   python run.py --mode dashboard
+   ```
+   Acesse a interface gráfica no navegador em: **`http://localhost:8080`**.
 
 ---
 
-## 🌐 Passo 4: Gerar a URL Pública para Acessar o Dashboard
+## ☁️ Opção 2: Deploy 24/7 na Nuvem (Railway / Render / VPS)
 
-1. Ainda nas configurações do seu serviço `spotbot` no Railway, vá para a aba **Settings**.
-2. Na seção **Networking**, procure por **Public Networking** e clique em **Generate Domain**.
-3. O Railway criará um link público seguro (ex: `https://spotbot-production.up.railway.app`).
-4. Clique no link gerado e faça login com seu `DASHBOARD_USER` e `DASHBOARD_PASSWORD`!
+Para colocar o robô operando 24h por dia, 7 dias por semana na nuvem:
+
+### 📋 Passos no Railway.app:
+
+1. **Conectar Repositório GitHub**:
+   - Acesse o [Railway Dashboard](https://railway.app/dashboard) e clique em **+ New Project** $\rightarrow$ **Deploy from GitHub repo**.
+   - Selecione o repositório `spotbot-pro-hedgefund`.
+
+2. **Adicionar Variáveis de Ambiente**:
+   Na aba **Variables** do projeto no Railway, adicione:
+   - `mainnet_api_key`
+   - `mainnet_secret_key`
+   - `gemini_api`
+   - `bot_token`
+   - `chat_id`
+   - `DASHBOARD_USER`
+   - `DASHBOARD_PASSWORD`
+   - `PORT=8080`
+
+3. **Gerar URL Pública para o Dashboard**:
+   - Vá para **Settings** $\rightarrow$ **Public Networking** $\rightarrow$ **Generate Domain**.
+   - Acesse o link gerado (ex: `https://spotbot-production.up.railway.app`) pelo celular ou PC!
 
 ---
 
-## 🎉 Pronto! O seu Robô está Operando 24/7
+## 🛡️ Resiliência & Healthchecks de Infraestrutura
 
-- O Railway lerá automaticamente o `Dockerfile` e o `Procfile` incluídos no repositório.
-- Seu robô funcionará initerruptamente na nuvem.
-- Se o servidor reiniciar ou houver atualização, ele religará sozinho.
-- Você pode acompanhar o gráfico e os logs em tempo real pelo navegador do seu PC ou celular a qualquer hora!
+- **Sincronização de Relógio Binance**: O robô executa a função `sync_binance_time` na inicialização para compensar qualquer variação de latência e eliminar o erro `-1021 Timestamp ahead/behind`.
+- **Persistência de Dados**: O banco SQLite (`spotbot.db`) salva todas as operações atomicamente. Em restarts, a função `monitor_oco_lifecycle` recupera posições abertas na Binance sem perdas.
+- **Botão de Emergência CANCEL**: Se for necessário interromper o robô remotamente, envie o comando **`/stop`**, **`/cancel`** ou clique no botão **CANCEL (CTRL+C)** do Dashboard.
