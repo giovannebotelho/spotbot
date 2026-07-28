@@ -477,7 +477,7 @@ def start_dashboard():
     port = DASHBOARD_CONFIG['port']
     secret = DASHBOARD_CONFIG['secret_key']
     print(f"Iniciando SpotBot Pro em modo Dashboard Web (NiceGUI)...")
-    ui.run(title='SpotBot Pro | Institutional Terminal', dark=True, reload=False, port=port, storage_secret=secret)
+    ui.run(title='SpotBot Pro | Institutional Terminal', host='0.0.0.0', dark=True, reload=False, port=port, storage_secret=secret)
 
 if __name__ in {"__main__", "__mp_main__"}:
     start_dashboard()
