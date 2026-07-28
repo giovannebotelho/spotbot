@@ -104,3 +104,13 @@ async def get_multi_timeframe_klines(client, symbol):
         '1h': res_1h,
         '15m': res_15m
     }
+
+async def get_lead_lag_btc_klines(client):
+    """
+    FASE 2 (v5.0): Obtém as últimas velas de 1m do BTCUSDT em tempo real
+    para o cálculo do Motor de Antecipação (Lead-Lag Alpha Engine).
+    """
+    try:
+        return await client.get_klines(symbol="BTCUSDT", interval="1m", limit=15)
+    except Exception:
+        return []

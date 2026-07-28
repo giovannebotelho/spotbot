@@ -530,3 +530,37 @@ def calculate_fibonacci_supports(klines, period=50):
     fib_786 = swing_high - (diff * 0.786)
 
     return fib_618, fib_786, swing_high, swing_low
+
+def calculate_lead_lag_alpha(btc_klines, altcoin_klines):
+    """
+    FASE 2 (v5.0): Motor de Antecipação (Lead-Lag Alpha Engine).
+    Avalia a aceleração de preço/volume do BTCUSDT nos últimos 60 a 180 segundos
+    e verifica se há divergência favorável (Lag) na altcoin do Top 20.
+    Retorna: (is_btc_lead: bool, btc_impulse_pct: float, alpha_msg: str)
+    """
+    if not btc_klines or len(btc_klines) < 3:
+        return False, 0.0, "Sem dados BTC 1m"
+
+    btc_closes = [float(k[4]) for k in btc_klines]
+    btc_vols = [float(k[5]) for k in btc_klines]
+
+    btc_cur = btc_closes[-1]
+    btc_prev = btc_closes[-3] if len(btc_closes) >= 3 else btc_closes[0]
+    btc_change_pct = ((btc_cur - btc_prev) / btc_prev) * 100.0 if btc_prev > 0 else 0.0
+
+    vol_series = pd.Series(btc_vols)
+    avg_vol = vol_series.mean() if len(vol_series) > 0 else 1.0
+    cur_vol = btc_vols[-1]
+    is_volume_spike = cur_vol >= avg_vol * 1.5
+
+    alt_change_pct = 0.0
+    if altcoin_klines and len(altcoin_klines) >= 3:
+        alt_closes = [float(k[4]) for k in altcoin_klines]
+        alt_cur = alt_closes[-1]
+        alt_prev = alt_closes[-3] if len(alt_closes) >= 3 else alt_closes[0]
+        alt_change_pct = ((alt_cur - alt_prev) / alt_prev) * 100.0 if alt_prev > 0 else 0.0
+
+    if btc_change_pct >= 0.25 and is_volume_spike and alt_change_pct <= (btc_change_pct * 0.7):
+        return True, btc_change_pct, f"🔥 LEAD-LAG ALPHA: BTC IMPULSE (+{btc_change_pct:.2f}% em 3m)"
+
+    return False, btc_change_pct, "Sem impulso de antecipação BTC"

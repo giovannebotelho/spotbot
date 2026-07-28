@@ -6,11 +6,11 @@ from datetime import datetime
 import pandas as pd
 
 from config.settings import API_KEYS, TRADING_CONFIG, RSI_CONFIG
-from services.binance_client import get_order_details, get_futures_analytics, get_order_book, get_multi_timeframe_klines
+from services.binance_client import get_order_details, get_futures_analytics, get_order_book, get_multi_timeframe_klines, get_lead_lag_btc_klines
 from core.indicators import (
     detect_market_regime, detect_liquidity_sweep, calculate_ema, calculate_adx,
     analyze_futures_squeeze_potential, calculate_orderbook_imbalance, calculate_multi_timeframe_confluence,
-    detect_orderbook_whale_walls, calculate_atr
+    detect_orderbook_whale_walls, calculate_atr, calculate_lead_lag_alpha
 )
 from services.gemini_ai import analyze_with_gemini, analyze_news_sentiment_with_gemini
 from services.news_scanner import fetch_crypto_news
@@ -280,6 +280,25 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
             "regime": regime,
             "mtf_score": score_mtf
         }
+
+    # 3.2. FASE 2 (v5.0): Correlation Lead-Lag Alpha Engine (Antecipação BTC)
+    try:
+        btc_1m = await get_lead_lag_btc_klines(client)
+        is_lead_alpha, btc_imp_pct, alpha_msg = calculate_lead_lag_alpha(btc_1m, klines)
+        if is_lead_alpha and rsi <= 55:
+            return {
+                "buy": True,
+                "message": f"{alpha_msg} ({regime})",
+                "candle_data": "",
+                "gemini_response": None,
+                "gemini_analysis": None,
+                "regime": regime,
+                "position_multiplier": 1.5,
+                "futures_data": futures_data,
+                "orderbook_imbalance": ob_ratio
+            }
+    except Exception:
+        pass
 
     if is_sweep and rsi <= 55:
         mult = 2.0 if (is_squeeze or has_buy_wall) else 1.0
