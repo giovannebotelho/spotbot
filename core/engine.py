@@ -122,27 +122,45 @@ async def check_rsi_reset(symbol, log=print):
             log(f"\n⏳ Níveis de RSI resetados para {symbol} por inatividade.")
         last_operation_time = datetime.now()
 
+_cached_balances = {'bnb': 0.0, 'bnb_usdt': 0.0, 'usdt': 0.0}
+_last_balance_time = 0
+_balance_client = None
+
 async def get_account_balances():
+    global _cached_balances, _last_balance_time, _balance_client
     if not api_key or not api_secret:
         return {'bnb': 0.0, 'bnb_usdt': 0.0, 'usdt': 0.0}
-    client = None
+    
+    now = time.time()
+    if now - _last_balance_time < 10.0 and _cached_balances['usdt'] > 0:
+        return _cached_balances
+
     try:
-        client = await BinanceAsyncClient.create(api_key, api_secret)
-        await sync_binance_time(client, log=lambda m: None)
-        bnb_balance = await client.get_asset_balance(asset='BNB')
+        if _balance_client is None:
+            _balance_client = await BinanceAsyncClient.create(api_key, api_secret)
+            await sync_binance_time(_balance_client, log=lambda m: None)
+
+        bnb_balance = await _balance_client.get_asset_balance(asset='BNB')
         bnb_balance_free = float(bnb_balance['free'])
-        bnb_price_usdt = await get_bnb_price(client)
+        bnb_price_usdt = await get_bnb_price(_balance_client)
         bnb_balance_usdt = bnb_balance_free * bnb_price_usdt
-        usdt_balance = await get_usdt_balance(client)
-        return {
+        usdt_balance = await get_usdt_balance(_balance_client)
+
+        _cached_balances = {
             'bnb': bnb_balance_free, 'bnb_usdt': bnb_balance_usdt, 'usdt': usdt_balance
         }
+        _last_balance_time = now
+        return _cached_balances
     except Exception as e:
-        print(f"Aviso ao buscar saldos: {e}")
-        return {'bnb': 0.0, 'bnb_usdt': 0.0, 'usdt': 0.0}
-    finally:
-        if client:
-            await client.close_connection()
+        err_msg = str(e) if str(e).strip() else repr(e)
+        print(f"⚠️ Aviso ao buscar saldos ({type(e).__name__}): {err_msg}")
+        if _balance_client:
+            try:
+                await _balance_client.close_connection()
+            except Exception:
+                pass
+            _balance_client = None
+        return _cached_balances
 
 async def monitor_oco_lifecycle(
     client, bsm, active_target_symbol, oco_order, limit_order_id, stop_order_id,
@@ -730,7 +748,8 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     await asyncio.sleep(5)
                     continue
             except Exception as e:
-                log(f"Erro ao buscar klines: {e}")
+                err_desc = str(e) if str(e).strip() else repr(e)
+                log(f"⚠️ Instabilidade ao buscar klines ({type(e).__name__}): {err_desc}")
                 await asyncio.sleep(5)
                 continue
 

@@ -471,7 +471,7 @@ async def index():
                           
                          log_ui = ui.log().classes('w-full h-full font-mono text-[0.65rem] bg-[#080B10] text-emerald-400 p-3 rounded-none border-none leading-tight')
 
-        ui.timer(2.0, update_data)
+        ui.timer(3.0, update_data)
 
 def start_dashboard():
     port = DASHBOARD_CONFIG['port']
