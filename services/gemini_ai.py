@@ -1,3 +1,4 @@
+import os
 import json
 import time
 from datetime import datetime
@@ -21,7 +22,7 @@ def analyze_with_gemini(
         return None
 
     if not api_key:
-        api_key = API_KEYS.get('gemini')
+        api_key = API_KEYS.get('gemini') or os.getenv('GEMINI_API_KEY') or os.getenv('gemini_api_key') or os.getenv('gemini_api') or os.getenv('GEMINI_KEY') or os.getenv('gemini')
     if not api_key:
         print("⚠️ Chave API do Gemini não configurada no .env.")
         return None
@@ -184,9 +185,9 @@ def analyze_news_sentiment_with_gemini(headlines, api_key=None):
         return 75, False, "Mercado estável (Gemini Cooldown)."
 
     if not api_key:
-        api_key = API_KEYS.get('gemini')
+        api_key = API_KEYS.get('gemini') or os.getenv('GEMINI_API_KEY') or os.getenv('gemini_api_key') or os.getenv('gemini_api') or os.getenv('GEMINI_KEY') or os.getenv('gemini')
     if not api_key:
-        return 75, False, "Sem chave Gemini configurada."
+        return 75, False, "Sem chave Gemini configurada no .env."
 
     if not headlines:
         return 75, False, "Sem notícias relevantes."

@@ -14,7 +14,8 @@ API_KEYS = {
     'testnet_spot': {
         'key': os.getenv('testnet_spot_api_key', ''),
         'secret': os.getenv('testnet_spot_secret_key', ''),
-    }
+    },
+    'gemini': os.getenv('GEMINI_API_KEY') or os.getenv('gemini_api_key') or os.getenv('gemini_api') or os.getenv('GEMINI_KEY') or os.getenv('gemini') or ''
 }
 
 TELEGRAM_CONFIG = {
