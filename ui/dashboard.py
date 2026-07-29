@@ -60,12 +60,18 @@ def log_handler(message):
     clean_msg = remove_ansi_codes(message)
     logs_buffer.append(clean_msg)
     if log_ui:
-        log_ui.push(clean_msg)
+        try:
+            log_ui.push(clean_msg)
+        except Exception:
+            pass
 
 def status_handler(message):
     if status_ui:
-        clean_msg = remove_ansi_codes(message)
-        status_ui.content = f"**{clean_msg}**"
+        try:
+            clean_msg = remove_ansi_codes(message)
+            status_ui.content = f"**{clean_msg}**"
+        except Exception:
+            pass
 
 async def update_data():
     global start_btn, stop_btn, status_indicator, _last_chart_sig

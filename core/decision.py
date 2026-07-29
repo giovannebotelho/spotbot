@@ -487,15 +487,15 @@ async def adjust_and_place_oco_order(client, symbol, quantity, price_tick_size, 
         log(f"⚠️ Valor nocional ({notional_value:.2f}) é menor que o mínimo exigido ({min_notional:.2f}). Ajustando...")
         quantity = round(math.ceil((min_notional / current_price) / step_size) * step_size, quantity_precision)
 
-    # FASE 4 (v4.0): Dynamic ATR Volatility Protection
+    # FASE 4 (v4.0): Dynamic ATR Volatility Protection anti-Stop Hunt
     try:
         atr_val, atr_pct = calculate_atr(klines, period=14)
-        stop_loss_pct = max(0.012, min(0.030, atr_pct * 1.2))
-        take_profit_pct = max(0.035, stop_loss_pct * 2.0)
-        log(f"⚡ \033[1;36mVolatility Adaptive Protection\033[0m: ATR(14)={atr_pct*100:.2f}%. Stop Loss ajustado para \033[1;31m-{stop_loss_pct*100:.2f}%\033[0m | Take Profit: \033[1;32m+{take_profit_pct*100:.2f}%\033[0m (Ratio 2.0x)")
+        stop_loss_pct = max(0.025, min(0.045, atr_pct * 1.8))
+        take_profit_pct = max(0.045, stop_loss_pct * 1.8)
+        log(f"⚡ \033[1;36mVolatility Adaptive Protection\033[0m: ATR(14)={atr_pct*100:.2f}%. Stop Loss ajustado para \033[1;31m-{stop_loss_pct*100:.2f}%\033[0m | Take Profit: \033[1;32m+{take_profit_pct*100:.2f}%\033[0m (Ratio 1.8x)")
     except Exception:
-        stop_loss_pct = 0.02
-        take_profit_pct = 0.04
+        stop_loss_pct = 0.028
+        take_profit_pct = 0.052
 
     raw_tp = current_price * (1 + take_profit_pct)
     raw_sl = current_price * (1 - stop_loss_pct)
