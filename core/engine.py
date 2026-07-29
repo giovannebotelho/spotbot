@@ -676,6 +676,32 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             order_val_usdt = round(executed_qty * price, 2)
             purchase_timestamp = datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
             
+            # Carrega klines e indicadores para popular o gráfico do ativo recuperado imediatamente
+            try:
+                klines_raw = await client.get_klines(symbol=active_target_symbol, interval=TRADING_CONFIG['interval'], limit=100)
+                klines_rec = [float(k[4]) for k in klines_raw]
+                dates_rec = [datetime.fromtimestamp(k[0]/1000).strftime('%H:%M') for k in klines_raw]
+                volumes_rec = [float(k[5]) for k in klines_raw]
+                
+                if len(klines_rec) >= 20:
+                    df_rec = pd.DataFrame({'close': klines_rec})
+                    sma20 = df_rec['close'].rolling(window=20).mean()
+                    std20 = df_rec['close'].rolling(window=20).std()
+                    bb_upper = (sma20 + 2 * std20).fillna(0).tolist()
+                    bb_lower = (sma20 - 2 * std20).fillna(0).tolist()
+                    ema200 = df_rec['close'].ewm(span=min(200, len(klines_rec)), adjust=False).mean().fillna(0).tolist()
+                else:
+                    bb_upper, bb_lower, ema200 = [], [], []
+
+                shared_market_data['dates'] = dates_rec
+                shared_market_data['klines'] = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in klines_raw]
+                shared_market_data['bb_upper'] = bb_upper
+                shared_market_data['bb_lower'] = bb_lower
+                shared_market_data['ema200'] = ema200
+                shared_market_data['volumes'] = volumes_rec
+            except Exception as k_err:
+                log(f"⚠️ Aviso ao carregar klines no State Recovery: {k_err}")
+
             await monitor_oco_lifecycle(
                 client, bsm, active_target_symbol, oco_order, limit_order_id, stop_order_id,
                 price, executed_qty, order_val_usdt, lucro_alvo, stop_loss, target_symbol_info,

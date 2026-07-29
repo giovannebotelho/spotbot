@@ -13,6 +13,11 @@ import core.engine as engine
 
 db = DatabaseManager()
 
+# Registro de arquivos estáticos (Favicon e Logo)
+assets_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'assets')
+if os.path.exists(assets_dir):
+    app.add_static_files('/assets', assets_dir)
+
 # Buffer de Logs Global (guarda os últimos 50 logs para novos visitantes/dispositivos)
 logs_buffer = collections.deque(maxlen=50)
 _last_chart_sig = None
@@ -281,6 +286,9 @@ def login():
 
     ui.colors(primary='#0284C7', secondary='#64748b', accent='#10B981', positive='#10B981', negative='#F43F5E', dark='#0B0E14')
     ui.add_head_html('''
+        <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
+        <link rel="shortcut icon" href="/assets/favicon.ico">
+        <link rel="apple-touch-icon" href="/assets/logo.png">
         <style>
             body { background-color: #0B0E14; color: #f8fafc; font-family: 'Inter', sans-serif; }
             .zinc-input .q-field__native { color: white !important; }
@@ -292,7 +300,7 @@ def login():
     with ui.column().classes('w-full h-screen items-center justify-center bg-[#0B0E14] px-4'):
         with ui.card().classes('w-full max-w-sm p-6 lg:p-8 bg-[#121722] border border-sky-500/20 shadow-[0_0_40px_rgba(2,132,199,0.1)] items-center gap-6 rounded-2xl'):
             with ui.column().classes('items-center gap-2'):
-                ui.icon('token', size='2.5rem', color='sky-400')
+                ui.image('/assets/logo.png').classes('w-12 h-12 rounded-xl shadow-lg border border-sky-500/30')
                 ui.label('SPOTBOT PRO').classes('text-2xl font-bold tracking-wider text-white')
                 ui.label('INSTITUTIONAL TERMINAL').classes('text-[0.6rem] font-bold text-sky-400/70 tracking-[0.25em]')
             
@@ -315,6 +323,9 @@ async def index():
     
     ui.add_head_html('''
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
+        <link rel="shortcut icon" href="/assets/favicon.ico">
+        <link rel="apple-touch-icon" href="/assets/logo.png">
         <style>
             :root { --nicegui-default-padding: 0.5rem; }
             body { background-color: #0B0E14; color: #f8fafc; font-family: 'Inter', system-ui, -apple-system, sans-serif; overflow-x: hidden; }
@@ -390,10 +401,10 @@ async def index():
         # Área Principal (Direita)
         with ui.column().classes('w-full lg:flex-1 h-auto lg:h-full p-0 bg-[#0B0E14] flex-col gap-0 min-w-0'):
             
-            # Header Ticker Neon com Botoes de Acao Sincronizados
+            # Header Ticker Neon com Botoes de Acao Sincronizados e Logo PNG
             with ui.row().classes('w-full h-10 bg-[#080B10] border-b border-slate-800 items-center px-3 justify-between flex-shrink-0 relative text-xs flex-nowrap'):
                 with ui.row().classes('items-center gap-2 z-10 bg-[#080B10] pr-3 border-r border-slate-800 flex-shrink-0'):
-                    ui.icon('token', size='sm', color='sky-400')
+                    ui.image('/assets/logo.png').classes('w-6 h-6 rounded-md shadow-md')
                     ui.label('SPOTBOT PRO').classes('font-bold tracking-wider text-white text-xs')
                     ui.label('QUANT').classes('text-[0.55rem] font-bold text-sky-400/80 tracking-widest hidden sm:inline')
                 
