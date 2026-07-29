@@ -8,7 +8,7 @@ from binance import BinanceSocketManager
 from binance import AsyncClient as BinanceAsyncClient
 from binance.exceptions import BinanceAPIException
 
-from config.settings import API_KEYS, TELEGRAM_CONFIG, TRADING_CONFIG, RSI_CONFIG, TRAILING_STOP_CONFIG, SCANNER_CONFIG, TOP_20_SYMBOLS
+from config.settings import API_KEYS, TELEGRAM_CONFIG, TRADING_CONFIG, RSI_CONFIG, TRAILING_STOP_CONFIG, SCANNER_CONFIG, TOP_20_SYMBOLS, MAX_CONCURRENT_POSITIONS, RESERVE_FRACTION_FOR_DCA
 from services.binance_client import extract_closes, extract_volumes, get_usdt_balance, get_order_details, get_klines, get_bnb_price, get_multi_klines
 from core.indicators import (
     calculate_rsi, calculate_macd, calculate_bollinger_bands, check_trend, check_candle_patterns,
@@ -40,8 +40,11 @@ else:
     api_secret = API_KEYS.get('mainnet', {}).get('secret', '')
 
 bot_running = True
+active_positions = {}
+
 bot_status_data = {
-    "rsi": 0, "price": 0, "symbol": "", "action": "Iniciando...", "trend": "N/A", "target_asset": "BTCUSDT"
+    "rsi": 0, "price": 0, "symbol": "", "action": "Iniciando...", "trend": "N/A", "target_asset": "BTCUSDT",
+    "active_symbols": [], "active_positions": active_positions
 }
 shared_market_data = {
     "klines": [], "dates": [], "bb_upper": [], "bb_lower": [], "bb_middle": [], "ema200": [], "volumes": [], "scanner_results": []
@@ -179,6 +182,14 @@ async def monitor_oco_lifecycle(
     partial_take_done = False
     dca_done = False
 
+    active_positions[active_target_symbol] = {
+        'tp': lucro_alvo,
+        'sl': stop_loss,
+        'entry': price,
+        'qty': executed_qty,
+        'val': order_val_usdt
+    }
+    bot_status_data['active_symbols'] = list(active_positions.keys())
     bot_status_data['target_asset'] = active_target_symbol
     bot_status_data['price'] = price
     bot_status_data['tp_price'] = lucro_alvo
@@ -352,6 +363,12 @@ async def monitor_oco_lifecycle(
                                 await check_stop_losses(last_stop_loss_time, log=log)
                             else:
                                 stop_loss_count = 0
+                            active_positions.pop(active_target_symbol, None)
+                            bot_status_data['active_symbols'] = list(active_positions.keys())
+                            if bot_status_data.get('target_asset') == active_target_symbol:
+                                bot_status_data['tp_price'] = 0.0
+                                bot_status_data['sl_price'] = 0.0
+                                bot_status_data['entry_price'] = 0.0
                             return
     except Exception as ws_err:
         use_ws_monitoring = False
@@ -400,16 +417,22 @@ async def monitor_oco_lifecycle(
                             await check_stop_losses(last_stop_loss_time, log=log)
                         else:
                             stop_loss_count = 0
-                        bot_status_data['tp_price'] = 0.0
-                        bot_status_data['sl_price'] = 0.0
-                        bot_status_data['entry_price'] = 0.0
+                        active_positions.pop(active_target_symbol, None)
+                        bot_status_data['active_symbols'] = list(active_positions.keys())
+                        if bot_status_data.get('target_asset') == active_target_symbol:
+                            bot_status_data['tp_price'] = 0.0
+                            bot_status_data['sl_price'] = 0.0
+                            bot_status_data['entry_price'] = 0.0
                         return
             except Exception as poll_err:
                 status(f"⚠️ Polling de Ordem: {poll_err}")
 
-    bot_status_data['tp_price'] = 0.0
-    bot_status_data['sl_price'] = 0.0
-    bot_status_data['entry_price'] = 0.0
+    active_positions.pop(active_target_symbol, None)
+    bot_status_data['active_symbols'] = list(active_positions.keys())
+    if bot_status_data.get('target_asset') == active_target_symbol:
+        bot_status_data['tp_price'] = 0.0
+        bot_status_data['sl_price'] = 0.0
+        bot_status_data['entry_price'] = 0.0
 
 async def run_bot(log_callback=None, investment_amount=None, selected_symbol=None, status_callback=None):
     global restart_attempts, bot_running, last_operation_time, stop_loss_count, last_stop_loss_time
@@ -664,79 +687,77 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 f"🪙 Modo Selecionado: <b>{display_symbol}</b>"
             ))
         
-        # Verificação e Adotação de Ordens OCO Ativas (State Recovery Engine v3.0)
+        # Verificação e Adotação Multi-Posição de Ordens OCO Ativas (State Recovery Engine v4.0)
         open_ocos = await client.get_open_oco_orders()
         if open_ocos:
-            oco_order = open_ocos[0]
-            active_target_symbol = oco_order['symbol']
-            log(f"🔄 \033[1;36mState Recovery Engine\033[0m: Ordem OCO ativa encontrada na Binance para \033[1;33m{active_target_symbol}\033[0m!")
-            log(f"🛡️ Retomando monitoramento de Scalp Locking (+1.5%) e Trailing Stop sem cancelar a operação...\n")
-            
-            if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
-                asyncio.create_task(send_telegram_message(
-                    TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
-                    f"🔄 <b>State Recovery Ativado!</b>\n\n"
-                    f"🪙 Par: <b>{active_target_symbol}</b>\n"
-                    f"🛡️ Ordem OCO recuperada da Binance. Retomando monitoramento de lucro e stop automaticamente!"
-                ))
-            
-            limit_order_id = oco_order['orders'][1]['orderId']
-            stop_order_id = oco_order['orders'][0]['orderId']
-            target_symbol_info = await client.get_symbol_info(active_target_symbol)
-            tick_size = float(next(f for f in target_symbol_info['filters'] if f['filterType'] == 'PRICE_FILTER')['tickSize'])
-            step_size = float(next(f for f in target_symbol_info['filters'] if f['filterType'] == 'LOT_SIZE')['stepSize'])
-            
-            limit_details = await get_order_details(client, active_target_symbol, limit_order_id)
-            stop_details = await get_order_details(client, active_target_symbol, stop_order_id)
-            
-            executed_qty = float(limit_details.get('origQty', stop_details.get('origQty', 0)))
-            lucro_alvo = float(limit_details.get('price', 0))
-            stop_loss = float(stop_details.get('stopPrice', stop_details.get('price', 0)))
-            stop_limit = float(stop_details.get('price', 0))
-            
-            ticker_cur = await client.get_symbol_ticker(symbol=active_target_symbol)
-            price = float(ticker_cur['price'])
-            order_val_usdt = round(executed_qty * price, 2)
-            purchase_timestamp = datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
-
-            bot_status_data['target_asset'] = active_target_symbol
-            bot_status_data['price'] = price
-            
-            # Carrega klines e indicadores para popular o gráfico do ativo recuperado imediatamente
-            try:
-                klines_raw = await client.get_klines(symbol=active_target_symbol, interval=TRADING_CONFIG['interval'], limit=100)
-                klines_rec = [float(k[4]) for k in klines_raw]
-                dates_rec = [datetime.fromtimestamp(k[0]/1000).strftime('%H:%M') for k in klines_raw]
-                volumes_rec = [float(k[5]) for k in klines_raw]
+            log(f"🔄 \033[1;36mState Recovery Engine\033[0m: {len(open_ocos)} ordem(ns) OCO ativa(s) encontrada(s) na Binance!")
+            for oco_order in open_ocos[:MAX_CONCURRENT_POSITIONS]:
+                active_target_symbol = oco_order['symbol']
+                log(f"🛡️ Retomando monitoramento paralelo de \033[1;33m{active_target_symbol}\033[0m sem cancelar a operação...")
                 
-                if len(klines_rec) >= 20:
-                    df_rec = pd.DataFrame({'close': klines_rec})
-                    sma20 = df_rec['close'].rolling(window=20).mean()
-                    std20 = df_rec['close'].rolling(window=20).std()
-                    bb_upper = (sma20 + 2 * std20).fillna(0).tolist()
-                    bb_lower = (sma20 - 2 * std20).fillna(0).tolist()
-                    ema200 = df_rec['close'].ewm(span=min(200, len(klines_rec)), adjust=False).mean().fillna(0).tolist()
-                else:
-                    bb_upper, bb_lower, ema200 = [], [], []
+                if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                    asyncio.create_task(send_telegram_message(
+                        TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                        f"🔄 <b>State Recovery Ativado!</b>\n\n"
+                        f"🪙 Par: <b>{active_target_symbol}</b>\n"
+                        f"🛡️ Ordem OCO recuperada da Binance. Retomando monitoramento de lucro e stop automaticamente!"
+                    ))
+                
+                limit_order_id = oco_order['orders'][1]['orderId']
+                stop_order_id = oco_order['orders'][0]['orderId']
+                target_symbol_info = await client.get_symbol_info(active_target_symbol)
+                tick_size = float(next(f for f in target_symbol_info['filters'] if f['filterType'] == 'PRICE_FILTER')['tickSize'])
+                step_size = float(next(f for f in target_symbol_info['filters'] if f['filterType'] == 'LOT_SIZE')['stepSize'])
+                
+                limit_details = await get_order_details(client, active_target_symbol, limit_order_id)
+                stop_details = await get_order_details(client, active_target_symbol, stop_order_id)
+                
+                executed_qty = float(limit_details.get('origQty', stop_details.get('origQty', 0)))
+                lucro_alvo = float(limit_details.get('price', 0))
+                stop_loss = float(stop_details.get('stopPrice', stop_details.get('price', 0)))
+                
+                ticker_cur = await client.get_symbol_ticker(symbol=active_target_symbol)
+                price = float(ticker_cur['price'])
+                order_val_usdt = round(executed_qty * price, 2)
+                purchase_timestamp = datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
 
-                shared_market_data['dates'] = dates_rec
-                shared_market_data['klines'] = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in klines_raw]
-                shared_market_data['bb_upper'] = bb_upper
-                shared_market_data['bb_lower'] = bb_lower
-                shared_market_data['ema200'] = ema200
-                shared_market_data['volumes'] = volumes_rec
-            except Exception as k_err:
-                log(f"⚠️ Aviso ao carregar klines no State Recovery: {k_err}")
+                bot_status_data['target_asset'] = active_target_symbol
+                bot_status_data['price'] = price
+                
+                # Carrega klines e indicadores para popular o gráfico do ativo recuperado
+                try:
+                    klines_raw = await client.get_klines(symbol=active_target_symbol, interval=TRADING_CONFIG['interval'], limit=100)
+                    klines_rec = [float(k[4]) for k in klines_raw]
+                    dates_rec = [datetime.fromtimestamp(k[0]/1000).strftime('%H:%M') for k in klines_raw]
+                    volumes_rec = [float(k[5]) for k in klines_raw]
+                    
+                    if len(klines_rec) >= 20:
+                        df_rec = pd.DataFrame({'close': klines_rec})
+                        sma20 = df_rec['close'].rolling(window=20).mean()
+                        std20 = df_rec['close'].rolling(window=20).std()
+                        bb_upper = (sma20 + 2 * std20).fillna(0).tolist()
+                        bb_lower = (sma20 - 2 * std20).fillna(0).tolist()
+                        ema200 = df_rec['close'].ewm(span=min(200, len(klines_rec)), adjust=False).mean().fillna(0).tolist()
+                    else:
+                        bb_upper, bb_lower, ema200 = [], [], []
 
-            await monitor_oco_lifecycle(
-                client, bsm, active_target_symbol, oco_order, limit_order_id, stop_order_id,
-                price, executed_qty, order_val_usdt, lucro_alvo, stop_loss, target_symbol_info,
-                tick_size, step_size, log, status, saldo_inicial_usdt, 1, purchase_timestamp,
-                "State Recovery (Posição Retomada)", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                [], 0, 0, 0, 0, 0, 0, True, None, db
-            )
-        else:
-            await cancel_all_oco_orders(client, symbol)
+                    shared_market_data['dates'] = dates_rec
+                    shared_market_data['klines'] = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in klines_raw]
+                    shared_market_data['bb_upper'] = bb_upper
+                    shared_market_data['bb_lower'] = bb_lower
+                    shared_market_data['ema200'] = ema200
+                    shared_market_data['volumes'] = volumes_rec
+                except Exception as k_err:
+                    log(f"⚠️ Aviso ao carregar klines no State Recovery ({active_target_symbol}): {k_err}")
+
+                # Lança o monitoramento em background para NÃO bloquear o scanner das vagas restantes!
+                asyncio.create_task(monitor_oco_lifecycle(
+                    client, bsm, active_target_symbol, oco_order, limit_order_id, stop_order_id,
+                    price, executed_qty, order_val_usdt, lucro_alvo, stop_loss, target_symbol_info,
+                    tick_size, step_size, log, status, saldo_inicial_usdt, 1, purchase_timestamp,
+                    "State Recovery (Posição Retomada)", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                    [], 0, 0, 0, 0, 0, 0, True, None, db
+                ))
 
         symbol_info = await client.get_symbol_info(symbol)
         tick_size = float(next(filter for filter in symbol_info['filters'] if filter['filterType'] == 'PRICE_FILTER')['tickSize'])
@@ -770,18 +791,33 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
 
                 usdt_balance = await get_usdt_balance(client)
                 
+                if len(active_positions) >= MAX_CONCURRENT_POSITIONS:
+                    active_list_str = ", ".join(active_positions.keys())
+                    status(f"⏳ Posições Máximas Atingidas ({len(active_positions)}/{MAX_CONCURRENT_POSITIONS}): [{active_list_str}]. Monitorando operações...")
+                    await asyncio.sleep(6)
+                    continue
+
                 db_stats = db.get_stats()
                 acc_pnl = db_stats['total_net_profit']
-                slots, slot_value = calculate_dynamic_position_slots(usdt_balance, accumulated_net_profit=acc_pnl)
+                slots, slot_value = calculate_dynamic_position_slots(
+                    usdt_balance,
+                    accumulated_net_profit=acc_pnl,
+                    max_concurrent_positions=MAX_CONCURRENT_POSITIONS,
+                    reserve_fraction_for_dca=RESERVE_FRACTION_FOR_DCA
+                )
 
                 active_target_symbol = symbol
                 if is_scanner_mode:
-                    status("⚡ Scanner 2.0 avaliando Força Relativa (RS vs BTC) dos Top 20 Criptoativos...")
+                    status(f"⚡ Scanner 2.0 avaliando Top 20... (Vagas Livres: {MAX_CONCURRENT_POSITIONS - len(active_positions)}/{MAX_CONCURRENT_POSITIONS})")
                     multi_klines = await get_multi_klines(client, TOP_20_SYMBOLS, TRADING_CONFIG['interval'], TRADING_CONFIG['limit'])
                     ranked_assets = calculate_relative_strength_rank(multi_klines)
                     if ranked_assets:
-                        active_target_symbol = ranked_assets[0]['symbol']
-                        shared_market_data['scanner_results'] = ranked_assets
+                        available_assets = [a for a in ranked_assets if a['symbol'] not in active_positions]
+                        if available_assets:
+                            active_target_symbol = available_assets[0]['symbol']
+                        else:
+                            await asyncio.sleep(5)
+                            continue
 
                 bot_status_data['target_asset'] = active_target_symbol
 
@@ -918,7 +954,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                 f"🪙 Par: <b>{active_target_symbol}</b>\n"
                                 f"💵 Preço: <b>${closes[-1]:.2f}</b>\n"
                                 f"🎯 Motivo: <i>{executed_condition}</i>\n"
-                                f"💰 Valor: <b>${order_val_usdt:.2f} USDT</b> (Juros Compostos Ativo)"
+                                f"💰 Valor: <b>${order_val_usdt:.2f} USDT</b> (Slot {len(active_positions)+1}/{MAX_CONCURRENT_POSITIONS})"
                             ))
 
                         order_count += 1
@@ -942,7 +978,8 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                             ))
                         last_operation_time = datetime.now()
 
-                        await monitor_oco_lifecycle(
+                        # Lança o monitoramento em background para NÃO bloquear o scanner!
+                        asyncio.create_task(monitor_oco_lifecycle(
                             client, bsm, active_target_symbol, oco_order, limit_order_id, stop_order_id,
                             price, executed_qty, order_val_usdt, lucro_alvo, stop_loss, target_symbol_info,
                             tick_size, step_size, log, status, saldo_inicial_usdt, order_count, purchase_timestamp,
@@ -950,7 +987,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                             candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100,
                             ema200, candle_patterns, amplitude, macd_current, signal_line_current, lower_band,
                             middle_band, upper_band, trend_is_up, gemini_response, db
-                        )
+                        ))
             except Exception as trade_exec_err:
                 log(f"⚠️ Erro recuperável na execução de ordem: {trade_exec_err}")
 

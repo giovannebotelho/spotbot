@@ -43,26 +43,28 @@ def get_min_notional(symbol_info):
             return float(f.get('minNotional', f.get('notional', 10.0)))
     return 10.0
 
-def calculate_dynamic_position_slots(usdt_balance, min_order_usdt=10.0, accumulated_net_profit=0.0):
+def calculate_dynamic_position_slots(usdt_balance, min_order_usdt=10.0, accumulated_net_profit=0.0, max_concurrent_positions=3, reserve_fraction_for_dca=0.25):
     usable_usdt = math.floor(usdt_balance * 0.99 * 100) / 100.0
     
-    total_effective_balance = usable_usdt
-    if accumulated_net_profit > 0:
-        total_effective_balance += accumulated_net_profit
-
     if usable_usdt < min_order_usdt:
         return 0, 0.0
-    
-    if total_effective_balance < 30.0:
-        return 1, min(usable_usdt, round(total_effective_balance, 2))
-    elif total_effective_balance < 60.0:
-        return 2, min(usable_usdt, round(total_effective_balance / 2, 2))
-    elif total_effective_balance < 100.0:
-        return 3, min(usable_usdt, round(total_effective_balance / 3, 2))
+
+    # Preserva 25% do saldo em reserva liquida para o Smart Recovery DCA (Suportes Fibonacci 61.8%)
+    allocatable_usdt = usable_usdt * (1.0 - reserve_fraction_for_dca)
+    if allocatable_usdt < min_order_usdt:
+        allocatable_usdt = usable_usdt
+
+    if allocatable_usdt < 20.0:
+        num_slots = 1
+    elif allocatable_usdt < 35.0:
+        num_slots = 2
     else:
-        num_slots = min(5, max(3, int(total_effective_balance // 30)))
-        slot_value = round(total_effective_balance / num_slots, 2)
-        return num_slots, min(usable_usdt, slot_value)
+        num_slots = min(max_concurrent_positions, 3)
+
+    slot_value = max(min_order_usdt, round(allocatable_usdt / num_slots, 2))
+    slot_value = min(usable_usdt, slot_value)
+    
+    return num_slots, slot_value
 
 async def place_safe_oco_sell_order(client, symbol, quantity, price, stop_price, stop_limit_price, precision_price, precision_qty):
     q_str = f"{quantity:.{precision_qty}f}"

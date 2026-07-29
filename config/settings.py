@@ -55,8 +55,13 @@ SCANNER_CONFIG = {
     'macro_interval': '4h',
     'default_micro_interval': '1h',
     'scalping_micro_interval': '15m',
-    'adaptive_interval': True
+    'adaptive_interval': True,
+    'max_concurrent_positions': 3,
+    'reserve_fraction_for_dca': 0.25
 }
+
+MAX_CONCURRENT_POSITIONS = SCANNER_CONFIG['max_concurrent_positions']
+RESERVE_FRACTION_FOR_DCA = SCANNER_CONFIG['reserve_fraction_for_dca']
 
 TRADING_CONFIG = {
     'symbol': 'BTCUSDT',
