@@ -421,6 +421,16 @@ async def index():
                     ui.label('Taxa de Vitória').classes('text-xs text-slate-400')
                     win_rate_val = ui.label('0.0%').classes('font-mono text-sm font-bold text-sky-400')
 
+                def download_csv_export():
+                    try:
+                        csv_data = db.export_trades_csv()
+                        ui.download(csv_data.encode('utf-8'), 'extrato_operacoes_spotbot.csv')
+                        ui.notify('Extrato CSV baixado com sucesso!', type='positive')
+                    except Exception as e:
+                        ui.notify(f'Erro ao exportar CSV: {e}', type='negative')
+
+                ui.button('📄 Exportar Extrato CSV', on_click=download_csv_export).props('unelevated dense size=xs color=sky-700 text-color=white').classes('w-full mt-1 text-[0.65rem] font-bold')
+
             with ui.column().classes('w-full gap-1 mt-1'):
                 ui.label('STATUS ATUAL').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
                 status_ui = ui.markdown('**Aguardando...**').classes('text-xs text-slate-300 leading-relaxed w-full break-words')
@@ -433,7 +443,7 @@ async def index():
                 with ui.row().classes('items-center gap-2 z-10 bg-[#080B10] pr-3 border-r border-slate-800 flex-shrink-0'):
                     ui.image('/assets/logo.png').classes('w-6 h-6 rounded-md shadow-md')
                     ui.label('SPOTBOT PRO').classes('font-bold tracking-wider text-white text-xs')
-                    ui.label('QUANT').classes('text-[0.55rem] font-bold text-sky-400/80 tracking-widest hidden sm:inline')
+                    ui.label('v6.0 QUANT').classes('text-[0.55rem] font-bold text-sky-400/80 tracking-widest hidden sm:inline')
                 
                 # Container do Marquee
                 with ui.element('div').classes('hidden md:flex flex-1 mx-3 overflow-hidden relative h-full items-center min-w-0'):
@@ -464,6 +474,10 @@ async def index():
                         ui.label('🚨').classes('text-xs')
                         ui.label('CANCEL').classes('hidden sm:inline text-xs font-bold ml-1')
                     
+                    ui.button(on_click=panic_sell).props('unelevated dense').classes('bg-[#BE123C] hover:bg-rose-600 text-white font-bold px-2 py-1 text-[0.65rem] rounded-md tracking-wider').tooltip('PANIC SELL: Venda Imediata')
+                    with ui.button(on_click=panic_sell).props('flat dense size=xs color=rose-500'):
+                        ui.label('🔥 PANIC')
+
                     status_indicator = ui.element('div').classes('w-2.5 h-2.5 rounded-full bg-[#BE123C] transition-all')
                     
                     def logout():
@@ -485,6 +499,17 @@ async def index():
                         ai_toggle_btn.text = '🧠 Ocultar IA ❮' if not is_vis else '🧠 Ver Análise IA ❯'
 
                 ai_toggle_btn = ui.button('🧠 Ver Análise IA ❯', on_click=toggle_ai_drawer).props('flat dense size=xs color=sky-400').classes('text-[0.65rem] font-semibold')
+
+            # Legenda de Indicadores Estilo Binance
+            with ui.row().classes('w-full h-6 bg-[#0B0E14] border-b border-slate-800/80 px-3 items-center gap-3 text-[0.6rem] font-mono text-slate-400 flex-shrink-0 overflow-x-auto flex-nowrap'):
+                ui.label('LEGENDA:').classes('font-bold text-slate-500')
+                ui.label('🟢 Vela Alta').classes('text-emerald-400')
+                ui.label('🔴 Vela Baixa').classes('text-rose-400')
+                ui.label('🟡 Banda Bollinger').classes('text-amber-400')
+                ui.label('🔵 EMA 200').classes('text-sky-400')
+                ui.label('🎯-- TP (+4.0%)').classes('text-emerald-400 font-bold')
+                ui.label('🛑-- SL (-2.5%)').classes('text-rose-400 font-bold')
+                ui.label('🩵-- Entrada').classes('text-sky-400 font-bold')
 
             # Conteúdo Expansível do Painel IA Gemini
             ai_reason_container = ui.card().classes('w-full p-3 bg-[#121722] border-b border-slate-800 text-xs text-slate-300 transition-all flex-shrink-0')

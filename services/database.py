@@ -275,3 +275,43 @@ class DatabaseManager:
             
         except Exception as e:
             print(f"Erro na migração do CSV: {e}")
+
+    def export_trades_csv(self, start_date=None, end_date=None):
+        """
+        FASE 1 (v6.0): Exporta histórico de operações filtrado por intervalo de data para CSV.
+        """
+        self.connect()
+        cursor = self.conn.cursor()
+        
+        sql = "SELECT order_index, symbol, quantity, buy_price, oco_result, oco_timestamp, trade_result_net, final_balance_usdt FROM trades"
+        params = []
+        
+        if start_date and end_date:
+            placeholder = "%s" if self.is_postgres else "?"
+            sql += f" WHERE oco_timestamp >= {placeholder} AND oco_timestamp <= {placeholder}"
+            params = [start_date, end_date]
+        elif start_date:
+            placeholder = "%s" if self.is_postgres else "?"
+            sql += f" WHERE oco_timestamp >= {placeholder}"
+            params = [start_date]
+            
+        sql += " ORDER BY id DESC"
+        cursor.execute(sql, tuple(params))
+        rows = cursor.fetchall()
+        self.close()
+        
+        data = []
+        for r in rows:
+            data.append({
+                "Índice": r["order_index"] if hasattr(r, "__getitem__") else r[0],
+                "Símbolo": r["symbol"] if hasattr(r, "__getitem__") else r[1],
+                "Quantidade": r["quantity"] if hasattr(r, "__getitem__") else r[2],
+                "Preço Compra": r["buy_price"] if hasattr(r, "__getitem__") else r[3],
+                "Resultado OCO": r["oco_result"] if hasattr(r, "__getitem__") else r[4],
+                "Data/Hora": r["oco_timestamp"] if hasattr(r, "__getitem__") else r[5],
+                "PnL Líquido (USDT)": r["trade_result_net"] if hasattr(r, "__getitem__") else r[6],
+                "Saldo Final (USDT)": r["final_balance_usdt"] if hasattr(r, "__getitem__") else r[7],
+            })
+        
+        df = pd.DataFrame(data)
+        return df.to_csv(index=False)

@@ -427,12 +427,99 @@ async def monitor_oco_lifecycle(
             except Exception as poll_err:
                 status(f"⚠️ Polling de Ordem: {poll_err}")
 
-    active_positions.pop(active_target_symbol, None)
-    bot_status_data['active_symbols'] = list(active_positions.keys())
-    if bot_status_data.get('target_asset') == active_target_symbol:
-        bot_status_data['tp_price'] = 0.0
-        bot_status_data['sl_price'] = 0.0
-        bot_status_data['entry_price'] = 0.0
+async def panic_sell_position(symbol, client_instance=None):
+    """
+    FASE 1 (v6.0): Panic Sell / Encerramento a Mercado de Posição Ativa.
+    Cancela a ordem OCO na Binance, executa venda a mercado imediatamente,
+    calcula o PnL final e grava o trade no PostgreSQL.
+    Funciona inclusive para posições recuperadas via State Recovery!
+    """
+    global active_positions, bot_status_data
+    symbol = symbol.strip().upper()
+    log_msg = f"🚨 \033[1;31mPANIC SELL\033[0m: Iniciando encerramento de emergência para {symbol}..."
+    print(log_msg)
+    
+    cli = client_instance or globals().get('client')
+    if not cli:
+        try:
+            cli = await BinanceAsyncClient.create(api_key, api_secret)
+            await sync_binance_time(cli, log=lambda m: None)
+        except Exception as e:
+            return False, f"Erro ao conectar com a Binance: {e}"
+
+    try:
+        # 1. Cancela ordens OCO abertas para o simbolo
+        open_ocos = await cli.get_open_oco_orders()
+        for oco in open_ocos:
+            if oco['symbol'] == symbol:
+                try:
+                    await cli.cancel_order(symbol=symbol, orderListId=oco['orderListId'])
+                except Exception as c_err:
+                    print(f"⚠️ Aviso ao cancelar OCO de {symbol}: {c_err}")
+
+        # 2. Obtem quantidade livre e vende a mercado
+        asset_name = symbol.replace("USDT", "")
+        bal = await cli.get_asset_balance(asset=asset_name)
+        free_qty = float(bal['free']) if bal else 0.0
+
+        info = await cli.get_symbol_info(symbol)
+        step_size = float(next(f for f in info['filters'] if f['filterType'] == 'LOT_SIZE')['stepSize'])
+        precision_qty = get_precision(step_size)
+        sell_qty = round(math.floor(free_qty / step_size) * step_size, precision_qty)
+
+        if sell_qty <= 0:
+            active_positions.pop(symbol, None)
+            bot_status_data['active_symbols'] = list(active_positions.keys())
+            return False, f"Saldo insuficiente de {asset_name} para efetuar venda a mercado."
+
+        sell_order = await cli.order_market_sell(symbol=symbol, quantity=sell_qty)
+        executed_qty = float(sell_order.get('executedQty', sell_qty))
+        sell_price = float(sell_order['fills'][0]['price']) if sell_order.get('fills') else float((await cli.get_symbol_ticker(symbol=symbol))['price'])
+
+        pos_info = active_positions.get(symbol, {})
+        entry_price = pos_info.get('entry', sell_price)
+        trade_result = (sell_price - entry_price) * executed_qty
+        trade_result_liquid = trade_result * 0.999 # Desconto de taxa estimado
+
+        timestamp = datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
+
+        # 3. Salva no banco de dados PostgreSQL/SQLite
+        db_mgr = DatabaseManager()
+        usdt_bal = await get_usdt_balance(cli)
+        data_row = create_data_row(
+            1, usdt_bal, usdt_bal, symbol, executed_qty, entry_price, timestamp,
+            pos_info.get('tp', 0.0), pos_info.get('sl', 0.0), pos_info.get('sl', 0.0),
+            "PANIC SELL (Encerramento Manual)", timestamp, trade_result, trade_result, usdt_bal,
+            0, "Panic Sell executado via Dashboard", 0, sell_price, sell_price, sell_price, sell_price, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, [], 0, 0, 0, 0, 0, 0, True, 0.001, trade_result_liquid,
+            trade_result_liquid, "Encerramento manual a mercado efetuado pelo usuário", 0
+        )
+        save_to_csv(data_row)
+        try:
+            db_mgr.add_trade(data_row)
+        except Exception as db_err:
+            print(f"⚠️ Erro ao registrar Panic Sell no banco: {db_err}")
+
+        # 4. Remove de active_positions
+        active_positions.pop(symbol, None)
+        bot_status_data['active_symbols'] = list(active_positions.keys())
+        if bot_status_data.get('target_asset') == symbol:
+            bot_status_data['tp_price'] = 0.0
+            bot_status_data['sl_price'] = 0.0
+            bot_status_data['entry_price'] = 0.0
+
+        if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+            asyncio.create_task(send_telegram_message(
+                TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                f"🚨 <b>PANIC SELL EXECUTADO!</b>\n\n"
+                f"🪙 Par: <b>{symbol}</b>\n"
+                f"💵 Preço de Venda: <b>${sell_price:.4f}</b>\n"
+                f"📊 PnL: <b>${trade_result_liquid:+.2f} USDT</b>"
+            ))
+
+        return True, f"Panic Sell de {symbol} executado a mercado com sucesso por ${sell_price:.4f}!"
+    except Exception as err:
+        return False, f"Falha no Panic Sell de {symbol}: {err}"
 
 async def run_bot(log_callback=None, investment_amount=None, selected_symbol=None, status_callback=None):
     global restart_attempts, bot_running, last_operation_time, stop_loss_count, last_stop_loss_time
