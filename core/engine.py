@@ -116,7 +116,7 @@ async def check_stop_losses(current_time, log=print):
 
 async def check_rsi_reset(symbol, log=print):
     global last_operation_time
-    if last_operation_time and (datetime.now() - last_operation_time) > timedelta(seconds=6*60*60):
+    if last_operation_time and (dt_module.datetime.now() - last_operation_time) > timedelta(seconds=6*60*60):
         current_levels = [RSI_CONFIG['dynamic_low'][i] for i in range(6)]
         default_levels = [RSI_CONFIG['levels'][i] for i in range(6)]
         
@@ -124,7 +124,7 @@ async def check_rsi_reset(symbol, log=print):
             for i in range(6):
                 RSI_CONFIG['dynamic_low'][i] = RSI_CONFIG['levels'][i]
             log(f"\n⏳ Níveis de RSI resetados para {symbol} por inatividade.")
-        last_operation_time = datetime.now()
+        last_operation_time = dt_module.datetime.now()
 
 _cached_balances = {'bnb': 0.0, 'bnb_usdt': 0.0, 'usdt': 0.0}
 _last_balance_time = 0
@@ -375,7 +375,7 @@ async def monitor_oco_lifecycle(
                             
                             if stop_details['status'] == 'FILLED':
                                 stop_loss_count += 1
-                                last_stop_loss_time = datetime.now()
+                                last_stop_loss_time = dt_module.datetime.now()
                                 await check_stop_losses(last_stop_loss_time, log=log)
                             else:
                                 stop_loss_count = 0
@@ -429,7 +429,7 @@ async def monitor_oco_lifecycle(
                         
                         if stop_details['status'] == 'FILLED':
                             stop_loss_count += 1
-                            last_stop_loss_time = datetime.now()
+                            last_stop_loss_time = dt_module.datetime.now()
                             await check_stop_losses(last_stop_loss_time, log=log)
                         else:
                             stop_loss_count = 0
@@ -497,7 +497,7 @@ async def panic_sell_position(symbol, client_instance=None):
         trade_result = (sell_price - entry_price) * executed_qty
         trade_result_liquid = trade_result * 0.999 # Desconto de taxa estimado
 
-        timestamp = datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
+        timestamp = dt_module.datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
 
         # 3. Salva no banco de dados PostgreSQL/SQLite
         db_mgr = DatabaseManager()
@@ -822,7 +822,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 ticker_cur = await client.get_symbol_ticker(symbol=active_target_symbol)
                 price = float(ticker_cur['price'])
                 order_val_usdt = round(executed_qty * price, 2)
-                purchase_timestamp = datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
+                purchase_timestamp = dt_module.datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
 
                 bot_status_data['target_asset'] = active_target_symbol
                 bot_status_data['price'] = price
@@ -866,13 +866,13 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         tick_size = float(next(filter for filter in symbol_info['filters'] if filter['filterType'] == 'PRICE_FILTER')['tickSize'])
         quote_precision = int(symbol_info['quoteAssetPrecision'])
 
-        last_sync_hour = datetime.now().hour
+        last_sync_hour = dt_module.datetime.now().hour
         last_pdf_sent_day = None
         order_count = 0
 
         while bot_running:
             try:
-                current_dt = datetime.now()
+                current_dt = dt_module.datetime.now()
                 current_hour = current_dt.hour
                 
                 if current_hour != last_sync_hour:
@@ -893,7 +893,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         log(f"⚠️ Erro ao gerar PDF automático de domingo: {pdf_err}")
 
                 # FASE 2: Relatório Diário Automático às 23:59
-                now_dt = datetime.now()
+                now_dt = dt_module.datetime.now()
                 if now_dt.hour == 23 and now_dt.minute == 59 and globals().get('_last_daily_report_date') != now_dt.date():
                     globals()['_last_daily_report_date'] = now_dt.date()
                     try:
@@ -1123,7 +1123,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         compra = await client.order_market_buy(symbol=active_target_symbol, quoteOrderQty=round(order_val_usdt, quote_precision))
                         executed_qty = float(compra['executedQty'])
                         price = float(compra['fills'][0]['price'])
-                        timestamp = datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
+                        timestamp = dt_module.datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
                         
                         log(f"✅️ ({order_count:02d}) Comprado: {active_target_symbol} - Qtd: {executed_qty} - Preço: ${price:.4f}")
                         purchase_timestamp = timestamp
@@ -1138,7 +1138,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                 f"🟢 Take Profit (TP): <b>${lucro_alvo:.4f}</b> (+4.0%)\n"
                                 f"🔴 Stop Loss (SL): <b>${stop_loss:.4f}</b> (-2.0%)"
                             ))
-                        last_operation_time = datetime.now()
+                        last_operation_time = dt_module.datetime.now()
 
                         # Lança o monitoramento em background para NÃO bloquear o scanner!
                         asyncio.create_task(monitor_oco_lifecycle(
