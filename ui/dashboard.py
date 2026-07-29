@@ -112,12 +112,17 @@ async def update_data():
         if win_rate_val:
             win_rate_val.text = f"{stats['win_rate']:.1f}%"
         
+        active_symbols = engine.bot_status_data.get('active_symbols', [])
         active_symbol = engine.bot_status_data.get('target_asset', 'BTCUSDT')
         current_price = engine.bot_status_data.get('price', 0.0)
         price_str = f"${current_price:.4f}" if (current_price > 0 and current_price < 1.0) else f"${current_price:.2f}"
 
         if chart_symbol_badge:
-            chart_symbol_badge.text = f"🪙 {active_symbol} ({price_str})"
+            if active_symbols:
+                active_str = " | ".join([f"{s}" for s in active_symbols])
+                chart_symbol_badge.text = f"⚡ VAGAS ATIVAS ({len(active_symbols)}/{engine.MAX_CONCURRENT_POSITIONS}): [{active_str}]"
+            else:
+                chart_symbol_badge.text = f"🪙 {active_symbol} ({price_str})"
 
         tp_price = engine.bot_status_data.get('tp_price', 0.0)
         sl_price = engine.bot_status_data.get('sl_price', 0.0)
