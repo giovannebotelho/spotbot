@@ -16,6 +16,7 @@ db = DatabaseManager()
 # Buffer de Logs Global (guarda os últimos 50 logs para novos visitantes/dispositivos)
 logs_buffer = collections.deque(maxlen=50)
 _last_chart_sig = None
+_last_trades_sig = None
 
 log_ui = None
 status_ui = None
@@ -41,8 +42,7 @@ scanner_table = None
 ai_card = None
 ai_signal_label = None
 ai_reason_markdown = None
-ai_reason_scroll = None
-ai_icon_container = None
+ai_reason_container = None
 
 risk_profile_select = None
 paper_trading_switch = None
@@ -63,7 +63,7 @@ def status_handler(message):
         status_ui.content = f"**{clean_msg}**"
 
 async def update_data():
-    global start_btn, stop_btn, status_indicator
+    global start_btn, stop_btn, status_indicator, _last_chart_sig
     try:
         # Sincronização de Estado dos Botões entre Dispositivos (PC / Celular)
         is_running = engine.bot_running or (bot_task is not None and not bot_task.done())
@@ -112,12 +112,11 @@ async def update_data():
 
         market_data = engine.shared_market_data
         if market_data['dates'] and candle_chart:
-            global _last_chart_sig
             current_sig = (active_symbol, price_str, len(market_data['dates']), market_data['dates'][-1] if market_data['dates'] else '')
             if current_sig != _last_chart_sig:
                 _last_chart_sig = current_sig
                 candle_chart.options['title'] = {
-                    'text': f'📈 {active_symbol} ({price_str})',
+                    'text': f'📈 {active_symbol}',
                     'subtext': 'Binance WebSockets & Scanner Quantitativo',
                     'left': 'center',
                     'top': 8,
@@ -133,7 +132,7 @@ async def update_data():
                 candle_chart.options['series'][4]['data'] = market_data.get('volumes', [])
                 candle_chart.update()
 
-        update_recent_trades_table()
+        await update_recent_trades_table()
 
         insight = engine.shared_market_data.get('gemini_insight')
         if insight and ai_signal_label and ai_reason_markdown:
@@ -141,56 +140,59 @@ async def update_data():
             ai_signal_label.text = f"{signal}"
             
             if signal == 'COMPRA':
-                ai_card.classes(remove='border-slate-800 border-rose-500/50', add='border-emerald-500/60 shadow-[0_0_15px_rgba(16,185,129,0.15)]')
+                if ai_card: ai_card.classes(remove='border-slate-800 border-rose-500/50', add='border-emerald-500/60')
                 ai_signal_label.classes(remove='text-slate-400 text-rose-400 text-amber-400', add='text-emerald-400')
-                if ai_icon_container: ai_icon_container.classes(remove='bg-slate-800 bg-rose-500/10', add='bg-emerald-500/10 text-emerald-400')
             elif signal == 'VENDA':
-                ai_card.classes(remove='border-slate-800 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.15)]', add='border-rose-500/60 shadow-[0_0_15px_rgba(244,63,94,0.15)]')
+                if ai_card: ai_card.classes(remove='border-slate-800 border-emerald-500/50', add='border-rose-500/60')
                 ai_signal_label.classes(remove='text-slate-400 text-emerald-400 text-amber-400', add='text-rose-400')
-                if ai_icon_container: ai_icon_container.classes(remove='bg-slate-800 bg-emerald-500/10', add='bg-rose-500/10 text-rose-400')
             else:
-                ai_card.classes(remove='border-emerald-500/50 border-rose-500/50', add='border-slate-800')
+                if ai_card: ai_card.classes(remove='border-emerald-500/50 border-rose-500/50', add='border-slate-800')
                 ai_signal_label.classes(remove='text-slate-400 text-emerald-400 text-rose-400', add='text-amber-400')
-                if ai_icon_container: ai_icon_container.classes(remove='bg-emerald-500/10 bg-rose-500/10', add='bg-amber-500/10 text-amber-400')
                 
             ai_reason_markdown.content = insight.get('justification', '**Sem justificativa disponível.**')
 
     except Exception:
         pass
 
-def update_recent_trades_table():
+async def update_recent_trades_table():
+    global _last_trades_sig
     if not recent_trades_table:
         return
 
-    trades_df = db.get_recent_trades(limit=10)
+    trades_df = await asyncio.to_thread(db.get_recent_trades, 10)
     if trades_df.empty:
-        recent_trades_table.rows = []
+        if _last_trades_sig != 0:
+            _last_trades_sig = 0
+            recent_trades_table.rows = []
         return
 
     if 'id' in trades_df.columns:
         trades_df = trades_df.sort_values('id', ascending=False)
     
-    rows = []
-    for _, row in trades_df.iterrows():
-        pnl_val = row.get('Resultado da Ordem OCO')
-        if not isinstance(pnl_val, (int, float)):
-             pnl_val = row.get('Resultado Parcial da Transação Líquido', 0)
-        
-        try:
-            pnl_float = float(pnl_val)
-            pnl_str = f"${pnl_float:.2f}"
-        except Exception:
-            pnl_str = str(pnl_val)
-        
-        rows.append({
-            'date': str(row.get('Data/Hora da Compra', 'N/A')),
-            'pair': str(row.get('Símbolo', 'N/A')),
-            'type': 'OCO',
-            'result': str(row.get('Resultado da Ordem OCO', '-')),
-            'pnl': pnl_str,
-        })
-        
-    recent_trades_table.rows = rows
+    current_sig = len(trades_df)
+    if current_sig != _last_trades_sig:
+        _last_trades_sig = current_sig
+        rows = []
+        for _, row in trades_df.iterrows():
+            pnl_val = row.get('Resultado da Ordem OCO')
+            if not isinstance(pnl_val, (int, float)):
+                 pnl_val = row.get('Resultado Parcial da Transação Líquido', 0)
+            
+            try:
+                pnl_float = float(pnl_val)
+                pnl_str = f"${pnl_float:.2f}"
+            except Exception:
+                pnl_str = str(pnl_val)
+            
+            rows.append({
+                'date': str(row.get('Data/Hora da Compra', 'N/A')),
+                'pair': str(row.get('Símbolo', 'N/A')),
+                'type': 'OCO',
+                'result': str(row.get('Resultado da Ordem OCO', '-')),
+                'pnl': pnl_str,
+            })
+            
+        recent_trades_table.rows = rows
 
 async def start_bot():
     global bot_task
@@ -308,10 +310,9 @@ async def index():
 
     global log_ui, status_ui, investment_input, symbol_select, bnb_val, bnb_usdt_val, usdt_val
     global total_profit_val, win_rate_val, recent_trades_table, status_indicator, candle_chart, scanner_table
-    global ai_signal_label, ai_reason_markdown, ai_reason_scroll, ai_card, ai_icon_container, risk_profile_select, paper_trading_switch
+    global ai_signal_label, ai_reason_markdown, ai_reason_container, ai_card, risk_profile_select, paper_trading_switch
     global chart_symbol_badge, start_btn, stop_btn, cancel_btn
     
-    # Cores Didáticas, Elegantes e Profissionais (Sem Azul Ciano Muito Forte)
     ui.colors(primary='#0284C7', secondary='#64748b', accent='#10B981', positive='#10B981', negative='#F43F5E', dark='#0B0E14')
     
     ui.add_head_html('''
@@ -344,10 +345,10 @@ async def index():
         </style>
     ''')
 
-    # Container Principal Responsivo: flex-col no Mobile (rolagem suave) e flex-row no Desktop (100% fixo sem rolagem)
+    # Container Principal Responsivo
     with ui.row().classes('w-full min-h-screen lg:h-screen overflow-x-hidden overflow-y-auto lg:overflow-hidden flex-col lg:flex-row flex-wrap lg:flex-nowrap gap-0 bg-[#0B0E14]'):
         
-        # Painel Esquerdo de Configurações & Métricas (No Mobile fica no topo, no PC fica à esquerda)
+        # Painel Esquerdo de Configurações & Métricas
         with ui.column().classes('w-full lg:w-64 h-auto lg:h-full border-b lg:border-b-0 lg:border-r border-slate-800 bg-[#0E121B] p-3 gap-2.5 flex-shrink-0 text-slate-300 overflow-y-auto'):
             with ui.column().classes('w-full gap-1'):
                 ui.label('MODO DE MONITORAMENTO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
@@ -388,10 +389,10 @@ async def index():
                 ui.label('STATUS ATUAL').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
                 status_ui = ui.markdown('**Aguardando...**').classes('text-xs text-slate-300 leading-relaxed w-full break-words')
 
-        # Área Principal (Direita) - Preenche o Restante da Tela no PC e Empilha no Mobile
+        # Área Principal (Direita)
         with ui.column().classes('w-full lg:flex-1 h-auto lg:h-full p-0 bg-[#0B0E14] flex-col gap-0 min-w-0'):
             
-            # Header Ticker Neon com Botoes de Acao Sincronizados e Cores Elegantes
+            # Header Ticker Neon com Botoes de Acao Sincronizados
             with ui.row().classes('w-full h-10 bg-[#080B10] border-b border-slate-800 items-center px-3 justify-between flex-shrink-0 relative text-xs flex-nowrap'):
                 with ui.row().classes('items-center gap-2 z-10 bg-[#080B10] pr-3 border-r border-slate-800 flex-shrink-0'):
                     ui.icon('token', size='sm', color='sky-400')
@@ -423,32 +424,31 @@ async def index():
                         ui.navigate.to('/login')
                     ui.button(icon='logout', on_click=logout).props('flat dense size=sm color=slate-400')
 
-            # Seção Central do Gráfico (360px no Mobile, 50vh no PC)
+            # Barra Superior Estilo Binance com Botao Drawer da IA Gemini (100% Limpo Sem Sobrepor o Grafico!)
+            with ui.row().classes('w-full h-8 bg-[#121722] border-b border-slate-800 px-3 items-center justify-between flex-shrink-0 z-20'):
+                with ui.row().classes('items-center gap-2'):
+                    ui.icon('psychology', size='xs', color='sky-400')
+                    ui.label('ANÁLISE IA GEMINI:').classes('text-[0.65rem] font-bold text-slate-400 tracking-wider')
+                    ai_signal_label = ui.label('NEUTRO').classes('text-[0.65rem] font-bold text-slate-400')
+                
+                def toggle_ai_drawer():
+                    if ai_reason_container:
+                        is_vis = ai_reason_container.visible
+                        ai_reason_container.set_visibility(not is_vis)
+                        ai_toggle_btn.text = '🧠 Ocultar IA ❮' if not is_vis else '🧠 Ver Análise IA ❯'
+
+                ai_toggle_btn = ui.button('🧠 Ver Análise IA ❯', on_click=toggle_ai_drawer).props('flat dense size=xs color=sky-400').classes('text-[0.65rem] font-semibold')
+
+            # Conteúdo Expansível do Painel IA Gemini
+            ai_reason_container = ui.card().classes('w-full p-3 bg-[#121722] border-b border-slate-800 text-xs text-slate-300 transition-all flex-shrink-0')
+            ai_reason_container.set_visibility(False)
+            with ai_reason_container:
+                ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-xs text-slate-300 leading-relaxed')
+
+            # Seção Central do Gráfico (100% Livre e Desimpedida!)
             with ui.element('div').classes('w-full h-[360px] lg:h-[50vh] min-h-[300px] relative border-b border-slate-800 flex-shrink-0 bg-[#0B0E14]'):
                 # Badge Flutuante no Canto Superior Direito
                 chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('absolute top-3 right-4 z-20 obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-sky-400 border border-sky-500/30 backdrop-blur-md shadow-lg')
-
-                # Card IA Gemini Compacto (Inicia Colapsado no Mobile para NÃO Cobrir o Gráfico)
-                ai_card = ui.card().classes('absolute top-3 left-3 w-56 lg:w-64 z-20 obsidian-card p-2 rounded-xl shadow-[0_10px_25px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all duration-300')
-                with ai_card:
-                    with ui.row().classes('w-full items-center justify-between mb-0.5'):
-                        with ui.row().classes('items-center gap-1.5'):
-                            ai_icon_container = ui.element('div').classes('p-1 rounded-lg bg-slate-800/80 text-slate-400')
-                            with ai_icon_container: ui.icon('psychology', size='xs')
-                            ai_signal_label = ui.label('NEUTRO').classes('text-[0.65rem] font-bold tracking-wide text-slate-400')
-                        
-                        def toggle_ai_content():
-                            if ai_reason_scroll:
-                                is_visible = ai_reason_scroll.visible
-                                ai_reason_scroll.set_visibility(not is_visible)
-                                toggle_btn.props(f'icon={"keyboard_arrow_down" if is_visible else "keyboard_arrow_up"}')
-
-                        toggle_btn = ui.button(icon='keyboard_arrow_down', on_click=toggle_ai_content).props('flat dense round size=xs color=slate-400')
-                    
-                    ai_reason_scroll = ui.scroll_area().classes('h-16')
-                    ai_reason_scroll.set_visibility(False) # Inicia fechadinho para o gráfico ficar 100% limpo!
-                    with ai_reason_scroll:
-                        ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-[0.6rem] text-slate-300 leading-relaxed')
 
                 # ECharts 100% Visível e Nítido
                 with ui.element('div').classes('w-full h-full'):
@@ -476,8 +476,8 @@ async def index():
                        ]
                     }).classes('w-full h-full')
 
-            # Painel Inferior (Execuções + Terminal Output Sincronizado) Preenchendo o Restante da Tela
-            with ui.row().classes('w-full flex-1 flex-col lg:flex-row gap-0 bg-[#0B0E14] overflow-hidden min-h-0'):
+            # Painel Inferior (Execuções + Terminal Output Sincronizado)
+            with ui.row().classes('w-full flex-1 flex-col lg:flex-row gap-0 bg-[#0B0E14] min-h-[300px] lg:min-h-0'):
                 with ui.column().classes('w-full lg:w-3/5 h-64 lg:h-full border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-[#0B0E14] p-0 flex-col'):
                     with ui.row().classes('w-full h-8 items-center px-4 border-b border-slate-800 bg-[#121722]/50 justify-between flex-shrink-0'):
                         ui.label('HISTÓRICO DE EXECUÇÕES').classes('text-[0.6rem] font-bold text-slate-400 tracking-widest')
@@ -512,7 +512,7 @@ async def index():
                     for past_msg in list(logs_buffer):
                         log_ui.push(past_msg)
 
-    ui.timer(5.0, update_data)
+    ui.timer(8.0, update_data)
 
 def start_dashboard():
     port = DASHBOARD_CONFIG['port']
