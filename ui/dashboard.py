@@ -113,9 +113,13 @@ async def update_data():
         if chart_symbol_badge:
             chart_symbol_badge.text = f"🪙 {active_symbol} ({price_str})"
 
+        tp_price = engine.bot_status_data.get('tp_price', 0.0)
+        sl_price = engine.bot_status_data.get('sl_price', 0.0)
+        entry_price = engine.bot_status_data.get('entry_price', 0.0)
+
         market_data = engine.shared_market_data
         if market_data['dates'] and candle_chart:
-            current_sig = (active_symbol, price_str, len(market_data['dates']), market_data['dates'][-1] if market_data['dates'] else '')
+            current_sig = (active_symbol, price_str, len(market_data['dates']), market_data['dates'][-1] if market_data['dates'] else '', tp_price, sl_price, entry_price)
             if current_sig != _last_chart_sig:
                 _last_chart_sig = current_sig
                 candle_chart.options['title'] = {
@@ -129,6 +133,18 @@ async def update_data():
                 candle_chart.options['xAxis'][0]['data'] = market_data['dates']
                 candle_chart.options['xAxis'][1]['data'] = market_data['dates']
                 candle_chart.options['series'][0]['data'] = market_data['klines']
+
+                # Desanha as Linhas OCO ativas (TP, SL e Preço de Entrada) Estilo Binance
+                mark_lines = []
+                if entry_price > 0:
+                    mark_lines.append({'yAxis': entry_price, 'lineStyle': {'color': '#38BDF8', 'type': 'dashed', 'width': 1.5}, 'label': {'formatter': f' Entrada: ${entry_price:.4f}', 'position': 'insideStartTop', 'color': '#38BDF8'}})
+                if tp_price > 0:
+                    mark_lines.append({'yAxis': tp_price, 'lineStyle': {'color': '#10B981', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🎯 TP: ${tp_price:.4f}', 'position': 'insideEndTop', 'color': '#10B981'}})
+                if sl_price > 0:
+                    mark_lines.append({'yAxis': sl_price, 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🛑 SL: ${sl_price:.4f}', 'position': 'insideEndBottom', 'color': '#F43F5E'}})
+                
+                candle_chart.options['series'][0]['markLine'] = {'symbol': ['none', 'none'], 'data': mark_lines}
+
                 candle_chart.options['series'][1]['data'] = market_data.get('bb_upper', [])
                 candle_chart.options['series'][2]['data'] = market_data.get('bb_lower', [])
                 candle_chart.options['series'][3]['data'] = market_data.get('ema200', [])
