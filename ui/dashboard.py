@@ -53,6 +53,8 @@ risk_profile_select = None
 paper_trading_switch = None
 
 chart_symbol_badge = None
+chart_asset_select = None
+selected_chart_symbol = None
 
 bot_task = None
 
@@ -65,13 +67,59 @@ def log_handler(message):
         except Exception:
             pass
 
-def status_handler(message):
-    if status_ui:
-        try:
-            clean_msg = remove_ansi_codes(message)
-            status_ui.content = f"**{clean_msg}**"
-        except Exception:
-            pass
+async def change_chart_asset(val):
+    global selected_chart_symbol, _last_chart_sig
+    if not val or 'Foco do Bot' in val:
+        selected_chart_symbol = None
+        _last_chart_sig = None
+        return
+        
+    selected_chart_symbol = val
+    _last_chart_sig = None
+    try:
+        if engine.client and candle_chart:
+            klines_raw = await engine.client.get_klines(symbol=val, interval=engine.TRADING_CONFIG['interval'], limit=50)
+            if klines_raw:
+                dates = [dt_module.datetime.fromtimestamp(int(k[0])/1000).strftime('%H:%M') for k in klines_raw]
+                candles = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in klines_raw]
+                closes = [float(k[4]) for k in klines_raw]
+                s_closes = pd.Series(closes)
+                ma = s_closes.rolling(window=20).mean()
+                std = s_closes.rolling(window=20).std()
+                bb_upper = (ma + (2 * std)).fillna(0).tolist()
+                bb_lower = (ma - (2 * std)).fillna(0).tolist()
+                ema200 = s_closes.ewm(span=min(200, len(closes)), adjust=False).mean().fillna(0).tolist()
+                
+                pos_info = engine.active_positions.get(val, {})
+                e_p = pos_info.get('entry', 0.0)
+                tp_p = pos_info.get('tp', 0.0)
+                sl_p = pos_info.get('sl', 0.0)
+                
+                mark_lines = []
+                if e_p > 0:
+                    mark_lines.append({'yAxis': e_p, 'lineStyle': {'color': '#38BDF8', 'type': 'dashed', 'width': 1.5}, 'label': {'formatter': f' Entrada: ${e_p:.4f}', 'position': 'insideStartTop', 'color': '#38BDF8'}})
+                if tp_p > 0:
+                    mark_lines.append({'yAxis': tp_p, 'lineStyle': {'color': '#10B981', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🎯 TP: ${tp_p:.4f}', 'position': 'insideEndTop', 'color': '#10B981'}})
+                if sl_p > 0:
+                    mark_lines.append({'yAxis': sl_p, 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🛑 SL: ${sl_p:.4f}', 'position': 'insideEndBottom', 'color': '#F43F5E'}})
+
+                candle_chart.options['title'] = {
+                    'text': f'📈 {val} (Posição Ativa OCO)',
+                    'subtext': f'Entrada: ${e_p:.4f} | TP: ${tp_p:.4f} | SL: ${sl_p:.4f}',
+                    'left': 15, 'top': 8,
+                    'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
+                    'subtextStyle': {'color': '#64748b', 'fontSize': 9}
+                }
+                candle_chart.options['xAxis'][0]['data'] = dates
+                candle_chart.options['xAxis'][1]['data'] = dates
+                candle_chart.options['series'][0]['data'] = candles
+                candle_chart.options['series'][0]['markLine'] = {'symbol': ['none', 'none'], 'data': mark_lines}
+                candle_chart.options['series'][1]['data'] = bb_upper
+                candle_chart.options['series'][2]['data'] = bb_lower
+                candle_chart.options['series'][3]['data'] = ema200
+                candle_chart.update()
+    except Exception as e:
+        print(f"Aviso ao alterar gráfico para {val}: {e}")
 
 async def update_data():
     global start_btn, stop_btn, status_indicator, _last_chart_sig
@@ -112,7 +160,19 @@ async def update_data():
         if win_rate_val:
             win_rate_val.text = f"{stats['win_rate']:.1f}%"
         
+        # Sincronização Automática do Perfil de Risco (Gemini Auto-Tuning)
+        if risk_profile_select and settings.ACTIVE_RISK_PROFILE:
+            if risk_profile_select.value != settings.ACTIVE_RISK_PROFILE:
+                risk_profile_select.value = settings.ACTIVE_RISK_PROFILE
+
         active_symbols = engine.bot_status_data.get('active_symbols', [])
+        
+        # Sincronização de Opções do Seletor de Ativo do Gráfico
+        if chart_asset_select:
+            curr_opts = ['⚡ Foco do Bot (Automático)'] + list(active_symbols)
+            if chart_asset_select.options != curr_opts:
+                chart_asset_select.options = curr_opts
+
         active_symbol = engine.bot_status_data.get('target_asset', 'BTCUSDT')
         current_price = engine.bot_status_data.get('price', 0.0)
         price_str = f"${current_price:.4f}" if (current_price > 0 and current_price < 1.0) else f"${current_price:.2f}"
@@ -129,7 +189,7 @@ async def update_data():
         entry_price = engine.bot_status_data.get('entry_price', 0.0)
 
         market_data = engine.shared_market_data
-        if market_data['dates'] and candle_chart:
+        if market_data['dates'] and candle_chart and not selected_chart_symbol:
             current_sig = (active_symbol, price_str, len(market_data['dates']), market_data['dates'][-1] if market_data['dates'] else '', tp_price, sl_price, entry_price)
             if current_sig != _last_chart_sig:
                 _last_chart_sig = current_sig
@@ -518,16 +578,25 @@ async def index():
 
                 ai_toggle_btn = ui.button('🧠 Ver Análise IA ❯', on_click=toggle_ai_drawer).props('flat dense size=xs color=sky-400').classes('text-[0.65rem] font-semibold')
 
-            # Legenda de Indicadores Estilo Binance
-            with ui.row().classes('w-full h-6 bg-[#0B0E14] border-b border-slate-800/80 px-3 items-center gap-3 text-[0.6rem] font-mono text-slate-400 flex-shrink-0 overflow-x-auto flex-nowrap'):
-                ui.label('LEGENDA:').classes('font-bold text-slate-500')
-                ui.label('🟢 Vela Alta').classes('text-emerald-400')
-                ui.label('🔴 Vela Baixa').classes('text-rose-400')
-                ui.label('🟡 Banda Bollinger').classes('text-amber-400')
-                ui.label('🔵 EMA 200').classes('text-sky-400')
-                ui.label('🎯-- TP (+4.0%)').classes('text-emerald-400 font-bold')
-                ui.label('🛑-- SL (-2.5%)').classes('text-rose-400 font-bold')
-                ui.label('🩵-- Entrada').classes('text-sky-400 font-bold')
+            # Barra de Seletor de Ativo do Gráfico & Legenda Estilo Binance
+            with ui.row().classes('w-full h-9 bg-[#0B0E14] border-b border-slate-800/80 px-3 items-center justify-between gap-3 flex-shrink-0 z-20 overflow-x-auto flex-nowrap'):
+                with ui.row().classes('items-center gap-2 flex-shrink-0'):
+                    ui.label('🎯 GRÁFICO DO ATIVO:').classes('text-[0.6rem] font-bold text-sky-400 tracking-wider')
+                    chart_asset_select = ui.select(
+                        options=['⚡ Foco do Bot (Automático)'],
+                        value='⚡ Foco do Bot (Automático)',
+                        on_change=lambda e: change_chart_asset(e.value)
+                    ).classes('input-zinc bg-[#121722] rounded-md text-xs font-mono min-w-[200px]').props('dark outlined dense')
+
+                with ui.row().classes('items-center gap-3 text-[0.6rem] font-mono text-slate-400 flex-shrink-0 hidden md:flex'):
+                    ui.label('LEGENDA:').classes('font-bold text-slate-500')
+                    ui.label('🟢 Vela Alta').classes('text-emerald-400')
+                    ui.label('🔴 Vela Baixa').classes('text-rose-400')
+                    ui.label('🟡 Banda Bollinger').classes('text-amber-400')
+                    ui.label('🔵 EMA 200').classes('text-sky-400')
+                    ui.label('🎯-- TP').classes('text-emerald-400 font-bold')
+                    ui.label('🛑-- SL').classes('text-rose-400 font-bold')
+                    ui.label('🩵-- Entrada').classes('text-sky-400 font-bold')
 
             # Conteúdo Expansível do Painel IA Gemini
             ai_reason_container = ui.card().classes('w-full p-3 bg-[#121722] border-b border-slate-800 text-xs text-slate-300 transition-all flex-shrink-0')
