@@ -344,11 +344,11 @@ async def index():
         </style>
     ''')
 
-    # Container Principal Responsivo 100% Sólido no Desktop (h-screen overflow-hidden) e Scrollável no Mobile
-    with ui.row().classes('w-full h-screen overflow-x-hidden overflow-y-auto lg:overflow-hidden flex-nowrap gap-0 bg-[#0B0E14]'):
+    # Container Principal Responsivo: flex-col no Mobile (rolagem suave) e flex-row no Desktop (100% fixo sem rolagem)
+    with ui.row().classes('w-full min-h-screen lg:h-screen overflow-x-hidden overflow-y-auto lg:overflow-hidden flex-col lg:flex-row flex-wrap lg:flex-nowrap gap-0 bg-[#0B0E14]'):
         
-        # Painel Esquerdo de Configurações & Métricas
-        with ui.column().classes('w-full lg:w-64 h-auto lg:h-full border-r border-slate-800 bg-[#0E121B] p-3 gap-2.5 flex-shrink-0 text-slate-300 overflow-y-auto'):
+        # Painel Esquerdo de Configurações & Métricas (No Mobile fica no topo, no PC fica à esquerda)
+        with ui.column().classes('w-full lg:w-64 h-auto lg:h-full border-b lg:border-b-0 lg:border-r border-slate-800 bg-[#0E121B] p-3 gap-2.5 flex-shrink-0 text-slate-300 overflow-y-auto'):
             with ui.column().classes('w-full gap-1'):
                 ui.label('MODO DE MONITORAMENTO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
                 symbol_select = ui.select(
@@ -388,8 +388,8 @@ async def index():
                 ui.label('STATUS ATUAL').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
                 status_ui = ui.markdown('**Aguardando...**').classes('text-xs text-slate-300 leading-relaxed w-full break-words')
 
-        # Área Principal (Direita) - Preenche 100% do Espaço Vertical
-        with ui.column().classes('flex-1 h-full p-0 overflow-hidden bg-[#0B0E14] flex-col gap-0 min-w-0'):
+        # Área Principal (Direita) - Preenche o Restante da Tela no PC e Empilha no Mobile
+        with ui.column().classes('w-full lg:flex-1 h-auto lg:h-full p-0 bg-[#0B0E14] flex-col gap-0 min-w-0'):
             
             # Header Ticker Neon com Botoes de Acao Sincronizados e Cores Elegantes
             with ui.row().classes('w-full h-10 bg-[#080B10] border-b border-slate-800 items-center px-3 justify-between flex-shrink-0 relative text-xs flex-nowrap'):
@@ -423,8 +423,8 @@ async def index():
                         ui.navigate.to('/login')
                     ui.button(icon='logout', on_click=logout).props('flat dense size=sm color=slate-400')
 
-            # Seção Central do Gráfico (52% de Altura Explicita com Layout Limpo Sem Poluição Visual no Mobile)
-            with ui.element('div').classes('w-full h-[50vh] min-h-[300px] relative border-b border-slate-800 flex-shrink-0 bg-[#0B0E14]'):
+            # Seção Central do Gráfico (360px no Mobile, 50vh no PC)
+            with ui.element('div').classes('w-full h-[360px] lg:h-[50vh] min-h-[300px] relative border-b border-slate-800 flex-shrink-0 bg-[#0B0E14]'):
                 # Badge Flutuante no Canto Superior Direito
                 chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('absolute top-3 right-4 z-20 obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-sky-400 border border-sky-500/30 backdrop-blur-md shadow-lg')
 
