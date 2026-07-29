@@ -2,6 +2,8 @@ import sqlite3
 import json
 import pandas as pd
 import warnings
+import datetime as dt_module
+from datetime import datetime
 from pathlib import Path
 from config.settings import DATABASE_URL, BASE_DIR
 
@@ -255,7 +257,7 @@ class DatabaseManager:
         FASE 2 (v6.0): Retorna estatísticas de PnL e operações do dia informado (ou hoje).
         """
         if not date_str:
-            date_str = datetime.now().strftime("%d/%m/%Y")
+            date_str = dt_module.datetime.now().strftime("%d/%m/%Y")
             
         self.connect()
         cursor = self.conn.cursor()
