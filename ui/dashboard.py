@@ -524,8 +524,8 @@ async def index():
                     }).classes('w-full h-full')
 
             # Painel Inferior (Execuções + Terminal Output Sincronizado)
-            with ui.row().classes('w-full flex-1 flex-col lg:flex-row gap-0 bg-[#0B0E14] min-h-[300px] lg:min-h-0'):
-                with ui.column().classes('w-full lg:w-3/5 h-64 lg:h-full border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-[#0B0E14] p-0 flex-col'):
+            with ui.row().classes('w-full flex-shrink-0 flex-col lg:flex-row gap-0 bg-[#0B0E14] min-h-[280px]'):
+                with ui.column().classes('w-full lg:w-3/5 h-64 lg:h-72 border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-[#0B0E14] p-0 flex-col'):
                     with ui.row().classes('w-full h-8 items-center px-4 border-b border-slate-800 bg-[#121722]/50 justify-between flex-shrink-0'):
                         ui.label('HISTÓRICO DE EXECUÇÕES').classes('text-[0.6rem] font-bold text-slate-400 tracking-widest')
                         ui.icon('history', size='xs', color='slate-500')
@@ -548,12 +548,12 @@ async def index():
                        </q-tr>
                     ''')
 
-                with ui.column().classes('w-full lg:w-2/5 h-64 lg:h-full bg-[#0B0E14] p-0 flex-col'):
+                with ui.column().classes('w-full lg:w-2/5 h-64 lg:h-72 bg-[#0B0E14] p-0 flex-col'):
                     with ui.row().classes('w-full h-8 items-center px-4 border-b border-slate-800 bg-[#121722]/50 gap-2 flex-shrink-0'):
                        ui.icon('terminal', size='xs', color='sky-400')
                        ui.label('TERMINAL OUTPUT (SINCRONIZADO)').classes('text-[0.6rem] font-bold text-slate-400 tracking-widest')
                      
-                    log_ui = ui.log().classes('w-full h-full font-mono text-[0.65rem] bg-[#080B10] text-emerald-400 p-3 rounded-none border-none leading-tight')
+                    log_ui = ui.log(max_lines=300).classes('w-full h-[calc(100%-2rem)] font-mono text-[0.65rem] bg-[#080B10] text-emerald-400 p-3 rounded-none border-none leading-tight overflow-y-auto')
                     
                     # Popula com os logs recentes sincronizados do buffer
                     for past_msg in list(logs_buffer):
