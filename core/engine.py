@@ -730,20 +730,20 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             except Exception as e:
                 return f"Erro ao buscar notícias: {e}"
 
-        elif cmd == '/ajuda':
+        elif cmd in ['/ajuda', '/help', '/menu']:
             return (
-                "📚 <b>COMANDOS DISPONÍVEIS (SPOTBOT PRO)</b>\n"
+                "📚 <b>COMANDOS DISPONÍVEIS (SPOTBOT PRO v6.0)</b>\n"
                 "━━━━━━━━━━━━━━━━━━━\n"
-                "/status - Exibe o ativo em foco, RSI e status do robô\n"
-                "/saldo - Exibe saldos USDT, BNB e cálculo de slots\n"
-                "/noticias - Exibe o sentimento de mercado e manchetes em tempo real via IA\n"
-                "/ocos ou /ordens - Exibe as ordens OCO e posições ativas em tempo real\n"
-                "/top20 ou /scanner - Varre a força relativa dos Top 20 ativos\n"
-                "/lucro ou /perf - Exibe o lucro total líquido acumulado\n"
-                "/relatorio ou /pdf - Gera e envia o Relatório Executivo em PDF\n"
-                "/stop - Pausa a execução remota com segurança\n"
-                "/cancel ou /abort - Interrupção imediata de emergência (CTRL+C)\n"
-                "/ajuda - Exibe esta mensagem de ajuda"
+                "📊 /status - Status do ativo em foco, RSI e confluência MTF\n"
+                "💰 /saldo - Saldos USDT, BNB e fracionamento de vagas\n"
+                "📈 /lucro ou /perf - Lucro líquido acumulado e Win Rate\n"
+                "⚡ /posicoes ou /ocos - Ordens OCO e posições ativas\n"
+                "📰 /noticias - Sentimento de mercado e notícias CryptoPanic\n"
+                "🔥 /top20 ou /scanner - Ranking de Força Relativa do Top 20\n"
+                "📄 /relatorio ou /pdf - Gera e envia Relatório Semanal PDF\n"
+                "🛑 /stop - Pausa o bot com segurança\n"
+                "🚨 /cancel - Interrupção de emergência (CTRL+C)\n"
+                "📱 /menu ou /ajuda - Exibe este menu com botões inline"
             )
         return "❓ Comando não reconhecido. Digite /ajuda para ver as opções."
 
