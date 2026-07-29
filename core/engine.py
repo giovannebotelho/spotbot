@@ -3,6 +3,7 @@ import os
 import time
 import math
 import pandas as pd
+import datetime as dt_module
 from datetime import datetime, timedelta
 from binance import BinanceSocketManager
 from binance import AsyncClient as BinanceAsyncClient
@@ -829,7 +830,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 try:
                     klines_raw = await client.get_klines(symbol=active_target_symbol, interval=TRADING_CONFIG['interval'], limit=100)
                     klines_rec = [float(k[4]) for k in klines_raw]
-                    dates_rec = [datetime.fromtimestamp(k[0]/1000).strftime('%H:%M') for k in klines_raw]
+                    dates_rec = [dt_module.datetime.fromtimestamp(float(k[0])/1000).strftime('%H:%M') for k in klines_raw]
                     volumes_rec = [float(k[5]) for k in klines_raw]
                     
                     if len(klines_rec) >= 20:
@@ -1016,7 +1017,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 chart_limit = 50
                 if len(klines) > chart_limit:
                     recent_klines = klines[-chart_limit:]
-                    shared_market_data['dates'] = [datetime.fromtimestamp(int(k[0])/1000).strftime('%H:%M') for k in recent_klines]
+                    shared_market_data['dates'] = [dt_module.datetime.fromtimestamp(int(k[0])/1000).strftime('%H:%M') for k in recent_klines]
                     shared_market_data['klines'] = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in recent_klines]
                     shared_market_data['volumes'] = [float(k[5]) for k in recent_klines]
                     
