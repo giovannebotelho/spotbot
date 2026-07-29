@@ -345,7 +345,8 @@ async def monitor_oco_lifecycle(
                             
                             # FASE 3: Síntese Pós-Trade via IA Gemini
                             try:
-                                post_synthesis = generate_post_trade_synthesis(active_target_symbol, order_result, price, exit_price, trade_result_liquid)
+                                cur_exit_price = lucro_alvo if (order_result and "TAKE" in str(order_result).upper()) else stop_loss
+                                post_synthesis = generate_post_trade_synthesis(active_target_symbol, order_result, price, cur_exit_price, trade_result_liquid)
                                 log(f"🧠 \033[1;36mAnálise Pós-Trade (IA Gemini)\033[0m: {post_synthesis}")
                                 if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
                                     asyncio.create_task(send_telegram_message(
