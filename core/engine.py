@@ -340,6 +340,11 @@ async def monitor_oco_lifecycle(
                                 total_difference_liquid, gemini_response, bnb_balance_free * bnb_price
                             )
                             save_to_csv(data_row)
+                            if db:
+                                try:
+                                    db.add_trade(data_row)
+                                except Exception as db_save_err:
+                                    log(f"⚠️ Erro ao registrar trade no banco de dados: {db_save_err}")
                             
                             if stop_details['status'] == 'FILLED':
                                 stop_loss_count += 1
@@ -383,6 +388,11 @@ async def monitor_oco_lifecycle(
                             total_difference_liquid, gemini_response, bnb_balance_free * bnb_price
                         )
                         save_to_csv(data_row)
+                        if db:
+                            try:
+                                db.add_trade(data_row)
+                            except Exception as db_save_err:
+                                log(f"⚠️ Erro ao registrar trade no banco de dados: {db_save_err}")
                         
                         if stop_details['status'] == 'FILLED':
                             stop_loss_count += 1

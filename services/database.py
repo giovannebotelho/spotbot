@@ -105,6 +105,8 @@ class DatabaseManager:
         self.close()
 
     def add_trade(self, data_row):
+        global _stats_cache
+        _stats_cache = None
         self.connect()
         cursor = self.conn.cursor()
         
