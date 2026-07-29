@@ -381,8 +381,8 @@ async def index():
         </style>
     ''')
 
-    # Container Principal Responsivo
-    with ui.row().classes('w-full min-h-screen lg:h-screen overflow-x-hidden overflow-y-auto lg:overflow-hidden flex-col lg:flex-row flex-wrap lg:flex-nowrap gap-0 bg-[#0B0E14]'):
+    # Container Principal Responsivo com Scroll Vertical Liberado no PC e Mobile
+    with ui.row().classes('w-full min-h-screen overflow-x-hidden overflow-y-auto flex-col lg:flex-row flex-wrap lg:flex-nowrap gap-0 bg-[#0B0E14]'):
         
         # Painel Esquerdo de Configurações & Métricas
         with ui.column().classes('w-full lg:w-64 h-auto lg:h-full border-b lg:border-b-0 lg:border-r border-slate-800 bg-[#0E121B] p-3 gap-2.5 flex-shrink-0 text-slate-300 overflow-y-auto'):
@@ -425,8 +425,8 @@ async def index():
                 ui.label('STATUS ATUAL').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
                 status_ui = ui.markdown('**Aguardando...**').classes('text-xs text-slate-300 leading-relaxed w-full break-words')
 
-        # Área Principal (Direita)
-        with ui.column().classes('w-full lg:flex-1 h-auto lg:h-full p-0 bg-[#0B0E14] flex-col gap-0 min-w-0'):
+        # Área Principal (Direita com Scroll Vertical Habilitado)
+        with ui.column().classes('w-full lg:flex-1 h-auto lg:h-full overflow-y-auto p-0 bg-[#0B0E14] flex-col gap-0 min-w-0'):
             
             # Header Ticker Neon com Botoes de Acao Sincronizados e Logo PNG
             with ui.row().classes('w-full h-10 bg-[#080B10] border-b border-slate-800 items-center px-3 justify-between flex-shrink-0 relative text-xs flex-nowrap'):
