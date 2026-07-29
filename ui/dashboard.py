@@ -281,6 +281,23 @@ def cancel_bot():
     if status_indicator: 
         status_indicator.classes(remove='bg-[#10B981] animate-pulse shadow-[0_0_15px_#10B981]', add='bg-[#D97706]')
 
+async def panic_sell():
+    active_syms = engine.bot_status_data.get('active_symbols', [])
+    target = engine.bot_status_data.get('target_asset')
+    syms_to_sell = list(active_syms) if active_syms else ([target] if target else [])
+    
+    if not syms_to_sell:
+        ui.notify('Nenhuma posição ativa detectada para Panic Sell.', type='warning')
+        return
+        
+    for sym in syms_to_sell:
+        ui.notify(f'🚨 Panic Sell acionado para {sym}...', type='warning')
+        success, msg = await engine.panic_sell_position(sym)
+        if success:
+            ui.notify(msg, type='positive')
+        else:
+            ui.notify(msg, type='negative')
+
 def update_timeframe(value):
     engine.TRADING_CONFIG['interval'] = value
     engine.shared_market_data['klines'] = []
@@ -474,9 +491,10 @@ async def index():
                         ui.label('🚨').classes('text-xs')
                         ui.label('CANCEL').classes('hidden sm:inline text-xs font-bold ml-1')
                     
-                    ui.button(on_click=panic_sell).props('unelevated dense').classes('bg-[#BE123C] hover:bg-rose-600 text-white font-bold px-2 py-1 text-[0.65rem] rounded-md tracking-wider').tooltip('PANIC SELL: Venda Imediata')
-                    with ui.button(on_click=panic_sell).props('flat dense size=xs color=rose-500'):
-                        ui.label('🔥 PANIC')
+                    panic_btn = ui.button(on_click=panic_sell).props('unelevated dense').classes('bg-[#BE123C] hover:bg-rose-600 text-white font-bold px-2 sm:px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md').tooltip('PANIC SELL: Venda Imediata a Mercado')
+                    with panic_btn:
+                        ui.label('🔥').classes('text-xs')
+                        ui.label('PANIC').classes('hidden sm:inline text-xs font-bold ml-1')
 
                     status_indicator = ui.element('div').classes('w-2.5 h-2.5 rounded-full bg-[#BE123C] transition-all')
                     
