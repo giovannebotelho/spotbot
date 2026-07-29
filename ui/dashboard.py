@@ -481,8 +481,8 @@ async def index():
             with ai_reason_container:
                 ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-xs text-slate-300 leading-relaxed')
 
-            # Seção Central do Gráfico (100% Livre e Desimpedida!)
-            with ui.element('div').classes('w-full h-[360px] lg:h-[50vh] min-h-[300px] relative border-b border-slate-800 flex-shrink-0 bg-[#0B0E14]'):
+            # Seção Central do Gráfico (+30% de Altura Explicita)
+            with ui.element('div').classes('w-full h-[470px] lg:h-[64vh] min-h-[420px] relative border-b border-slate-800 flex-shrink-0 bg-[#0B0E14]'):
                 # Badge Flutuante no Canto Superior Direito
                 chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('absolute top-3 right-4 z-20 obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-sky-400 border border-sky-500/30 backdrop-blur-md shadow-lg')
 

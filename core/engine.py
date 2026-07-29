@@ -179,6 +179,8 @@ async def monitor_oco_lifecycle(
     partial_take_done = False
     dca_done = False
 
+    bot_status_data['target_asset'] = active_target_symbol
+    bot_status_data['price'] = price
     bot_status_data['tp_price'] = lucro_alvo
     bot_status_data['sl_price'] = stop_loss
     bot_status_data['entry_price'] = price
@@ -686,6 +688,9 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             price = float(ticker_cur['price'])
             order_val_usdt = round(executed_qty * price, 2)
             purchase_timestamp = datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
+
+            bot_status_data['target_asset'] = active_target_symbol
+            bot_status_data['price'] = price
             
             # Carrega klines e indicadores para popular o gráfico do ativo recuperado imediatamente
             try:
