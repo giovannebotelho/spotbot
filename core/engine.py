@@ -680,7 +680,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 client, bsm, active_target_symbol, oco_order, limit_order_id, stop_order_id,
                 price, executed_qty, order_val_usdt, lucro_alvo, stop_loss, target_symbol_info,
                 tick_size, step_size, log, status, saldo_inicial_usdt, 1, purchase_timestamp,
-                "State Recovery (Posição Retomada)", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                "State Recovery (Posição Retomada)", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 [], 0, 0, 0, 0, 0, 0, True, None, db
             )
         else:

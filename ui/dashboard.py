@@ -70,7 +70,6 @@ async def update_data():
         
         if is_running:
             if start_btn:
-                start_btn.text = '🟢 RODANDO...'
                 start_btn.props('disable')
                 start_btn.classes(remove='bg-[#059669] hover:bg-[#10B981] text-white shadow-md', add='bg-slate-800 text-emerald-400 border border-emerald-500/30 opacity-90')
             if stop_btn:
@@ -80,7 +79,6 @@ async def update_data():
                 status_indicator.classes(remove='bg-[#BE123C] bg-[#D97706]', add='bg-[#10B981] animate-pulse shadow-[0_0_15px_#10B981]')
         else:
             if start_btn:
-                start_btn.text = '▶️ START'
                 start_btn.props(remove='disable')
                 start_btn.classes(remove='bg-slate-800 text-emerald-400 border border-emerald-500/30 opacity-90', add='bg-[#059669] hover:bg-[#10B981] text-white font-bold shadow-md')
             if stop_btn:
@@ -118,7 +116,7 @@ async def update_data():
                 candle_chart.options['title'] = {
                     'text': f'📈 {active_symbol}',
                     'subtext': 'Binance WebSockets & Scanner Quantitativo',
-                    'left': 'center',
+                    'left': 15,
                     'top': 8,
                     'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
                     'subtextStyle': {'color': '#64748b', 'fontSize': 9}
@@ -412,10 +410,21 @@ async def index():
                         ui.label('24h Vol: $78.4B').classes('text-slate-400')
 
                 # Botoes de Acao Touch-Friendly (START, STOP, CANCEL, LOGOUT)
-                with ui.row().classes('items-center gap-2 z-10 bg-[#080B10] ml-auto flex-shrink-0'):
-                    start_btn = ui.button('▶️ START', on_click=start_bot).props('unelevated dense').classes('bg-[#059669] hover:bg-[#10B981] text-white font-bold px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md')
-                    stop_btn = ui.button('🛑 STOP', on_click=stop_bot).props('unelevated dense').classes('bg-slate-800 text-slate-500 opacity-50 font-bold px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md')
-                    cancel_btn = ui.button('CANCEL', on_click=cancel_bot).props('unelevated dense').classes('bg-[#0284C7] hover:bg-sky-600 text-white font-bold px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md').tooltip('Abortar Emergência')
+                with ui.row().classes('items-center gap-1.5 sm:gap-2 z-10 bg-[#080B10] ml-auto flex-shrink-0'):
+                    start_btn = ui.button(on_click=start_bot).props('unelevated dense').classes('bg-[#059669] hover:bg-[#10B981] text-white font-bold px-2 sm:px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md')
+                    with start_btn:
+                        ui.label('▶️').classes('text-xs')
+                        ui.label('START').classes('hidden sm:inline text-xs font-bold ml-1')
+
+                    stop_btn = ui.button(on_click=stop_bot).props('unelevated dense').classes('bg-slate-800 text-slate-500 opacity-50 font-bold px-2 sm:px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md')
+                    with stop_btn:
+                        ui.label('🛑').classes('text-xs')
+                        ui.label('STOP').classes('hidden sm:inline text-xs font-bold ml-1')
+
+                    cancel_btn = ui.button(on_click=cancel_bot).props('unelevated dense').classes('bg-[#0284C7] hover:bg-sky-600 text-white font-bold px-2 sm:px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md').tooltip('Abortar Emergência')
+                    with cancel_btn:
+                        ui.label('🚨').classes('text-xs')
+                        ui.label('CANCEL').classes('hidden sm:inline text-xs font-bold ml-1')
                     
                     status_indicator = ui.element('div').classes('w-2.5 h-2.5 rounded-full bg-[#BE123C] transition-all')
                     
@@ -450,14 +459,14 @@ async def index():
                 # Badge Flutuante no Canto Superior Direito
                 chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('absolute top-3 right-4 z-20 obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-sky-400 border border-sky-500/30 backdrop-blur-md shadow-lg')
 
-                # ECharts 100% Visível e Nítido
+                # ECharts 100% Visível e Nítido com Titulo Alinhado a Esquerda (Sem colidir com a Badge da Direita!)
                 with ui.element('div').classes('w-full h-full'):
                     candle_chart = ui.echart({
                        'backgroundColor': '#0B0E14',
                        'title': {
                            'text': '📈 BTCUSDT',
                            'subtext': 'Binance WebSockets & Scanner Quantitativo',
-                           'left': 'center',
+                           'left': 15,
                            'top': 8,
                            'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
                            'subtextStyle': {'color': '#64748b', 'fontSize': 9}
