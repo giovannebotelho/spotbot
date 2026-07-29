@@ -183,9 +183,8 @@ async def monitor_oco_lifecycle(
     bot_status_data['sl_price'] = stop_loss
     bot_status_data['entry_price'] = price
 
+    use_ws_monitoring = True
     try:
-        use_ws_monitoring = True
-        try:
         async with bsm.user_socket() as um:
             while True:
                 try:
@@ -389,13 +388,16 @@ async def monitor_oco_lifecycle(
                             await check_stop_losses(last_stop_loss_time, log=log)
                         else:
                             stop_loss_count = 0
+                        bot_status_data['tp_price'] = 0.0
+                        bot_status_data['sl_price'] = 0.0
+                        bot_status_data['entry_price'] = 0.0
                         return
             except Exception as poll_err:
                 status(f"⚠️ Polling de Ordem: {poll_err}")
-    finally:
-        bot_status_data['tp_price'] = 0.0
-        bot_status_data['sl_price'] = 0.0
-        bot_status_data['entry_price'] = 0.0
+
+    bot_status_data['tp_price'] = 0.0
+    bot_status_data['sl_price'] = 0.0
+    bot_status_data['entry_price'] = 0.0
 
 async def run_bot(log_callback=None, investment_amount=None, selected_symbol=None, status_callback=None):
     global restart_attempts, bot_running, last_operation_time, stop_loss_count, last_stop_loss_time
