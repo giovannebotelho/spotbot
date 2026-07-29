@@ -840,6 +840,8 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         
                         target_symbol_info = await client.get_symbol_info(active_target_symbol)
                         min_notional = get_min_notional(target_symbol_info)
+                        tick_size = float(next(f for f in target_symbol_info['filters'] if f['filterType'] == 'PRICE_FILTER')['tickSize'])
+                        step_size = float(next(f for f in target_symbol_info['filters'] if f['filterType'] == 'LOT_SIZE')['stepSize'])
                         
                         pos_multiplier = buy_result.get('position_multiplier', 1.0)
                         safe_usdt_limit = math.floor(usdt_balance * 0.99 * 100) / 100.0
@@ -877,7 +879,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         purchase_timestamp = timestamp
                         gemini_response = buy_result.get("gemini_response")
 
-                        oco_order, limit_order_id, stop_order_id, lucro_alvo, stop_loss, stop_limit = await adjust_and_place_oco_order(client, active_target_symbol, executed_qty, tick_size, tick_size, klines, log=log)
+                        oco_order, limit_order_id, stop_order_id, lucro_alvo, stop_loss, stop_limit = await adjust_and_place_oco_order(client, active_target_symbol, executed_qty, tick_size, step_size, klines, log=log)
                         if oco_order and TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
                             asyncio.create_task(send_telegram_message(
                                 TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
