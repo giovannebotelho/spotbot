@@ -23,7 +23,7 @@ from core.decision import (
 from core.post_trade import process_order_details, log_and_notify_results, create_data_row, save_to_csv
 from services.telegram_notifier import send_telegram_message, send_telegram_document, TelegramBot
 from services.news_scanner import fetch_crypto_news
-from services.gemini_ai import analyze_news_sentiment_with_gemini
+from services.gemini_ai import analyze_news_sentiment_with_gemini, generate_post_trade_synthesis, auto_tune_risk_profile
 from services.database import DatabaseManager
 from services.pdf_generator import generate_weekly_telemetry_pdf
 from utils.formatting import remove_ansi_codes
@@ -341,6 +341,20 @@ async def monitor_oco_lifecycle(
                         
                         if order_result:
                             log_and_notify_results(order_result, active_target_symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_free * bnb_price, log=log)
+                            
+                            # FASE 3: Síntese Pós-Trade via IA Gemini
+                            try:
+                                post_synthesis = generate_post_trade_synthesis(active_target_symbol, order_result, price, exit_price, trade_result_liquid)
+                                log(f"🧠 \033[1;36mAnálise Pós-Trade (IA Gemini)\033[0m: {post_synthesis}")
+                                if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                                    asyncio.create_task(send_telegram_message(
+                                        TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                                        f"🧠 <b>ANÁLISE PÓS-TRADE (IA GEMINI)</b>\n\n"
+                                        f"🪙 Par: <b>{active_target_symbol}</b>\n"
+                                        f"📝 Resumo IA: <i>{post_synthesis}</i>"
+                                    ))
+                            except Exception as ai_post_err:
+                                log(f"⚠️ Aviso na análise pós-trade IA Gemini: {ai_post_err}")
                             data_row = create_data_row(
                                 order_count, saldo_inicial_usdt, novo_saldo_usdt, active_target_symbol,
                                 executed_qty, price, purchase_timestamp, lucro_alvo, stop_loss, stop_loss,
@@ -924,6 +938,27 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
 
                 db_stats = db.get_stats()
                 acc_pnl = db_stats['total_net_profit']
+
+                # FASE 3: Gemini Auto-Tuning de Perfil de Risco a cada 30 min
+                if now_dt.minute % 30 == 0 and globals().get('_last_autotune_min') != now_dt.minute:
+                    globals()['_last_autotune_min'] = now_dt.minute
+                    try:
+                        rec_profile, rec_just = auto_tune_risk_profile("ALTA", db_stats['win_rate'], acc_pnl)
+                        from config.settings import RISK_PROFILES
+                        import config.settings as setts
+                        if rec_profile in RISK_PROFILES and setts.ACTIVE_RISK_PROFILE != rec_profile:
+                            setts.ACTIVE_RISK_PROFILE = rec_profile
+                            log(f"🧠 \033[1;36mGemini Auto-Tuning\033[0m: Perfil de Risco ajustado para \033[1;32m{rec_profile}\033[0m! ({rec_just})")
+                            if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                                asyncio.create_task(send_telegram_message(
+                                    TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                                    f"🧠 <b>GEMINI AUTO-TUNING DE RISCO</b>\n\n"
+                                    f"🎯 Novo Perfil Recomendado: <b>{rec_profile}</b>\n"
+                                    f"📝 Justificativa IA: <i>{rec_just}</i>"
+                                ))
+                    except Exception as at_err:
+                        log(f"⚠️ Aviso no Gemini Auto-Tuning: {at_err}")
+
                 slots, slot_value = calculate_dynamic_position_slots(
                     usdt_balance,
                     accumulated_net_profit=acc_pnl,

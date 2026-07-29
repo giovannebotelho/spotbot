@@ -223,3 +223,81 @@ def analyze_news_sentiment_with_gemini(headlines, api_key=None):
             _last_429_time = time.time()
 
     return 75, False, "Sentimento Neutro (Sem pânico detectado)."
+
+def generate_post_trade_synthesis(symbol, outcome, entry_price, exit_price, pnl_net, api_key=None):
+    """
+    FASE 3 (v6.0): Gera uma síntese executiva curta da IA Gemini após a conclusão de uma operação (TP ou SL).
+    """
+    global _last_429_time
+    if time.time() - _last_429_time < COOLDOWN_429_SECONDS:
+        return f"Operação concluída em {outcome} com PnL de ${pnl_net:+.2f} USDT."
+
+    if not api_key:
+        api_key = API_KEYS.get('gemini') or os.getenv('GEMINI_API_KEY') or os.getenv('gemini_api_key') or os.getenv('gemini_api') or os.getenv('GEMINI_KEY') or os.getenv('gemini')
+    if not api_key:
+        return f"Operação concluída em {outcome} com PnL de ${pnl_net:+.2f} USDT."
+
+    prompt = (
+        f"Você é a IA analista sênior do SpotBot Pro.\n"
+        f"Sintetize em APENAS 1 FRASE CURTA em português o resultado do trade em {symbol}.\n"
+        f"Detalhes: Resultado={outcome}, Entrada=${entry_price:.4f}, Saída=${exit_price:.4f}, PnL=${pnl_net:+.2f} USDT.\n"
+        f"Retorne apenas o texto puro da frase sem aspas."
+    )
+
+    try:
+        from google import genai
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        if response and response.text:
+            return response.text.strip()
+    except Exception as e:
+        if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+            _last_429_time = time.time()
+
+    return f"Operação encerrada em {outcome} com resultado de ${pnl_net:+.2f} USDT."
+
+def auto_tune_risk_profile(btc_trend, win_rate, recent_pnl, api_key=None):
+    """
+    FASE 3 (v6.0): Avalia as condições de mercado via IA Gemini e sugere o perfil de risco ideal.
+    Retorna: (profile_name: str, rationale: str) -> "Conservador", "Moderado" ou "Agressivo"
+    """
+    global _last_429_time
+    if time.time() - _last_429_time < COOLDOWN_429_SECONDS:
+        return "Moderado", "Gemini em cooldown, mantido perfil Moderado por segurança."
+
+    if not api_key:
+        api_key = API_KEYS.get('gemini') or os.getenv('GEMINI_API_KEY') or os.getenv('gemini_api_key') or os.getenv('gemini_api') or os.getenv('GEMINI_KEY') or os.getenv('gemini')
+    if not api_key:
+        return "Moderado", "Sem chave Gemini, mantido perfil Moderado."
+
+    prompt = (
+        f"Você é o Diretor de Risco IA do SpotBot Pro.\n"
+        f"Avalie as condições do mercado e recomende o perfil de risco ideal: 'Conservador', 'Moderado' ou 'Agressivo'.\n"
+        f"Dados: Tendência BTC={btc_trend}, Win Rate Recente={win_rate:.1f}%, PnL Acumulado=${recent_pnl:+.2f} USDT.\n\n"
+        f"Retorne APENAS um JSON:\n"
+        f'{{"perfil": "Moderado", "justificativa": "Descrição concisa em português"}}\n'
+    )
+
+    try:
+        from google import genai
+        client = genai.Client(api_key=api_key)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt
+        )
+        if response and response.text:
+            text = response.text.replace('```json', '').replace('```', '').strip()
+            data = json.loads(text)
+            perfil = str(data.get('perfil', 'Moderado')).capitalize()
+            if perfil not in ['Conservador', 'Moderado', 'Agressivo']:
+                perfil = 'Moderado'
+            just = str(data.get('justificativa', 'Ajuste de risco efetuado via IA Gemini.'))
+            return perfil, just
+    except Exception as e:
+        if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+            _last_429_time = time.time()
+
+    return "Moderado", "Perfil mantido em Moderado."
