@@ -2,8 +2,8 @@ import aiohttp
 import asyncio
 from pathlib import Path
 
-async def send_telegram_message(bot_token, chat_id, message):
-    """Envia uma mensagem assíncrona para o Telegram."""
+async def send_telegram_message(bot_token, chat_id, message, reply_markup=None):
+    """Envia uma mensagem assíncrona para o Telegram com suporte a botões inline."""
     if not bot_token or not chat_id:
         return None
 
@@ -13,6 +13,9 @@ async def send_telegram_message(bot_token, chat_id, message):
         "text": message,
         "parse_mode": "HTML"
     }
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload) as response:
@@ -52,6 +55,21 @@ class TelegramBot:
         self.offset = 0
         self.base_url = f"https://api.telegram.org/bot{token}"
 
+    def get_menu_keyboard(self):
+        """Retorna o teclado inline com botões de toque rápido."""
+        return {
+            "inline_keyboard": [
+                [
+                    {"text": "📊 Status", "callback_data": "/status"},
+                    {"text": "💰 Lucro Hoje", "callback_data": "/lucro"},
+                ],
+                [
+                    {"text": "⚡ Posições Ativas", "callback_data": "/posicoes"},
+                    {"text": "📄 Relatório PDF", "callback_data": "/relatorio"},
+                ]
+            ]
+        }
+
     async def start(self):
         self.running = True
         print("🤖 Telegram Bot ouvindo comandos...")
@@ -82,6 +100,24 @@ class TelegramBot:
             return []
 
     async def process_update(self, update, session):
+        # Suporte a Clique em Botões Inline
+        if 'callback_query' in update:
+            cb = update['callback_query']
+            chat_id = str(cb.get('message', {}).get('chat', {}).get('id', ''))
+            cb_id = cb.get('id')
+            cmd_data = cb.get('data', '')
+            
+            if chat_id == self.allowed_chat_id and cmd_data.startswith('/'):
+                try:
+                    await session.post(f"{self.base_url}/answerCallbackQuery", json={"callback_query_id": cb_id})
+                except Exception:
+                    pass
+                    
+                response_text = await self.command_handler(cmd_data)
+                if response_text:
+                    await send_telegram_message(self.token, chat_id, response_text, reply_markup=self.get_menu_keyboard())
+            return
+
         message = update.get('message', {})
         chat_id = str(message.get('chat', {}).get('id', ''))
         text = message.get('text', '')
@@ -92,4 +128,4 @@ class TelegramBot:
         if text.startswith('/'):
             response_text = await self.command_handler(text)
             if response_text:
-                await send_telegram_message(self.token, chat_id, response_text)
+                await send_telegram_message(self.token, chat_id, response_text, reply_markup=self.get_menu_keyboard())

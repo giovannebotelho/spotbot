@@ -246,11 +246,49 @@ class DatabaseManager:
             _last_stats_time = now
             return _stats_cache
         except Exception:
-            if _stats_cache is not None:
-                return _stats_cache
             return {
                 "total_trades": 0, "wins": 0, "losses": 0, "win_rate": 0, "total_net_profit": 0.0
             }
+
+    def get_daily_stats(self, date_str=None):
+        """
+        FASE 2 (v6.0): Retorna estatísticas de PnL e operações do dia informado (ou hoje).
+        """
+        if not date_str:
+            date_str = datetime.now().strftime("%d/%m/%Y")
+            
+        self.connect()
+        cursor = self.conn.cursor()
+        
+        placeholder = "%s" if self.is_postgres else "?"
+        sql = f"SELECT trade_result_net, oco_result FROM trades WHERE oco_timestamp LIKE {placeholder}"
+        cursor.execute(sql, (f"%{date_str}%",))
+        rows = cursor.fetchall()
+        self.close()
+        
+        trades_count = len(rows)
+        daily_pnl = 0.0
+        wins = 0
+        losses = 0
+        
+        for r in rows:
+            pnl = float(r["trade_result_net"] if hasattr(r, "__getitem__") else r[0] or 0.0)
+            daily_pnl += pnl
+            res = str(r["oco_result"] if hasattr(r, "__getitem__") else r[1] or "")
+            if pnl > 0 or "LUCRO" in res.upper() or "TAKE" in res.upper():
+                wins += 1
+            else:
+                losses += 1
+                
+        win_rate = (wins / trades_count * 100.0) if trades_count > 0 else 0.0
+        return {
+            "date": date_str,
+            "trades": trades_count,
+            "wins": wins,
+            "losses": losses,
+            "win_rate": win_rate,
+            "daily_pnl": daily_pnl
+        }
 
     def migrate_from_csv(self, csv_path="results.csv"):
         csv_file = BASE_DIR / csv_path

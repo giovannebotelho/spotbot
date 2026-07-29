@@ -876,8 +876,46 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     except Exception as pdf_err:
                         log(f"⚠️ Erro ao gerar PDF automático de domingo: {pdf_err}")
 
+                # FASE 2: Relatório Diário Automático às 23:59
+                now_dt = datetime.now()
+                if now_dt.hour == 23 and now_dt.minute == 59 and globals().get('_last_daily_report_date') != now_dt.date():
+                    globals()['_last_daily_report_date'] = now_dt.date()
+                    try:
+                        d_stats = db.get_daily_stats()
+                        if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                            asyncio.create_task(send_telegram_message(
+                                TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                                f"📊 <b>RELATÓRIO DIÁRIO DE TRADING ({d_stats['date']})</b>\n\n"
+                                f"🎯 Operações Executadas: <b>{d_stats['trades']}</b>\n"
+                                f"🏆 Vitórias / Derrotas: <b>{d_stats['wins']} Wins / {d_stats['losses']} Losses</b>\n"
+                                f"📈 Win Rate do Dia: <b>{d_stats['win_rate']:.1f}%</b>\n"
+                                f"💰 PnL Líquido Diário: <b>${d_stats['daily_pnl']:+.2f} USDT</b>\n"
+                                f"💵 Saldo Livre Atual: <b>${await get_usdt_balance(client):.2f} USDT</b>"
+                            ))
+                            log("📄 Relatório Diário enviado automaticamente para o Telegram!")
+                    except Exception as r_err:
+                        log(f"⚠️ Erro ao gerar relatório diário: {r_err}")
+
                 usdt_balance = await get_usdt_balance(client)
                 
+                # FASE 2: Daily Circuit Breaker (-5.0% Max Drawdown Diário)
+                daily_stats = db.get_daily_stats()
+                daily_pnl = daily_stats['daily_pnl']
+                circuit_breaker_limit = -abs(max(5.0, usdt_balance * 0.05))
+                
+                if daily_pnl <= circuit_breaker_limit:
+                    status(f"🚨 DAILY CIRCUIT BREAKER ATIVADO ({daily_pnl:+.2f} USDT). Novas compras pausadas por 12h...")
+                    if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id') and globals().get('_last_cb_alert') != now_dt.date():
+                        globals()['_last_cb_alert'] = now_dt.date()
+                        asyncio.create_task(send_telegram_message(
+                            TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                            f"🚨 <b>DAILY CIRCUIT BREAKER ATIVADO!</b>\n\n"
+                            f"📊 Perda acumulada hoje de <b>${daily_pnl:.2f} USDT</b> atingiu o limite de proteção de -5.0%!\n"
+                            f"🛡️ Novas compras pausadas por 12 horas enquanto as ordens OCO ativas continuam sendo monitoradas."
+                        ))
+                    await asyncio.sleep(600)
+                    continue
+
                 if len(active_positions) >= MAX_CONCURRENT_POSITIONS:
                     active_list_str = ", ".join(active_positions.keys())
                     status(f"⏳ Posições Máximas Atingidas ({len(active_positions)}/{MAX_CONCURRENT_POSITIONS}): [{active_list_str}]. Monitorando operações...")
