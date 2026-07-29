@@ -183,8 +183,9 @@ async def monitor_oco_lifecycle(
     bot_status_data['sl_price'] = stop_loss
     bot_status_data['entry_price'] = price
 
-    use_ws_monitoring = True
     try:
+        use_ws_monitoring = True
+        try:
         async with bsm.user_socket() as um:
             while True:
                 try:
