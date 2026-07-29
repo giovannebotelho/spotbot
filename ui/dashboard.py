@@ -13,7 +13,7 @@ import core.engine as engine
 
 db = DatabaseManager()
 
-# Buffer de Logs Global (guarda os últimos 50 logs para novos clientes/dispositivos)
+# Buffer de Logs Global (guarda os últimos 50 logs para novos visitantes/dispositivos)
 logs_buffer = collections.deque(maxlen=50)
 
 log_ui = None
@@ -24,6 +24,7 @@ status_indicator = None
 
 start_btn = None
 stop_btn = None
+cancel_btn = None
 
 bnb_val = None
 bnb_usdt_val = None
@@ -34,12 +35,12 @@ win_rate_val = None
 recent_trades_table = None
 
 candle_chart = None
-chart_card = None
 scanner_table = None
 
 ai_card = None
 ai_signal_label = None
 ai_reason_markdown = None
+ai_reason_scroll = None
 ai_icon_container = None
 
 risk_profile_select = None
@@ -70,22 +71,22 @@ async def update_data():
             if start_btn:
                 start_btn.text = '🟢 RODANDO...'
                 start_btn.props('disable')
-                start_btn.classes(remove='bg-[#00F5A0] hover:bg-[#00E5FF] text-slate-950 shadow-md', add='bg-slate-800 text-emerald-400 border border-emerald-500/30 opacity-90')
+                start_btn.classes(remove='bg-[#059669] hover:bg-[#10B981] text-white shadow-md', add='bg-slate-800 text-emerald-400 border border-emerald-500/30 opacity-90')
             if stop_btn:
                 stop_btn.props(remove='disable')
-                stop_btn.classes(remove='bg-slate-800 text-slate-500 opacity-50', add='bg-[#FF2E93] hover:bg-rose-600 text-white shadow-lg animate-pulse')
+                stop_btn.classes(remove='bg-slate-800 text-slate-500 opacity-50', add='bg-[#BE123C] hover:bg-rose-700 text-white shadow-lg animate-pulse')
             if status_indicator:
-                status_indicator.classes(remove='bg-[#FF2E93] bg-[#FFB800]', add='bg-[#00F5A0] animate-pulse shadow-[0_0_15px_#00F5A0]')
+                status_indicator.classes(remove='bg-[#BE123C] bg-[#D97706]', add='bg-[#10B981] animate-pulse shadow-[0_0_15px_#10B981]')
         else:
             if start_btn:
                 start_btn.text = '▶️ START'
                 start_btn.props(remove='disable')
-                start_btn.classes(remove='bg-slate-800 text-emerald-400 border border-emerald-500/30 opacity-90', add='bg-[#00F5A0] hover:bg-[#00E5FF] text-slate-950 font-bold shadow-md')
+                start_btn.classes(remove='bg-slate-800 text-emerald-400 border border-emerald-500/30 opacity-90', add='bg-[#059669] hover:bg-[#10B981] text-white font-bold shadow-md')
             if stop_btn:
                 stop_btn.props('disable')
-                stop_btn.classes(remove='bg-[#FF2E93] hover:bg-rose-600 text-white shadow-lg animate-pulse', add='bg-slate-800 text-slate-500 opacity-50')
+                stop_btn.classes(remove='bg-[#BE123C] hover:bg-rose-700 text-white shadow-lg animate-pulse', add='bg-slate-800 text-slate-500 opacity-50')
             if status_indicator:
-                status_indicator.classes(remove='bg-[#00F5A0] animate-pulse shadow-[0_0_15px_#00F5A0]', add='bg-[#FF2E93]')
+                status_indicator.classes(remove='bg-[#10B981] animate-pulse shadow-[0_0_15px_#10B981]', add='bg-[#BE123C]')
 
         # Consulta de Saldos e Estatísticas
         balances = await engine.get_account_balances()
@@ -97,7 +98,7 @@ async def update_data():
         stats = await asyncio.to_thread(db.get_stats)
         if total_profit_val:
             total_profit_val.text = f"${stats['total_net_profit']:.2f}"
-            total_profit_val.classes(remove='text-emerald-400 text-rose-400', add='text-[#00F5A0]' if stats['total_net_profit'] >= 0 else 'text-[#FF2E93]')
+            total_profit_val.classes(remove='text-emerald-400 text-rose-400', add='text-[#10B981]' if stats['total_net_profit'] >= 0 else 'text-[#F43F5E]')
         if win_rate_val:
             win_rate_val.text = f"{stats['win_rate']:.1f}%"
         
@@ -111,12 +112,12 @@ async def update_data():
         market_data = engine.shared_market_data
         if market_data['dates'] and candle_chart:
             candle_chart.options['title'] = {
-                'text': f'📈 {active_symbol} — Gráfico em Tempo Real ({price_str})',
-                'subtext': 'Alimentado por Binance WebSockets & Scanner 2.0 Quantitativo',
+                'text': f'📈 {active_symbol} ({price_str})',
+                'subtext': 'Binance WebSockets & Scanner Quantitativo',
                 'left': 'center',
-                'top': 10,
-                'textStyle': {'color': '#00E5FF', 'fontSize': 14, 'fontWeight': 'bold'},
-                'subtextStyle': {'color': '#64748b', 'fontSize': 9.5}
+                'top': 8,
+                'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
+                'subtextStyle': {'color': '#64748b', 'fontSize': 9}
             }
             candle_chart.options['xAxis'][0]['data'] = market_data['dates']
             candle_chart.options['xAxis'][1]['data'] = market_data['dates']
@@ -135,17 +136,17 @@ async def update_data():
             ai_signal_label.text = f"{signal}"
             
             if signal == 'COMPRA':
-                ai_card.classes(remove='border-slate-800 border-[#FF2E93]/50', add='border-[#00F5A0]/60 shadow-[0_0_25px_rgba(0,245,160,0.2)]')
-                ai_signal_label.classes(remove='text-slate-400 text-[#FF2E93] text-[#FFB800]', add='text-[#00F5A0]')
-                if ai_icon_container: ai_icon_container.classes(remove='bg-slate-800 bg-[#FF2E93]/10', add='bg-[#00F5A0]/10 text-[#00F5A0]')
+                ai_card.classes(remove='border-slate-800 border-rose-500/50', add='border-emerald-500/60 shadow-[0_0_15px_rgba(16,185,129,0.15)]')
+                ai_signal_label.classes(remove='text-slate-400 text-rose-400 text-amber-400', add='text-emerald-400')
+                if ai_icon_container: ai_icon_container.classes(remove='bg-slate-800 bg-rose-500/10', add='bg-emerald-500/10 text-emerald-400')
             elif signal == 'VENDA':
-                ai_card.classes(remove='border-slate-800 border-[#00F5A0]/50 shadow-[0_0_25px_rgba(0,245,160,0.2)]', add='border-[#FF2E93]/60 shadow-[0_0_25px_rgba(255,46,147,0.2)]')
-                ai_signal_label.classes(remove='text-slate-400 text-[#00F5A0] text-[#FFB800]', add='text-[#FF2E93]')
-                if ai_icon_container: ai_icon_container.classes(remove='bg-slate-800 bg-[#00F5A0]/10', add='bg-[#FF2E93]/10 text-[#FF2E93]')
+                ai_card.classes(remove='border-slate-800 border-emerald-500/50 shadow-[0_0_15px_rgba(16,185,129,0.15)]', add='border-rose-500/60 shadow-[0_0_15px_rgba(244,63,94,0.15)]')
+                ai_signal_label.classes(remove='text-slate-400 text-emerald-400 text-amber-400', add='text-rose-400')
+                if ai_icon_container: ai_icon_container.classes(remove='bg-slate-800 bg-emerald-500/10', add='bg-rose-500/10 text-rose-400')
             else:
-                ai_card.classes(remove='border-[#00F5A0]/50 border-[#FF2E93]/50 shadow-[0_0_25px_rgba(0,245,160,0.2)]', add='border-slate-800')
-                ai_signal_label.classes(remove='text-slate-400 text-[#00F5A0] text-[#FF2E93]', add='text-[#FFB800]')
-                if ai_icon_container: ai_icon_container.classes(remove='bg-[#00F5A0]/10 bg-[#FF2E93]/10', add='bg-[#FFB800]/10 text-[#FFB800]')
+                ai_card.classes(remove='border-emerald-500/50 border-rose-500/50', add='border-slate-800')
+                ai_signal_label.classes(remove='text-slate-400 text-emerald-400 text-rose-400', add='text-amber-400')
+                if ai_icon_container: ai_icon_container.classes(remove='bg-emerald-500/10 bg-rose-500/10', add='bg-amber-500/10 text-amber-400')
                 
             ai_reason_markdown.content = insight.get('justification', '**Sem justificativa disponível.**')
 
@@ -202,7 +203,7 @@ async def start_bot():
     ui.notify('Iniciando Sistema SpotBot Pro...', type='positive')
     engine.bot_running = True
     if status_indicator: 
-        status_indicator.classes(remove='bg-[#FF2E93] bg-[#FFB800]', add='bg-[#00F5A0] animate-pulse shadow-[0_0_15px_#00F5A0]')
+        status_indicator.classes(remove='bg-[#BE123C] bg-[#D97706]', add='bg-[#10B981] animate-pulse shadow-[0_0_15px_#10B981]')
     
     bot_task = asyncio.create_task(engine.run_bot(log_callback=log_handler, investment_amount=investment, selected_symbol=symbol, status_callback=status_handler))
     
@@ -214,33 +215,34 @@ async def start_bot():
         except Exception:
             pass
         if status_indicator: 
-            status_indicator.classes(remove='bg-[#00F5A0] animate-pulse shadow-[0_0_15px_#00F5A0]', add='bg-[#FF2E93]')
+            status_indicator.classes(remove='bg-[#10B981] animate-pulse shadow-[0_0_15px_#10B981]', add='bg-[#BE123C]')
     except Exception as e:
         try:
             ui.notify(f'Erro: {e}', type='negative')
         except Exception:
             pass
         if status_indicator: 
-            status_indicator.classes(remove='bg-[#00F5A0] animate-pulse shadow-[0_0_15px_#00F5A0]', add='bg-[#FF2E93]')
+            status_indicator.classes(remove='bg-[#10B981] animate-pulse shadow-[0_0_15px_#10B981]', add='bg-[#BE123C]')
 
 def stop_bot():
     global bot_task
-    if engine.bot_running or (bot_task and not bot_task.done()):
-        engine.bot_running = False
-        if bot_task:
-            bot_task.cancel()
-        ui.notify('Parando Sistema com segurança...', type='info')
-    else:
-        ui.notify('Sistema offline.', type='warning')
+    engine.bot_running = False
+    engine.bot_status_data['is_running'] = False
+    if bot_task and not bot_task.done():
+        bot_task.cancel()
+    ui.notify('🛑 Parando Sistema com segurança...', type='info')
+    if status_indicator: 
+        status_indicator.classes(remove='bg-[#10B981] animate-pulse shadow-[0_0_15px_#10B981]', add='bg-[#BE123C]')
 
 def cancel_bot():
     global bot_task
     engine.bot_running = False
+    engine.bot_status_data['is_running'] = False
     if bot_task and not bot_task.done():
         bot_task.cancel()
-    ui.notify('🚨 EMERGÊNCIA: Execução abortada via Cancel (CTRL+C)!', type='negative')
+    ui.notify('🚨 EMERGÊNCIA: Execução abortada via Cancel!', type='negative')
     if status_indicator: 
-        status_indicator.classes(remove='bg-[#00F5A0] animate-pulse shadow-[0_0_15px_#00F5A0]', add='bg-[#FFB800]')
+        status_indicator.classes(remove='bg-[#10B981] animate-pulse shadow-[0_0_15px_#10B981]', add='bg-[#D97706]')
 
 def update_timeframe(value):
     engine.TRADING_CONFIG['interval'] = value
@@ -272,7 +274,7 @@ def login():
         else:
             ui.notify('Acesso Negado', type='negative')
 
-    ui.colors(primary='#00E5FF', secondary='#64748b', accent='#00F5A0', positive='#00F5A0', negative='#FF2E93', dark='#0B0E14')
+    ui.colors(primary='#0284C7', secondary='#64748b', accent='#10B981', positive='#10B981', negative='#F43F5E', dark='#0B0E14')
     ui.add_head_html('''
         <style>
             body { background-color: #0B0E14; color: #f8fafc; font-family: 'Inter', sans-serif; }
@@ -283,16 +285,16 @@ def login():
     ''')
 
     with ui.column().classes('w-full h-screen items-center justify-center bg-[#0B0E14] px-4'):
-        with ui.card().classes('w-full max-w-sm p-6 lg:p-8 bg-[#121722] border border-cyan-500/20 shadow-[0_0_40px_rgba(0,229,255,0.1)] items-center gap-6 rounded-2xl'):
+        with ui.card().classes('w-full max-w-sm p-6 lg:p-8 bg-[#121722] border border-sky-500/20 shadow-[0_0_40px_rgba(2,132,199,0.1)] items-center gap-6 rounded-2xl'):
             with ui.column().classes('items-center gap-2'):
-                ui.icon('token', size='2.5rem', color='cyan-400')
+                ui.icon('token', size='2.5rem', color='sky-400')
                 ui.label('SPOTBOT PRO').classes('text-2xl font-bold tracking-wider text-white')
-                ui.label('INSTITUTIONAL TERMINAL').classes('text-[0.6rem] font-bold text-cyan-400/70 tracking-[0.25em]')
+                ui.label('INSTITUTIONAL TERMINAL').classes('text-[0.6rem] font-bold text-sky-400/70 tracking-[0.25em]')
             
             username = ui.input('Usuário').classes('w-full zinc-input').props('dark outlined dense')
             password = ui.input('Senha', password=True, password_toggle_button=True).classes('w-full zinc-input').props('dark outlined dense').on('keydown.enter', try_login)
             
-            ui.button('ENTRAR NO TERMINAL', on_click=try_login).props('unelevated').classes('w-full bg-gradient-to-r from-cyan-600 to-cyan-500 hover:from-cyan-500 hover:to-cyan-400 text-white font-bold tracking-wider py-2 rounded-lg shadow-lg')
+            ui.button('ENTRAR NO TERMINAL', on_click=try_login).props('unelevated').classes('w-full bg-gradient-to-r from-sky-700 to-sky-600 hover:from-sky-600 hover:to-sky-500 text-white font-bold tracking-wider py-2 rounded-lg shadow-lg')
 
 @ui.page('/')
 async def index():
@@ -301,10 +303,11 @@ async def index():
 
     global log_ui, status_ui, investment_input, symbol_select, bnb_val, bnb_usdt_val, usdt_val
     global total_profit_val, win_rate_val, recent_trades_table, status_indicator, candle_chart, scanner_table
-    global ai_signal_label, ai_reason_markdown, ai_card, ai_icon_container, risk_profile_select, paper_trading_switch
-    global chart_symbol_badge, start_btn, stop_btn, chart_card
+    global ai_signal_label, ai_reason_markdown, ai_reason_scroll, ai_card, ai_icon_container, risk_profile_select, paper_trading_switch
+    global chart_symbol_badge, start_btn, stop_btn, cancel_btn
     
-    ui.colors(primary='#00E5FF', secondary='#64748b', accent='#00F5A0', positive='#00F5A0', negative='#FF2E93', dark='#0B0E14')
+    # Cores Didáticas, Elegantes e Profissionais (Sem Azul Ciano Muito Forte)
+    ui.colors(primary='#0284C7', secondary='#64748b', accent='#10B981', positive='#10B981', negative='#F43F5E', dark='#0B0E14')
     
     ui.add_head_html('''
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -315,7 +318,7 @@ async def index():
             ::-webkit-scrollbar-track { background: #0B0E14; }
             ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
             ::-webkit-scrollbar-thumb:hover { background: #334155; }
-            .obsidian-card { background: #121722; border: 1px solid rgba(255, 255, 255, 0.07); }
+            .obsidian-card { background: #121722; border: 1px solid rgba(255, 255, 255, 0.08); }
             .input-zinc .q-field__native { color: #f8fafc !important; }
             .input-zinc .q-field__label { color: #64748b !important; }
             .input-zinc .q-field__control:before { border-color: #1e293b !important; }
@@ -336,174 +339,175 @@ async def index():
         </style>
     ''')
 
-    with ui.column().classes('w-full min-h-screen lg:h-screen gap-0 bg-[#0B0E14] overflow-y-auto lg:overflow-hidden'):
+    # Container Principal Responsivo 100% Sólido no Desktop (h-screen overflow-hidden) e Scrollável no Mobile
+    with ui.row().classes('w-full h-screen overflow-x-hidden overflow-y-auto lg:overflow-hidden flex-nowrap gap-0 bg-[#0B0E14]'):
         
-        # Header Ticker Neon com Botoes de Acao Sincronizados
-        with ui.row().classes('w-full min-h-[2.5rem] bg-[#080B10] border-b border-slate-800/80 items-center px-2 lg:px-4 justify-between overflow-hidden relative text-xs flex-wrap lg:flex-nowrap gap-2 py-1'):
-            with ui.row().classes('items-center gap-2 z-10 bg-[#080B10] pr-2 lg:pr-4 border-r border-slate-800 flex-shrink-0'):
-                ui.icon('token', size='sm', color='cyan-400')
-                ui.label('SPOTBOT PRO').classes('font-bold tracking-wider text-white text-xs')
-                ui.label('QUANT').classes('text-[0.55rem] font-bold text-cyan-400/80 tracking-widest hidden sm:inline')
+        # Painel Esquerdo de Configurações & Métricas
+        with ui.column().classes('w-full lg:w-64 h-auto lg:h-full border-r border-slate-800 bg-[#0E121B] p-3 gap-2.5 flex-shrink-0 text-slate-300 overflow-y-auto'):
+            with ui.column().classes('w-full gap-1'):
+                ui.label('MODO DE MONITORAMENTO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
+                symbol_select = ui.select(
+                    options=['⚡ SCANNER TOP 20', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'LINKUSDT', 'NEARUSDT'],
+                    value='⚡ SCANNER TOP 20'
+                ).classes('w-full input-zinc bg-[#121722] rounded-lg').props('dark outlined dense')
+
+            with ui.column().classes('w-full gap-1'):
+                ui.label('VALOR USDT POR ORDEM').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
+                investment_input = ui.input(value='Dinâmico (Min $10)').classes('w-full input-zinc bg-[#121722] rounded-lg').props('dark outlined dense readonly')
+
+            with ui.column().classes('w-full gap-1'):
+                ui.label('PERFIL DE RISCO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
+                risk_profile_select = ui.select(
+                    options=list(RISK_PROFILES.keys()),
+                    value=settings.ACTIVE_RISK_PROFILE,
+                    on_change=lambda e: set_risk_profile(e.value)
+                ).classes('w-full input-zinc bg-[#121722] rounded-lg').props('dark outlined dense')
+
+            with ui.column().classes('w-full gap-1'):
+                ui.label('PAPER TRADING').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
+                paper_trading_switch = ui.switch('Simulação', value=False, on_change=toggle_paper_trading).props('dense color=sky-600').classes('text-xs text-slate-400')
+
+                ui.label('TIMEFRAME ADAPTATIVO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
+                ui.toggle(['Adaptativo (1h/15m)', '15m (Scalping)', '1h (Swing)'], value='Adaptativo (1h/15m)').props('unelevated dense spread size=xs color=slate-900 text-color=slate-400 toggle-color=sky-700').classes('w-full border border-slate-800 rounded-lg overflow-hidden text-[0.6rem]')
+
+            with ui.column().classes('w-full gap-2 mt-1'):
+                ui.label('PERFORMANCE').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
+                with ui.row().classes('w-full justify-between items-center p-2 rounded-xl bg-[#121722] border border-slate-800'):
+                    ui.label('Lucro Total').classes('text-xs text-slate-400')
+                    total_profit_val = ui.label('$0.00').classes('font-mono text-sm font-bold text-[#10B981]')
+                with ui.row().classes('w-full justify-between items-center p-2 rounded-xl bg-[#121722] border border-slate-800'):
+                    ui.label('Taxa de Vitória').classes('text-xs text-slate-400')
+                    win_rate_val = ui.label('0.0%').classes('font-mono text-sm font-bold text-sky-400')
+
+            with ui.column().classes('w-full gap-1 mt-1'):
+                ui.label('STATUS ATUAL').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
+                status_ui = ui.markdown('**Aguardando...**').classes('text-xs text-slate-300 leading-relaxed w-full break-words')
+
+        # Área Principal (Direita) - Preenche 100% do Espaço Vertical
+        with ui.column().classes('flex-1 h-full p-0 overflow-hidden bg-[#0B0E14] flex-col gap-0 min-w-0'):
             
-            # Container do Marquee
-            with ui.element('div').classes('hidden md:flex flex-1 mx-2 lg:mx-4 overflow-hidden relative h-full items-center min-w-0'):
-                with ui.element('div').classes('animate-marquee items-center gap-8 text-[0.7rem] font-mono text-slate-300 whitespace-nowrap'):
-                    ui.label('🔥 MARKET TICKER').classes('font-bold text-cyan-400')
-                    ui.label('BTC: $64,340.00 (+0.37%)').classes('text-emerald-400 font-semibold')
-                    ui.label('ETH: $1,873.20 (+0.81%)').classes('text-emerald-400 font-semibold')
-                    ui.label('BNB: $568.49 (+0.82%)').classes('text-emerald-400 font-semibold')
-                    ui.label('SOL: $74.38 (-1.44%)').classes('text-rose-400 font-semibold')
-                    ui.label('XRP: $1.09 (+0.87%)').classes('text-emerald-400 font-semibold')
-                    ui.label('Market Cap: $2.38T (+1.2%)').classes('text-slate-400')
-                    ui.label('24h Vol: $78.4B').classes('text-slate-400')
-
-            # Botoes de Acao Touch-Friendly (START, STOP, CANCEL, LOGOUT)
-            with ui.row().classes('items-center gap-1.5 lg:gap-2.5 z-10 bg-[#080B10] ml-auto flex-shrink-0'):
-                start_btn = ui.button('▶️ START', on_click=start_bot).props('unelevated dense').classes('bg-[#00F5A0] hover:bg-[#00E5FF] text-slate-950 font-bold px-2.5 lg:px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md')
-                stop_btn = ui.button('🛑 STOP', on_click=stop_bot).props('unelevated dense').classes('bg-slate-800 text-slate-500 opacity-50 font-bold px-2.5 lg:px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md')
-                ui.button('CANCEL', on_click=cancel_bot).props('unelevated dense').classes('bg-[#FFB800] hover:bg-amber-600 text-slate-950 font-bold px-2 lg:px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md').tooltip('Abortar Emergência')
+            # Header Ticker Neon com Botoes de Acao Sincronizados e Cores Elegantes
+            with ui.row().classes('w-full h-10 bg-[#080B10] border-b border-slate-800 items-center px-3 justify-between flex-shrink-0 relative text-xs flex-nowrap'):
+                with ui.row().classes('items-center gap-2 z-10 bg-[#080B10] pr-3 border-r border-slate-800 flex-shrink-0'):
+                    ui.icon('token', size='sm', color='sky-400')
+                    ui.label('SPOTBOT PRO').classes('font-bold tracking-wider text-white text-xs')
+                    ui.label('QUANT').classes('text-[0.55rem] font-bold text-sky-400/80 tracking-widest hidden sm:inline')
                 
-                status_indicator = ui.element('div').classes('w-2.5 h-2.5 rounded-full bg-[#FF2E93] transition-all')
-                
-                def logout():
-                    app.storage.user['authenticated'] = False
-                    ui.navigate.to('/login')
-                ui.button(icon='logout', on_click=logout).props('flat dense size=sm color=slate-400')
+                # Container do Marquee
+                with ui.element('div').classes('hidden md:flex flex-1 mx-3 overflow-hidden relative h-full items-center min-w-0'):
+                    with ui.element('div').classes('animate-marquee items-center gap-8 text-[0.7rem] font-mono text-slate-300 whitespace-nowrap'):
+                        ui.label('🔥 MARKET TICKER').classes('font-bold text-sky-400')
+                        ui.label('BTC: $64,340.00 (+0.37%)').classes('text-emerald-400 font-semibold')
+                        ui.label('ETH: $1,873.20 (+0.81%)').classes('text-emerald-400 font-semibold')
+                        ui.label('BNB: $568.49 (+0.82%)').classes('text-emerald-400 font-semibold')
+                        ui.label('SOL: $74.38 (-1.44%)').classes('text-rose-400 font-semibold')
+                        ui.label('XRP: $1.09 (+0.87%)').classes('text-emerald-400 font-semibold')
+                        ui.label('Market Cap: $2.38T (+1.2%)').classes('text-slate-400')
+                        ui.label('24h Vol: $78.4B').classes('text-slate-400')
 
-        # Layout Principal Responsivo Mobile (Empilhamento flex-col em telas pequenas, flex-row em telas grandes)
-        with ui.row().classes('w-full flex-grow flex-col lg:flex-row gap-0 overflow-y-auto lg:overflow-hidden'):
-            
-            # Painel Esquerdo de Configurações & Métricas (Empilha no Mobile)
-            with ui.column().classes('w-full lg:w-64 h-auto lg:h-screen border-b lg:border-b-0 lg:border-r border-slate-800 bg-[#0E121B] p-3 gap-3 flex-shrink-0 text-slate-300'):
-                with ui.column().classes('w-full gap-1'):
-                    ui.label('MODO DE MONITORAMENTO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
-                    symbol_select = ui.select(
-                        options=['⚡ SCANNER TOP 20', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'LINKUSDT', 'NEARUSDT'],
-                        value='⚡ SCANNER TOP 20'
-                    ).classes('w-full input-zinc bg-[#121722] rounded-lg').props('dark outlined dense')
+                # Botoes de Acao Touch-Friendly (START, STOP, CANCEL, LOGOUT)
+                with ui.row().classes('items-center gap-2 z-10 bg-[#080B10] ml-auto flex-shrink-0'):
+                    start_btn = ui.button('▶️ START', on_click=start_bot).props('unelevated dense').classes('bg-[#059669] hover:bg-[#10B981] text-white font-bold px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md')
+                    stop_btn = ui.button('🛑 STOP', on_click=stop_bot).props('unelevated dense').classes('bg-slate-800 text-slate-500 opacity-50 font-bold px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md')
+                    cancel_btn = ui.button('CANCEL', on_click=cancel_bot).props('unelevated dense').classes('bg-[#0284C7] hover:bg-sky-600 text-white font-bold px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md').tooltip('Abortar Emergência')
+                    
+                    status_indicator = ui.element('div').classes('w-2.5 h-2.5 rounded-full bg-[#BE123C] transition-all')
+                    
+                    def logout():
+                        app.storage.user['authenticated'] = False
+                        ui.navigate.to('/login')
+                    ui.button(icon='logout', on_click=logout).props('flat dense size=sm color=slate-400')
 
-                with ui.column().classes('w-full gap-1'):
-                    ui.label('VALOR USDT POR ORDEM').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
-                    investment_input = ui.input(value='Dinâmico (Min $10)').classes('w-full input-zinc bg-[#121722] rounded-lg').props('dark outlined dense readonly')
+            # Seção Central do Gráfico (52% de Altura Explicita com Layout Limpo Sem Poluição Visual no Mobile)
+            with ui.element('div').classes('w-full h-[50vh] min-h-[300px] relative border-b border-slate-800 flex-shrink-0 bg-[#0B0E14]'):
+                # Badge Flutuante no Canto Superior Direito
+                chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('absolute top-3 right-4 z-20 obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-sky-400 border border-sky-500/30 backdrop-blur-md shadow-lg')
 
-                with ui.column().classes('w-full gap-1'):
-                    ui.label('PERFIL DE RISCO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
-                    risk_profile_select = ui.select(
-                        options=list(RISK_PROFILES.keys()),
-                        value=settings.ACTIVE_RISK_PROFILE,
-                        on_change=lambda e: set_risk_profile(e.value)
-                    ).classes('w-full input-zinc bg-[#121722] rounded-lg').props('dark outlined dense')
+                # Card IA Gemini Compacto (Inicia Colapsado no Mobile para NÃO Cobrir o Gráfico)
+                ai_card = ui.card().classes('absolute top-3 left-3 w-56 lg:w-64 z-20 obsidian-card p-2 rounded-xl shadow-[0_10px_25px_rgba(0,0,0,0.5)] backdrop-blur-md transition-all duration-300')
+                with ai_card:
+                    with ui.row().classes('w-full items-center justify-between mb-0.5'):
+                        with ui.row().classes('items-center gap-1.5'):
+                            ai_icon_container = ui.element('div').classes('p-1 rounded-lg bg-slate-800/80 text-slate-400')
+                            with ai_icon_container: ui.icon('psychology', size='xs')
+                            ai_signal_label = ui.label('NEUTRO').classes('text-[0.65rem] font-bold tracking-wide text-slate-400')
+                        
+                        def toggle_ai_content():
+                            if ai_reason_scroll:
+                                is_visible = ai_reason_scroll.visible
+                                ai_reason_scroll.set_visibility(not is_visible)
+                                toggle_btn.props(f'icon={"keyboard_arrow_down" if is_visible else "keyboard_arrow_up"}')
 
-                with ui.column().classes('w-full gap-1'):
-                    ui.label('PAPER TRADING').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
-                    paper_trading_switch = ui.switch('Simulação', value=False, on_change=toggle_paper_trading).props('dense color=cyan-500').classes('text-xs text-slate-400')
+                        toggle_btn = ui.button(icon='keyboard_arrow_down', on_click=toggle_ai_content).props('flat dense round size=xs color=slate-400')
+                    
+                    ai_reason_scroll = ui.scroll_area().classes('h-16')
+                    ai_reason_scroll.set_visibility(False) # Inicia fechadinho para o gráfico ficar 100% limpo!
+                    with ai_reason_scroll:
+                        ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-[0.6rem] text-slate-300 leading-relaxed')
 
-                    ui.label('TIMEFRAME ADAPTATIVO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
-                    ui.toggle(['Adaptativo (1h/15m)', '15m (Scalping)', '1h (Swing)'], value='Adaptativo (1h/15m)').props('unelevated dense spread size=xs color=slate-900 text-color=slate-400 toggle-color=cyan-600').classes('w-full border border-slate-800 rounded-lg overflow-hidden text-[0.6rem]')
+                # ECharts 100% Visível e Nítido
+                with ui.element('div').classes('w-full h-full'):
+                    candle_chart = ui.echart({
+                       'backgroundColor': '#0B0E14',
+                       'title': {
+                           'text': '📈 BTCUSDT',
+                           'subtext': 'Binance WebSockets & Scanner Quantitativo',
+                           'left': 'center',
+                           'top': 8,
+                           'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
+                           'subtextStyle': {'color': '#64748b', 'fontSize': 9}
+                       },
+                       'grid': [{'left': '45', 'right': '15', 'top': '60', 'height': '55%'}, {'left': '45', 'right': '15', 'top': '82%', 'height': '14%'}],
+                       'tooltip': {'trigger': 'axis', 'axisPointer': {'type': 'cross'}, 'backgroundColor': 'rgba(18, 23, 34, 0.95)', 'borderColor': '#0284C7', 'textStyle': {'color': '#f8fafc'}},
+                       'dataZoom': [{'type': 'inside', 'xAxisIndex': [0, 1]}, {'type': 'slider', 'xAxisIndex': [0, 1], 'bottom': 3, 'height': 16, 'borderColor': '#1e293b', 'dataBackground': {'lineStyle': {'color': '#38BDF8'}, 'areaStyle': {'color': '#121722'}}}],
+                       'xAxis': [{'type': 'category', 'data': [], 'gridIndex': 0, 'axisLine': {'lineStyle': {'color': '#334155'}}}, {'type': 'category', 'data': [], 'gridIndex': 1, 'axisLabel': {'show': False}, 'axisTick': {'show': False}, 'axisLine': {'show': False}}],
+                       'yAxis': [{'type': 'value', 'scale': True, 'gridIndex': 0, 'splitLine': {'lineStyle': {'color': 'rgba(255, 255, 255, 0.05)'}}, 'position': 'right'}, {'type': 'value', 'scale': True, 'gridIndex': 1, 'splitLine': {'show': False}, 'axisLabel': {'show': False}, 'axisTick': {'show': False}}],
+                       'series': [
+                           {'type': 'candlestick', 'name': 'Preço', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'itemStyle': {'color': '#10B981', 'color0': '#F43F5E', 'borderColor': '#10B981', 'borderColor0': '#F43F5E'}},
+                           {'name': 'BB Upper', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'opacity': 0.4, 'color': '#F59E0B', 'width': 1.5}},
+                           {'name': 'BB Lower', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'opacity': 0.4, 'color': '#F59E0B', 'width': 1.5}},
+                           {'name': 'EMA 200', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'color': '#38BDF8', 'width': 2}},
+                           {'name': 'Volume', 'type': 'bar', 'xAxisIndex': 1, 'yAxisIndex': 1, 'data': [], 'itemStyle': {'color': '#38BDF8', 'opacity': 0.25}, 'large': True}
+                       ]
+                    }).classes('w-full h-full')
 
-                with ui.column().classes('w-full gap-2 mt-1'):
-                    ui.label('PERFORMANCE').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
-                    with ui.row().classes('w-full justify-between items-center p-2 rounded-xl bg-[#121722] border border-slate-800'):
-                        ui.label('Lucro Total').classes('text-xs text-slate-400')
-                        total_profit_val = ui.label('$0.00').classes('font-mono text-sm font-bold text-[#00F5A0]')
-                    with ui.row().classes('w-full justify-between items-center p-2 rounded-xl bg-[#121722] border border-slate-800'):
-                        ui.label('Taxa de Vitória').classes('text-xs text-slate-400')
-                        win_rate_val = ui.label('0.0%').classes('font-mono text-sm font-bold text-cyan-400')
+            # Painel Inferior (Execuções + Terminal Output Sincronizado) Preenchendo o Restante da Tela
+            with ui.row().classes('w-full flex-1 flex-col lg:flex-row gap-0 bg-[#0B0E14] overflow-hidden min-h-0'):
+                with ui.column().classes('w-full lg:w-3/5 h-64 lg:h-full border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-[#0B0E14] p-0 flex-col'):
+                    with ui.row().classes('w-full h-8 items-center px-4 border-b border-slate-800 bg-[#121722]/50 justify-between flex-shrink-0'):
+                        ui.label('HISTÓRICO DE EXECUÇÕES').classes('text-[0.6rem] font-bold text-slate-400 tracking-widest')
+                        ui.icon('history', size='xs', color='slate-500')
+                     
+                    recent_trades_table = ui.table(
+                        columns=[
+                           {'name': 'date', 'label': 'Horário', 'field': 'date', 'align': 'left'},
+                           {'name': 'pair', 'label': 'Par', 'field': 'pair', 'align': 'left'},
+                           {'name': 'type', 'label': 'Tipo', 'field': 'type', 'align': 'center'},
+                           {'name': 'pnl', 'label': 'PnL Líquido', 'field': 'pnl', 'align': 'right'},
+                        ],
+                        rows=[],
+                        pagination={'rowsPerPage': 5}
+                    ).classes('w-full h-full no-shadow bg-transparent text-slate-300').props('flat dense square')
+                    recent_trades_table.add_slot('header', r'''
+                       <q-tr :props="props" class="bg-[#121722] text-slate-400 text-xs font-semibold">
+                           <q-th v-for="col in props.cols" :key="col.name" :props="props">
+                               {{ col.label }}
+                           </q-th>
+                       </q-tr>
+                    ''')
 
-                with ui.column().classes('w-full gap-1 mt-1'):
-                    ui.label('STATUS ATUAL').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
-                    status_ui = ui.markdown('**Aguardando...**').classes('text-xs text-slate-300 leading-relaxed w-full break-words')
+                with ui.column().classes('w-full lg:w-2/5 h-64 lg:h-full bg-[#0B0E14] p-0 flex-col'):
+                    with ui.row().classes('w-full h-8 items-center px-4 border-b border-slate-800 bg-[#121722]/50 gap-2 flex-shrink-0'):
+                       ui.icon('terminal', size='xs', color='sky-400')
+                       ui.label('TERMINAL OUTPUT (SINCRONIZADO)').classes('text-[0.6rem] font-bold text-slate-400 tracking-widest')
+                     
+                    log_ui = ui.log().classes('w-full h-full font-mono text-[0.65rem] bg-[#080B10] text-emerald-400 p-3 rounded-none border-none leading-tight')
+                    
+                    # Popula com os logs recentes sincronizados do buffer
+                    for past_msg in list(logs_buffer):
+                        log_ui.push(past_msg)
 
-            # Painel Central de Gráfico e Tabelas
-            with ui.column().classes('w-full lg:flex-grow h-auto p-0 relative bg-[#0B0E14]'):
-                 chart_card = ui.card().classes('w-full h-[360px] lg:h-[480px] p-0 rounded-none bg-[#0B0E14] border-b border-slate-800 gap-0 shadow-none relative flex-shrink-0')
-                 with chart_card:
-                     # Badge Flutuante no Canto Superior Direito
-                     chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('absolute top-3 right-4 z-20 obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-[#00E5FF] border border-cyan-500/30 backdrop-blur-md shadow-lg')
-
-                     # Card IA Holográfico Otimizado
-                     ai_card = ui.card().classes('absolute top-3 left-3 w-64 lg:w-72 z-20 obsidian-card p-2.5 rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.5)] opacity-95 backdrop-blur-md transition-all duration-300')
-                     with ai_card:
-                         with ui.row().classes('w-full items-center justify-between mb-1'):
-                             with ui.row().classes('items-center gap-1.5'):
-                                 ai_icon_container = ui.element('div').classes('p-1 rounded-lg bg-slate-800/80 text-slate-400')
-                                 with ai_icon_container: ui.icon('psychology', size='xs')
-                                 ai_signal_label = ui.label('NEUTRO').classes('text-[0.7rem] font-bold tracking-wide text-slate-400')
-                             
-                             def toggle_ai_content():
-                                 is_visible = ai_reason_scroll.visible
-                                 ai_reason_scroll.set_visibility(not is_visible)
-                                 toggle_btn.props(f'icon={"keyboard_arrow_down" if is_visible else "keyboard_arrow_up"}')
-
-                             toggle_btn = ui.button(icon='keyboard_arrow_up', on_click=toggle_ai_content).props('flat dense round size=xs color=slate-400')
-                         
-                         ai_reason_scroll = ui.scroll_area().classes('h-20')
-                         with ai_reason_scroll:
-                             ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-[0.65rem] text-slate-300 leading-relaxed')
-
-                     # ECharts com Cores Cyberpunk Neon e Altura Fixa Garantida
-                     with ui.element('div').classes('w-full h-[360px] lg:h-[480px]'):
-                         candle_chart = ui.echart({
-                            'backgroundColor': '#0B0E14',
-                            'title': {
-                                'text': '📈 BTCUSDT — Gráfico em Tempo Real',
-                                'subtext': 'Alimentado por Binance WebSockets & Scanner 2.0 Quantitativo',
-                                'left': 'center',
-                                'top': 12,
-                                'textStyle': {'color': '#00E5FF', 'fontSize': 14, 'fontWeight': 'bold'},
-                                'subtextStyle': {'color': '#64748b', 'fontSize': 9.5}
-                            },
-                            'grid': [{'left': '45', 'right': '20', 'top': '65', 'height': '50%'}, {'left': '45', 'right': '20', 'top': '80%', 'height': '15%'}],
-                            'tooltip': {'trigger': 'axis', 'axisPointer': {'type': 'cross'}, 'backgroundColor': 'rgba(18, 23, 34, 0.95)', 'borderColor': '#00E5FF', 'textStyle': {'color': '#f8fafc'}},
-                            'dataZoom': [{'type': 'inside', 'xAxisIndex': [0, 1]}, {'type': 'slider', 'xAxisIndex': [0, 1], 'bottom': 5, 'height': 20, 'borderColor': '#1e293b', 'dataBackground': {'lineStyle': {'color': '#00E5FF'}, 'areaStyle': {'color': '#121722'}}}],
-                            'xAxis': [{'type': 'category', 'data': [], 'gridIndex': 0, 'axisLine': {'lineStyle': {'color': '#334155'}}}, {'type': 'category', 'data': [], 'gridIndex': 1, 'axisLabel': {'show': False}, 'axisTick': {'show': False}, 'axisLine': {'show': False}}],
-                            'yAxis': [{'type': 'value', 'scale': True, 'gridIndex': 0, 'splitLine': {'lineStyle': {'color': 'rgba(255, 255, 255, 0.05)'}}, 'position': 'right'}, {'type': 'value', 'scale': True, 'gridIndex': 1, 'splitLine': {'show': False}, 'axisLabel': {'show': False}, 'axisTick': {'show': False}}],
-                            'series': [
-                                {'type': 'candlestick', 'name': 'Preço', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'itemStyle': {'color': '#00F5A0', 'color0': '#FF2E93', 'borderColor': '#00F5A0', 'borderColor0': '#FF2E93'}},
-                                {'name': 'BB Upper', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'opacity': 0.4, 'color': '#FFB800', 'width': 1.5}},
-                                {'name': 'BB Lower', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'opacity': 0.4, 'color': '#FFB800', 'width': 1.5}},
-                                {'name': 'EMA 200', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'color': '#00E5FF', 'width': 2}},
-                                {'name': 'Volume', 'type': 'bar', 'xAxisIndex': 1, 'yAxisIndex': 1, 'data': [], 'itemStyle': {'color': '#00E5FF', 'opacity': 0.25}, 'large': True}
-                            ]
-                         }).classes('w-full h-full')
-
-                 # Painel Inferior Responsivo (Execuções + Terminal Output Sincronizado)
-                 with ui.row().classes('w-full flex-col lg:flex-row flex-grow gap-0 bg-[#0B0E14]'):
-                     with ui.column().classes('w-full lg:w-3/5 min-h-[220px] lg:h-full border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-[#0B0E14] p-0'):
-                         with ui.row().classes('w-full h-8 items-center px-4 border-b border-slate-800 bg-[#121722]/50 justify-between'):
-                             ui.label('HISTÓRICO DE EXECUÇÕES').classes('text-[0.6rem] font-bold text-slate-400 tracking-widest')
-                             ui.icon('history', size='xs', color='slate-500')
-                          
-                         recent_trades_table = ui.table(
-                             columns=[
-                                {'name': 'date', 'label': 'Horário', 'field': 'date', 'align': 'left'},
-                                {'name': 'pair', 'label': 'Par', 'field': 'pair', 'align': 'left'},
-                                {'name': 'type', 'label': 'Tipo', 'field': 'type', 'align': 'center'},
-                                {'name': 'pnl', 'label': 'PnL Líquido', 'field': 'pnl', 'align': 'right'},
-                             ],
-                             rows=[],
-                             pagination={'rowsPerPage': 5}
-                         ).classes('w-full h-full no-shadow bg-transparent text-slate-300').props('flat dense square')
-                         recent_trades_table.add_slot('header', r'''
-                            <q-tr :props="props" class="bg-[#121722] text-slate-400 text-xs font-semibold">
-                                <q-th v-for="col in props.cols" :key="col.name" :props="props">
-                                    {{ col.label }}
-                                </q-th>
-                            </q-tr>
-                         ''')
-
-                     with ui.column().classes('w-full lg:w-2/5 min-h-[220px] lg:h-full bg-[#0B0E14] p-0'):
-                         with ui.row().classes('w-full h-8 items-center px-4 border-b border-slate-800 bg-[#121722]/50 gap-2'):
-                            ui.icon('terminal', size='xs', color='cyan-400')
-                            ui.label('TERMINAL OUTPUT (SINCRONIZADO)').classes('text-[0.6rem] font-bold text-slate-400 tracking-widest')
-                          
-                         log_ui = ui.log().classes('w-full h-full font-mono text-[0.65rem] bg-[#080B10] text-emerald-400 p-3 rounded-none border-none leading-tight')
-                         
-                         # Popula com os logs recentes sincronizados do buffer
-                         for past_msg in list(logs_buffer):
-                             log_ui.push(past_msg)
-
-        ui.timer(5.0, update_data)
+    ui.timer(5.0, update_data)
 
 def start_dashboard():
     port = DASHBOARD_CONFIG['port']
