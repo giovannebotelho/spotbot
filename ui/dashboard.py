@@ -4,6 +4,7 @@ import collections
 from nicegui import ui, app
 import pandas as pd
 from datetime import datetime
+import datetime as dt_module
 
 from config.settings import DASHBOARD_CONFIG, TRADING_CONFIG, RSI_CONFIG, RISK_PROFILES
 import config.settings as settings
@@ -64,6 +65,14 @@ def log_handler(message):
     if log_ui:
         try:
             log_ui.push(clean_msg)
+        except Exception:
+            pass
+
+def status_handler(message):
+    if status_ui:
+        try:
+            clean_msg = remove_ansi_codes(message)
+            status_ui.content = f"**{clean_msg}**"
         except Exception:
             pass
 
