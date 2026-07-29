@@ -7,6 +7,9 @@ from config.settings import DATABASE_URL, BASE_DIR
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
+_stats_cache = None
+_last_stats_time = 0
+
 class DatabaseManager:
     def __init__(self, db_url=None):
         self.db_url = db_url or DATABASE_URL
@@ -14,24 +17,31 @@ class DatabaseManager:
         self.conn = None
 
     def connect(self):
+        if self.conn is not None:
+            try:
+                if not self.is_postgres:
+                    return
+                cursor = self.conn.cursor()
+                cursor.execute("SELECT 1")
+                return
+            except Exception:
+                self.conn = None
+
         if self.is_postgres:
             import psycopg2
             from psycopg2.extras import RealDictCursor
             self.conn = psycopg2.connect(self.db_url, cursor_factory=RealDictCursor)
         else:
-            # Garante que o caminho para o arquivo SQLite seja relativo ao diretório do projeto ou absoluto
             if self.db_url.startswith("sqlite:///"):
                 db_path = Path(self.db_url.replace("sqlite:///", ""))
             else:
                 db_path = BASE_DIR / "spotbot.db"
             
-            self.conn = sqlite3.connect(db_path)
+            self.conn = sqlite3.connect(db_path, check_same_thread=False)
             self.conn.row_factory = sqlite3.Row
 
     def close(self):
-        if self.conn:
-            self.conn.close()
-            self.conn = None
+        pass
 
     def create_tables(self):
         self.connect()
@@ -200,6 +210,12 @@ class DatabaseManager:
             return pd.DataFrame()
 
     def get_stats(self):
+        global _stats_cache, _last_stats_time
+        import time
+        now = time.time()
+        if _stats_cache is not None and (now - _last_stats_time < 15.0):
+            return _stats_cache
+
         try:
             self.connect()
             cursor = self.conn.cursor()
@@ -218,23 +234,21 @@ class DatabaseManager:
             
             win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
             
-            return {
+            _stats_cache = {
                 "total_trades": total_trades,
                 "wins": wins,
                 "losses": total_trades - wins,
                 "win_rate": win_rate,
                 "total_net_profit": total_net_profit
             }
-        except Exception as e:
-            try:
-                self.create_tables()
-            except Exception:
-                pass
+            _last_stats_time = now
+            return _stats_cache
+        except Exception:
+            if _stats_cache is not None:
+                return _stats_cache
             return {
                 "total_trades": 0, "wins": 0, "losses": 0, "win_rate": 0, "total_net_profit": 0.0
             }
-        finally:
-            self.close()
 
     def migrate_from_csv(self, csv_path="results.csv"):
         csv_file = BASE_DIR / csv_path

@@ -15,6 +15,7 @@ db = DatabaseManager()
 
 # Buffer de Logs Global (guarda os últimos 50 logs para novos visitantes/dispositivos)
 logs_buffer = collections.deque(maxlen=50)
+_last_chart_sig = None
 
 log_ui = None
 status_ui = None
@@ -111,22 +112,26 @@ async def update_data():
 
         market_data = engine.shared_market_data
         if market_data['dates'] and candle_chart:
-            candle_chart.options['title'] = {
-                'text': f'📈 {active_symbol} ({price_str})',
-                'subtext': 'Binance WebSockets & Scanner Quantitativo',
-                'left': 'center',
-                'top': 8,
-                'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
-                'subtextStyle': {'color': '#64748b', 'fontSize': 9}
-            }
-            candle_chart.options['xAxis'][0]['data'] = market_data['dates']
-            candle_chart.options['xAxis'][1]['data'] = market_data['dates']
-            candle_chart.options['series'][0]['data'] = market_data['klines']
-            candle_chart.options['series'][1]['data'] = market_data.get('bb_upper', [])
-            candle_chart.options['series'][2]['data'] = market_data.get('bb_lower', [])
-            candle_chart.options['series'][3]['data'] = market_data.get('ema200', [])
-            candle_chart.options['series'][4]['data'] = market_data.get('volumes', [])
-            candle_chart.update()
+            global _last_chart_sig
+            current_sig = (active_symbol, price_str, len(market_data['dates']), market_data['dates'][-1] if market_data['dates'] else '')
+            if current_sig != _last_chart_sig:
+                _last_chart_sig = current_sig
+                candle_chart.options['title'] = {
+                    'text': f'📈 {active_symbol} ({price_str})',
+                    'subtext': 'Binance WebSockets & Scanner Quantitativo',
+                    'left': 'center',
+                    'top': 8,
+                    'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
+                    'subtextStyle': {'color': '#64748b', 'fontSize': 9}
+                }
+                candle_chart.options['xAxis'][0]['data'] = market_data['dates']
+                candle_chart.options['xAxis'][1]['data'] = market_data['dates']
+                candle_chart.options['series'][0]['data'] = market_data['klines']
+                candle_chart.options['series'][1]['data'] = market_data.get('bb_upper', [])
+                candle_chart.options['series'][2]['data'] = market_data.get('bb_lower', [])
+                candle_chart.options['series'][3]['data'] = market_data.get('ema200', [])
+                candle_chart.options['series'][4]['data'] = market_data.get('volumes', [])
+                candle_chart.update()
 
         update_recent_trades_table()
 
