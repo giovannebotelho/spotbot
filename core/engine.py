@@ -1192,7 +1192,18 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
 
                         order_count += 1
                         compra = await client.order_market_buy(symbol=active_target_symbol, quoteOrderQty=round(order_val_usdt, quote_precision))
-                        executed_qty = float(compra['executedQty'])
+                        
+                        # Fix Binance Fee: pega a quantidade real líquida recebida para evitar "Insufficient Balance"
+                        base_asset = active_target_symbol.replace('USDT', '')
+                        try:
+                            asset_balance = await client.get_asset_balance(asset=base_asset)
+                            available_qty = float(asset_balance['free'])
+                        except Exception:
+                            available_qty = float('inf')
+                            
+                        nominal_qty = float(compra['executedQty'])
+                        executed_qty = min(nominal_qty, available_qty)
+                        
                         price = float(compra['fills'][0]['price'])
                         timestamp = dt_module.datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
                         
