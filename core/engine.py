@@ -27,7 +27,9 @@ from services.news_scanner import fetch_crypto_news
 from services.gemini_ai import analyze_news_sentiment_with_gemini, generate_post_trade_synthesis, auto_tune_risk_profile
 from services.database import DatabaseManager
 from services.pdf_generator import generate_weekly_telemetry_pdf
-from utils.formatting import remove_ansi_codes
+from utils.formatting import remove_ansi_codes, format_price
+
+client = None
 
 environment = os.getenv("BOT_ENVIRONMENT", "mainnet")
 if environment == "mainnet":
@@ -575,12 +577,13 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         elif cmd == '/status':
             target_asset = bot_status_data.get('target_asset', 'BTCUSDT')
             mtf_sc = bot_status_data.get('mtf_score', 80)
+            cur_price_str = format_price(bot_status_data.get('price', 0.0))
             return (
                 f"⚡ <b>STATUS DO SPOTBOT PRO v4.0 (QUANT)</b>\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
                 f"🎯 <b>Modo</b>: {bot_status_data['symbol']}\n"
                 f"🪙 <b>Foco Atual</b>: <b>{target_asset}</b>\n"
-                f"💵 <b>Preço</b>: <b>${bot_status_data['price']:.2f}</b>\n"
+                f"💵 <b>Preço</b>: <b>{cur_price_str}</b>\n"
                 f"📊 <b>RSI</b>: <b>{bot_status_data['rsi']:.1f}</b>\n"
                 f"📐 <b>Confluência MTF (4H+1H+15M)</b>: <b>{mtf_sc}%</b> 🟢\n"
                 f"📈 <b>Tendência 4h</b>: <b>{bot_status_data['trend']}</b>\n"
@@ -633,7 +636,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     rsi_v = item['rsi']
                     rs_v = item['rs_ratio']
                     emoji = "🟢" if rsi_v <= 35 else ("🟡" if rsi_v <= 50 else "⚪")
-                    lines.append(f"{emoji} <b>{sym}</b>: ${prc:.2f} | RS: <b>{rs_v:+.1f}%</b> | RSI: <b>{rsi_v:.1f}</b>")
+                    lines.append(f"{emoji} <b>{sym}</b>: <b>{format_price(prc)}</b> | RS: <b>{rs_v:+.1f}%</b> | RSI: <b>{rsi_v:.1f}</b>")
                 
                 return "\n".join(lines)
             except Exception as e:
@@ -778,7 +781,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         log(f"⚠️ Aviso no banco de dados: {e}")
 
     await asyncio.sleep(1)
-    client = None
+    global client
     try:
         client = await BinanceAsyncClient.create(api_key, api_secret)
         await sync_binance_time(client, log=log)
@@ -1062,7 +1065,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             bot_status_data['rsi'] = rsi
             bot_status_data['trend'] = "Alta" if check_trend(klines) else "Baixa/Neutro"
             
-            status(f"📊 RSI ({active_target_symbol}): {rsi:.1f} | Preço: ${closes[-1]:.2f}")
+            status(f"📊 RSI ({active_target_symbol}): {rsi:.1f} | Preço: {format_price(closes[-1])}")
             
             if volumes_series.iloc[-1] > volume_ma * (1 + TRADING_CONFIG['volume_avg'] / 100):
                 status("⚠️ Alto volume detectado (Volatilidade). Operação em espera.")

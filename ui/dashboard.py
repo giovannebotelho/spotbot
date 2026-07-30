@@ -93,9 +93,10 @@ async def change_chart_asset(val):
 
         dates, candles, bb_upper, bb_lower, ema200 = None, None, [], [], []
         
-        if engine.client:
+        client_obj = getattr(engine, 'client', None)
+        if client_obj:
             try:
-                klines_raw = await engine.client.get_klines(symbol=val, interval=engine.TRADING_CONFIG['interval'], limit=50)
+                klines_raw = await client_obj.get_klines(symbol=val, interval=engine.TRADING_CONFIG['interval'], limit=50)
                 if klines_raw:
                     dates = [dt_module.datetime.fromtimestamp(int(k[0])/1000).strftime('%H:%M') for k in klines_raw]
                     candles = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in klines_raw]
