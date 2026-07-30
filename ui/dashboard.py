@@ -676,7 +676,7 @@ async def index():
                            'subtextStyle': {'color': '#64748b', 'fontSize': 9}
                        },
                        'grid': [{'left': '45', 'right': '15', 'top': '70', 'height': '45%'}, {'left': '45', 'right': '15', 'top': '82%', 'height': '14%'}],
-                       'legend': {'data': ['Preço', 'BB Upper', 'BB Lower', 'EMA 200'], 'top': 40, 'left': 15, 'textStyle': {'color': '#94a3b8', 'fontSize': 10}},
+                       'legend': {'data': ['Preço', 'BB Upper', 'BB Lower', 'EMA 200', 'TP', 'SL', 'Entrada'], 'top': 48, 'left': 15, 'textStyle': {'color': '#94a3b8', 'fontSize': 10}},
                        'tooltip': {'trigger': 'axis', 'axisPointer': {'type': 'cross'}, 'backgroundColor': 'rgba(18, 23, 34, 0.95)', 'borderColor': '#0284C7', 'textStyle': {'color': '#f8fafc'}},
                        'dataZoom': [
                            {'type': 'inside', 'xAxisIndex': [0, 1]},
@@ -690,6 +690,9 @@ async def index():
                            {'name': 'BB Upper', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'opacity': 0.4, 'color': '#F59E0B', 'width': 1.5}},
                            {'name': 'BB Lower', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'opacity': 0.4, 'color': '#F59E0B', 'width': 1.5}},
                            {'name': 'EMA 200', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'color': '#38BDF8', 'width': 2}},
+                           {'name': 'TP', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'symbol': 'none', 'lineStyle': {'color': '#10B981', 'type': 'dashed', 'width': 2}},
+                           {'name': 'SL', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'symbol': 'none', 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}},
+                           {'name': 'Entrada', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'symbol': 'none', 'lineStyle': {'color': '#38BDF8', 'type': 'dashed', 'width': 1.5}},
                            {'name': 'Volume', 'type': 'bar', 'xAxisIndex': 1, 'yAxisIndex': 1, 'data': [], 'itemStyle': {'color': '#38BDF8', 'opacity': 0.25}, 'large': True}
                        ]
                     }).classes('w-full h-full')
