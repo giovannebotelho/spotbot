@@ -629,10 +629,9 @@ async def index():
             # Barra de Abas do Gráfico (Multi-Ativo) & Legenda Estilo Binance
             with ui.row().classes('w-full h-10 bg-[#0B0E14] border-b border-slate-800/80 px-3 items-center justify-between gap-3 flex-shrink-0 z-20 overflow-x-auto flex-nowrap'):
                 with ui.row().classes('items-center gap-1 flex-shrink-0'):
-                    chart_tabs = ui.tabs().props('dense active-color=sky-400 indicator-color=sky-400 text-color=slate-400 no-caps').classes('bg-transparent h-9 text-xs')
+                    chart_tabs = ui.tabs(on_change=lambda e: change_chart_asset(e.value)).props('dense active-color=sky-400 indicator-color=sky-400 text-color=slate-400 no-caps').classes('bg-transparent h-9 text-xs')
                     with chart_tabs:
                         ui.tab('foco', label='⚡ Foco do Bot (Scanner)', icon='center_focus_strong')
-                    chart_tabs.on_change(lambda e: change_chart_asset(e.value))
 
                 with ui.row().classes('items-center gap-3 text-[0.6rem] font-mono text-slate-400 flex-shrink-0 hidden lg:flex ml-auto'):
                     ui.label('LEGENDA:').classes('font-bold text-slate-500')
