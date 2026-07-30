@@ -390,7 +390,10 @@ async def monitor_oco_lifecycle(
                             return
     except Exception as ws_err:
         use_ws_monitoring = False
-        log(f"⚠️ Conexão WebSocket instável ({ws_err}). Alternando automaticamente para monitoramento de ordem por REST Polling...")
+        if "-2035" in str(ws_err) or "already active" in str(ws_err):
+            log(f"ℹ️ Monitoramento Multimodal: Posição secundária ({active_target_symbol}) alocada no motor REST Polling.")
+        else:
+            log(f"⚠️ Conexão WebSocket instável ({ws_err}). Alternando automaticamente para monitoramento de ordem por REST Polling...")
 
     # Fallback REST Polling se o WebSocket instabilizar
     if not use_ws_monitoring:
