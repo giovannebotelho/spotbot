@@ -899,7 +899,8 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
 
         while bot_running:
             try:
-                current_dt = dt_module.datetime.now()
+                brt_tz = dt_module.timezone(dt_module.timedelta(hours=-3))
+                current_dt = dt_module.datetime.now(brt_tz)
                 current_hour = current_dt.hour
                 
                 if current_hour != last_sync_hour:
@@ -920,9 +921,8 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         log(f"⚠️ Erro ao gerar PDF automático de domingo: {pdf_err}")
 
                 # FASE 2: Relatório Diário Automático às 23:59
-                now_dt = dt_module.datetime.now()
-                if now_dt.hour == 23 and now_dt.minute == 59 and globals().get('_last_daily_report_date') != now_dt.date():
-                    globals()['_last_daily_report_date'] = now_dt.date()
+                if current_hour == 23 and current_dt.minute == 59 and globals().get('_last_daily_report_date') != current_dt.date():
+                    globals()['_last_daily_report_date'] = current_dt.date()
                     try:
                         d_stats = db.get_daily_stats()
                         if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
