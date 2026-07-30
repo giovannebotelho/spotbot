@@ -104,9 +104,9 @@ async def change_chart_asset(val):
                     s_closes = pd.Series(closes)
                     ma = s_closes.rolling(window=20).mean()
                     std = s_closes.rolling(window=20).std()
-                    bb_upper = (ma + (2 * std)).fillna(0).tolist()
-                    bb_lower = (ma - (2 * std)).fillna(0).tolist()
-                    ema200 = s_closes.ewm(span=min(200, len(closes)), adjust=False).mean().fillna(0).tolist()
+                    bb_upper = (ma + (2 * std)).fillna('-').tolist()
+                    bb_lower = (ma - (2 * std)).fillna('-').tolist()
+                    ema200 = s_closes.ewm(span=min(200, len(closes)), adjust=False).mean().fillna('-').tolist()
             except Exception as k_err:
                 print(f"Aviso ao buscar klines via client para {val}: {k_err}")
 
@@ -674,6 +674,7 @@ async def index():
                            'subtextStyle': {'color': '#64748b', 'fontSize': 9}
                        },
                        'grid': [{'left': '45', 'right': '15', 'top': '60', 'height': '55%'}, {'left': '45', 'right': '15', 'top': '82%', 'height': '14%'}],
+                       'legend': {'data': ['Preço', 'BB Upper', 'BB Lower', 'EMA 200'], 'top': 8, 'right': 140, 'textStyle': {'color': '#94a3b8', 'fontSize': 10}},
                        'tooltip': {'trigger': 'axis', 'axisPointer': {'type': 'cross'}, 'backgroundColor': 'rgba(18, 23, 34, 0.95)', 'borderColor': '#0284C7', 'textStyle': {'color': '#f8fafc'}},
                        'dataZoom': [{'type': 'inside', 'xAxisIndex': [0, 1]}, {'type': 'slider', 'xAxisIndex': [0, 1], 'bottom': 3, 'height': 16, 'borderColor': '#1e293b', 'dataBackground': {'lineStyle': {'color': '#38BDF8'}, 'areaStyle': {'color': '#121722'}}}],
                        'xAxis': [{'type': 'category', 'data': [], 'gridIndex': 0, 'axisLine': {'lineStyle': {'color': '#334155'}}}, {'type': 'category', 'data': [], 'gridIndex': 1, 'axisLabel': {'show': False}, 'axisTick': {'show': False}, 'axisLine': {'show': False}}],
