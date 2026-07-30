@@ -199,8 +199,10 @@ async def update_data():
             curr_opts = ['⚡ Foco do Bot (Automático)'] + list(active_symbols)
             if chart_asset_select.options != curr_opts:
                 chart_asset_select.options = curr_opts
+                chart_asset_select.update()
                 if active_symbols and (not selected_chart_symbol or chart_asset_select.value == '⚡ Foco do Bot (Automático)'):
                     chart_asset_select.value = active_symbols[0]
+                    chart_asset_select.update()
                     await change_chart_asset(active_symbols[0])
 
         active_symbol = engine.bot_status_data.get('target_asset', 'BTCUSDT')
