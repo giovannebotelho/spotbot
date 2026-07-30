@@ -732,9 +732,26 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             except Exception as e:
                 return f"Erro ao buscar notícias: {e}"
 
+        elif cmd.startswith('/set_risk_'):
+            new_prof = cmd.replace('/set_risk_', '').capitalize()
+            from config.settings import RISK_PROFILES
+            import config.settings as setts
+            if new_prof in RISK_PROFILES:
+                setts.ACTIVE_RISK_PROFILE = new_prof
+                return f"⚙️ <b>Perfil de Risco Alterado!</b>\nNovo Perfil: <b>{new_prof}</b>\n<i>TP: +{RISK_PROFILES[new_prof]['tp_pct']*100:.1f}% | SL: -{RISK_PROFILES[new_prof]['sl_pct']*100:.1f}%</i>"
+            return "⚠️ Perfil de risco inválido."
+
+        elif cmd == '/panic_sell_all':
+            if active_positions:
+                count = len(active_positions)
+                for sym in list(active_positions.keys()):
+                    asyncio.create_task(panic_sell_position(sym))
+                return f"🔥 <b>PANIC SELL DISPARADO!</b>\nEncerrando {count} posição(ões) ativa(s) a mercado imediatamente..."
+            return "ℹ️ Nenhuma posição ativa no momento para encerrar."
+
         elif cmd in ['/ajuda', '/help', '/menu']:
             return (
-                "📚 <b>COMANDOS DISPONÍVEIS (SPOTBOT PRO v6.0)</b>\n"
+                "📚 <b>COMANDOS DISPONÍVEIS (SPOTBOT PRO v6.1)</b>\n"
                 "━━━━━━━━━━━━━━━━━━━\n"
                 "📊 /status - Status do ativo em foco, RSI e confluência MTF\n"
                 "💰 /saldo - Saldos USDT, BNB e fracionamento de vagas\n"
@@ -744,8 +761,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 "🔥 /top20 ou /scanner - Ranking de Força Relativa do Top 20\n"
                 "📄 /relatorio ou /pdf - Gera e envia Relatório Semanal PDF\n"
                 "🛑 /stop - Pausa o bot com segurança\n"
-                "🚨 /cancel - Interrupção de emergência (CTRL+C)\n"
-                "📱 /menu ou /ajuda - Exibe este menu com botões inline"
+                "📱 /menu ou /ajuda - Exibe o menu interativo com subcategorias"
             )
         return "❓ Comando não reconhecido. Digite /ajuda para ver as opções."
 

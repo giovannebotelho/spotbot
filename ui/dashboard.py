@@ -9,7 +9,7 @@ import datetime as dt_module
 from config.settings import DASHBOARD_CONFIG, TRADING_CONFIG, RSI_CONFIG, RISK_PROFILES
 import config.settings as settings
 from services.database import DatabaseManager
-from utils.formatting import remove_ansi_codes
+from utils.formatting import remove_ansi_codes, format_price
 import core.engine as engine
 
 db = DatabaseManager()
@@ -55,7 +55,9 @@ paper_trading_switch = None
 
 chart_symbol_badge = None
 chart_asset_select = None
+chart_tabs = None
 selected_chart_symbol = None
+_last_rendered_tabs = set()
 
 bot_task = None
 
@@ -121,17 +123,21 @@ async def change_chart_asset(val):
             tp_p = pos_info.get('tp', engine.bot_status_data.get('tp_price', 0.0))
             sl_p = pos_info.get('sl', engine.bot_status_data.get('sl_price', 0.0))
             
+            e_str = format_price(e_p)
+            tp_str = format_price(tp_p)
+            sl_str = format_price(sl_p)
+
             mark_lines = []
             if e_p > 0:
-                mark_lines.append({'yAxis': e_p, 'lineStyle': {'color': '#38BDF8', 'type': 'dashed', 'width': 1.5}, 'label': {'formatter': f' Entrada: ${e_p:.4f}', 'position': 'insideStartTop', 'color': '#38BDF8'}})
+                mark_lines.append({'yAxis': e_p, 'lineStyle': {'color': '#38BDF8', 'type': 'dashed', 'width': 1.5}, 'label': {'formatter': f' Entrada: {e_str}', 'position': 'insideStartTop', 'color': '#38BDF8'}})
             if tp_p > 0:
-                mark_lines.append({'yAxis': tp_p, 'lineStyle': {'color': '#10B981', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🎯 TP: ${tp_p:.4f}', 'position': 'insideEndTop', 'color': '#10B981'}})
+                mark_lines.append({'yAxis': tp_p, 'lineStyle': {'color': '#10B981', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🎯 TP: {tp_str}', 'position': 'insideEndTop', 'color': '#10B981'}})
             if sl_p > 0:
-                mark_lines.append({'yAxis': sl_p, 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🛑 SL: ${sl_p:.4f}', 'position': 'insideEndBottom', 'color': '#F43F5E'}})
+                mark_lines.append({'yAxis': sl_p, 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🛑 SL: {sl_str}', 'position': 'insideEndBottom', 'color': '#F43F5E'}})
 
             candle_chart.options['title'] = {
                 'text': f'📈 {val} (Posição Ativa OCO)',
-                'subtext': f'Entrada: ${e_p:.4f} | TP: ${tp_p:.4f} | SL: ${sl_p:.4f}',
+                'subtext': f'Entrada: {e_str} | TP: {tp_str} | SL: {sl_str}',
                 'left': 15, 'top': 8,
                 'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
                 'subtextStyle': {'color': '#64748b', 'fontSize': 9}
@@ -191,25 +197,31 @@ async def update_data():
             if risk_profile_select.value != settings.ACTIVE_RISK_PROFILE:
                 risk_profile_select.value = settings.ACTIVE_RISK_PROFILE
 
-        active_positions_keys = list(engine.active_positions.keys())
-        active_symbols = active_positions_keys if active_positions_keys else engine.bot_status_data.get('active_symbols', [])
-        
-        # Sincronização de Opções do Seletor de Ativo do Gráfico
-        if chart_asset_select:
-            curr_opts = ['⚡ Foco do Bot (Automático)'] + list(active_symbols)
-            if chart_asset_select.options != curr_opts:
-                chart_asset_select.options = curr_opts
-                chart_asset_select.update()
-                if active_symbols and (not selected_chart_symbol or chart_asset_select.value == '⚡ Foco do Bot (Automático)'):
-                    chart_asset_select.value = active_symbols[0]
-                    chart_asset_select.update()
-                    await change_chart_asset(active_symbols[0])
+        # Sincronização Dinâmica de Abas do Gráfico (Multi-Ativo)
+        if chart_tabs:
+            current_active_keys = set(engine.active_positions.keys())
+            global _last_rendered_tabs
+            if current_active_keys != _last_rendered_tabs:
+                _last_rendered_tabs = current_active_keys.copy()
+                chart_tabs.clear()
+                with chart_tabs:
+                    ui.tab('foco', label='⚡ Foco do Bot (Scanner)', icon='center_focus_strong')
+                    for sym in sorted(current_active_keys):
+                        ui.tab(sym, label=f'🪙 {sym} (OCO)', icon='show_chart')
+                chart_tabs.update()
+                
+                if current_active_keys and (not selected_chart_symbol or chart_tabs.value == 'foco'):
+                    first_sym = sorted(current_active_keys)[0]
+                    chart_tabs.value = first_sym
+                    chart_tabs.update()
+                    await change_chart_asset(first_sym)
 
         active_symbol = engine.bot_status_data.get('target_asset', 'BTCUSDT')
         current_price = engine.bot_status_data.get('price', 0.0)
-        price_str = f"${current_price:.4f}" if (current_price > 0 and current_price < 1.0) else f"${current_price:.2f}"
+        price_str = format_price(current_price)
 
         if chart_symbol_badge:
+            active_symbols = list(engine.active_positions.keys())
             if active_symbols:
                 active_str = " | ".join([f"{s}" for s in active_symbols])
                 chart_symbol_badge.text = f"⚡ VAGAS ATIVAS ({len(active_symbols)}/{engine.MAX_CONCURRENT_POSITIONS}): [{active_str}]"
@@ -237,14 +249,18 @@ async def update_data():
                 candle_chart.options['xAxis'][1]['data'] = market_data['dates']
                 candle_chart.options['series'][0]['data'] = market_data['klines']
 
-                # Desanha as Linhas OCO ativas (TP, SL e Preço de Entrada) Estilo Binance
+                # Desenha as Linhas OCO ativas (TP, SL e Preço de Entrada) Estilo Binance
+                e_str = format_price(entry_price)
+                tp_str = format_price(tp_price)
+                sl_str = format_price(sl_price)
+                
                 mark_lines = []
                 if entry_price > 0:
-                    mark_lines.append({'yAxis': entry_price, 'lineStyle': {'color': '#38BDF8', 'type': 'dashed', 'width': 1.5}, 'label': {'formatter': f' Entrada: ${entry_price:.4f}', 'position': 'insideStartTop', 'color': '#38BDF8'}})
+                    mark_lines.append({'yAxis': entry_price, 'lineStyle': {'color': '#38BDF8', 'type': 'dashed', 'width': 1.5}, 'label': {'formatter': f' Entrada: {e_str}', 'position': 'insideStartTop', 'color': '#38BDF8'}})
                 if tp_price > 0:
-                    mark_lines.append({'yAxis': tp_price, 'lineStyle': {'color': '#10B981', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🎯 TP: ${tp_price:.4f}', 'position': 'insideEndTop', 'color': '#10B981'}})
+                    mark_lines.append({'yAxis': tp_price, 'lineStyle': {'color': '#10B981', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🎯 TP: {tp_str}', 'position': 'insideEndTop', 'color': '#10B981'}})
                 if sl_price > 0:
-                    mark_lines.append({'yAxis': sl_price, 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🛑 SL: ${sl_price:.4f}', 'position': 'insideEndBottom', 'color': '#F43F5E'}})
+                    mark_lines.append({'yAxis': sl_price, 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🛑 SL: {sl_str}', 'position': 'insideEndBottom', 'color': '#F43F5E'}})
                 
                 candle_chart.options['series'][0]['markLine'] = {'symbol': ['none', 'none'], 'data': mark_lines}
 
@@ -610,25 +626,23 @@ async def index():
 
                 ai_toggle_btn = ui.button('🧠 Ver Análise IA ❯', on_click=toggle_ai_drawer).props('flat dense size=xs color=sky-400').classes('text-[0.65rem] font-semibold')
 
-            # Barra de Seletor de Ativo do Gráfico & Legenda Estilo Binance
-            with ui.row().classes('w-full h-9 bg-[#0B0E14] border-b border-slate-800/80 px-3 items-center justify-between gap-3 flex-shrink-0 z-20 overflow-x-auto flex-nowrap'):
-                with ui.row().classes('items-center gap-2 flex-shrink-0'):
-                    ui.label('🎯 GRÁFICO DO ATIVO:').classes('text-[0.6rem] font-bold text-sky-400 tracking-wider')
-                    chart_asset_select = ui.select(
-                        options=['⚡ Foco do Bot (Automático)'],
-                        value='⚡ Foco do Bot (Automático)',
-                        on_change=lambda e: change_chart_asset(e.value)
-                    ).classes('input-zinc bg-[#121722] rounded-md text-xs font-mono min-w-[200px]').props('dark outlined dense')
+            # Barra de Abas do Gráfico (Multi-Ativo) & Legenda Estilo Binance
+            with ui.row().classes('w-full h-10 bg-[#0B0E14] border-b border-slate-800/80 px-3 items-center justify-between gap-3 flex-shrink-0 z-20 overflow-x-auto flex-nowrap'):
+                with ui.row().classes('items-center gap-1 flex-shrink-0'):
+                    chart_tabs = ui.tabs().props('dense active-color=sky-400 indicator-color=sky-400 text-color=slate-400 no-caps').classes('bg-transparent h-9 text-xs')
+                    with chart_tabs:
+                        ui.tab('foco', label='⚡ Foco do Bot (Scanner)', icon='center_focus_strong')
+                    chart_tabs.on_change(lambda e: change_chart_asset(e.value))
 
-                with ui.row().classes('items-center gap-3 text-[0.6rem] font-mono text-slate-400 flex-shrink-0 hidden md:flex'):
+                with ui.row().classes('items-center gap-3 text-[0.6rem] font-mono text-slate-400 flex-shrink-0 hidden lg:flex ml-auto'):
                     ui.label('LEGENDA:').classes('font-bold text-slate-500')
-                    ui.label('🟢 Vela Alta').classes('text-emerald-400')
-                    ui.label('🔴 Vela Baixa').classes('text-rose-400')
-                    ui.label('🟡 Banda Bollinger').classes('text-amber-400')
+                    ui.label('🟢 Alta').classes('text-emerald-400')
+                    ui.label('🔴 Baixa').classes('text-rose-400')
+                    ui.label('🟡 Bollinger').classes('text-amber-400')
                     ui.label('🔵 EMA 200').classes('text-sky-400')
-                    ui.label('🎯-- TP').classes('text-emerald-400 font-bold')
-                    ui.label('🛑-- SL').classes('text-rose-400 font-bold')
-                    ui.label('🩵-- Entrada').classes('text-sky-400 font-bold')
+                    ui.label('🎯 TP').classes('text-emerald-400 font-bold')
+                    ui.label('🛑 SL').classes('text-rose-400 font-bold')
+                    ui.label('🩵 Entrada').classes('text-sky-400 font-bold')
 
             # Conteúdo Expansível do Painel IA Gemini
             ai_reason_container = ui.card().classes('w-full p-3 bg-[#121722] border-b border-slate-800 text-xs text-slate-300 transition-all flex-shrink-0')

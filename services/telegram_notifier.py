@@ -55,20 +55,109 @@ class TelegramBot:
         self.offset = 0
         self.base_url = f"https://api.telegram.org/bot{token}"
 
-    def get_menu_keyboard(self):
-        """Retorna o teclado inline com botões de toque rápido."""
-        return {
-            "inline_keyboard": [
-                [
-                    {"text": "📊 Status", "callback_data": "/status"},
-                    {"text": "💰 Lucro Hoje", "callback_data": "/lucro"},
-                ],
-                [
-                    {"text": "⚡ Posições Ativas", "callback_data": "/posicoes"},
-                    {"text": "📄 Relatório PDF", "callback_data": "/relatorio"},
+    def get_menu_keyboard(self, menu_type="main"):
+        """Retorna os teclados inline interativos com navegação por submenus sofisticados."""
+        if menu_type == "status":
+            return {
+                "inline_keyboard": [
+                    [
+                        {"text": "📊 Status do Robô", "callback_data": "/status"},
+                        {"text": "💰 Saldos (USDT/BNB)", "callback_data": "/saldo"},
+                    ],
+                    [
+                        {"text": "📈 PnL & Performance", "callback_data": "/lucro"},
+                    ],
+                    [
+                        {"text": "🔙 Voltar ao Menu Principal", "callback_data": "sub_main"},
+                    ]
                 ]
-            ]
-        }
+            }
+        elif menu_type == "posicoes":
+            return {
+                "inline_keyboard": [
+                    [
+                        {"text": "⚡ Ordens OCO Ativas", "callback_data": "/posicoes"},
+                    ],
+                    [
+                        {"text": "🔥 PANIC SELL (Venda Geral)", "callback_data": "/panic_sell_all"},
+                    ],
+                    [
+                        {"text": "🔙 Voltar ao Menu Principal", "callback_data": "sub_main"},
+                    ]
+                ]
+            }
+        elif menu_type == "risco":
+            return {
+                "inline_keyboard": [
+                    [
+                        {"text": "🛡️ Conservador", "callback_data": "/set_risk_conservador"},
+                        {"text": "⚖️ Moderado", "callback_data": "/set_risk_moderado"},
+                    ],
+                    [
+                        {"text": "🚀 Agressivo", "callback_data": "/set_risk_agressivo"},
+                    ],
+                    [
+                        {"text": "🔙 Voltar ao Menu Principal", "callback_data": "sub_main"},
+                    ]
+                ]
+            }
+        elif menu_type == "scanner":
+            return {
+                "inline_keyboard": [
+                    [
+                        {"text": "🏆 Top 20 Ranking", "callback_data": "/top20"},
+                        {"text": "🔄 Rescan de Mercado", "callback_data": "/status"},
+                    ],
+                    [
+                        {"text": "🔙 Voltar ao Menu Principal", "callback_data": "sub_main"},
+                    ]
+                ]
+            }
+        elif menu_type == "ia":
+            return {
+                "inline_keyboard": [
+                    [
+                        {"text": "🧠 Sentimento & Notícias", "callback_data": "/noticias"},
+                        {"text": "📊 Relatório PDF", "callback_data": "/relatorio"},
+                    ],
+                    [
+                        {"text": "🔙 Voltar ao Menu Principal", "callback_data": "sub_main"},
+                    ]
+                ]
+            }
+        elif menu_type == "config":
+            return {
+                "inline_keyboard": [
+                    [
+                        {"text": "📄 Gerar PDF Semanal", "callback_data": "/relatorio"},
+                        {"text": "⏱️ Sync Relógio", "callback_data": "/status"},
+                    ],
+                    [
+                        {"text": "🛑 Parar Robô", "callback_data": "/stop"},
+                        {"text": "📱 Ajuda Completa", "callback_data": "/ajuda"},
+                    ],
+                    [
+                        {"text": "🔙 Voltar ao Menu Principal", "callback_data": "sub_main"},
+                    ]
+                ]
+            }
+        else: # "main"
+            return {
+                "inline_keyboard": [
+                    [
+                        {"text": "📊 Status & Saldos", "callback_data": "sub_status"},
+                        {"text": "📈 Posições OCO", "callback_data": "sub_posicoes"},
+                    ],
+                    [
+                        {"text": "⚡ Top 20 Scanner", "callback_data": "sub_scanner"},
+                        {"text": "⚙️ Perfil de Risco", "callback_data": "sub_risco"},
+                    ],
+                    [
+                        {"text": "🤖 Análise IA Gemini", "callback_data": "sub_ia"},
+                        {"text": "🛠️ Configs & Operações", "callback_data": "sub_config"},
+                    ]
+                ]
+            }
 
     async def start(self):
         self.running = True
@@ -107,15 +196,29 @@ class TelegramBot:
             cb_id = cb.get('id')
             cmd_data = cb.get('data', '')
             
-            if chat_id == self.allowed_chat_id and cmd_data.startswith('/'):
+            if chat_id == self.allowed_chat_id:
                 try:
                     await session.post(f"{self.base_url}/answerCallbackQuery", json={"callback_query_id": cb_id})
                 except Exception:
                     pass
                     
-                response_text = await self.command_handler(cmd_data)
-                if response_text:
-                    await send_telegram_message(self.token, chat_id, response_text, reply_markup=self.get_menu_keyboard())
+                if cmd_data.startswith('sub_'):
+                    menu_type = cmd_data.replace('sub_', '')
+                    titles = {
+                        "main": "🤖 <b>MENU PRINCIPAL — SPOTBOT PRO v6.1</b>\nSelecione um painel abaixo para navegar:",
+                        "status": "📊 <b>PAINEL DE STATUS & SALDOS</b>\nConsulte o estado do robô, saldos e performance acumulada:",
+                        "posicoes": "📈 <b>PAINEL DE POSIÇÕES OCO ATIVAS</b>\nMonitore ordens ativas ou execute encerramentos:",
+                        "risco": "⚙️ <b>CONFIGURAÇÃO DE PERFIL DE RISCO</b>\nSelecione a estratégia de gestão de banca desejada:",
+                        "scanner": "⚡ <b>SCANNER DE FORÇA RELATIVA TOP 20</b>\nAcompanhe o ranking dos 20 maiores ativos do mercado:",
+                        "ia": "🤖 <b>PAINEL INTELIGÊNCIA IA GEMINI</b>\nAnálise de sentimento e relatórios preditivos:",
+                        "config": "🛠️ <b>OPERAÇÕES & CONFIGURAÇÕES</b>\nComandos de sistema, relatórios PDF e controle de operação:"
+                    }
+                    msg_text = titles.get(menu_type, "🤖 <b>PAINEL SPOTBOT PRO</b>")
+                    await send_telegram_message(self.token, chat_id, msg_text, reply_markup=self.get_menu_keyboard(menu_type))
+                elif cmd_data.startswith('/'):
+                    response_text = await self.command_handler(cmd_data)
+                    if response_text:
+                        await send_telegram_message(self.token, chat_id, response_text, reply_markup=self.get_menu_keyboard("main"))
             return
 
         message = update.get('message', {})
@@ -128,4 +231,4 @@ class TelegramBot:
         if text.startswith('/'):
             response_text = await self.command_handler(text)
             if response_text:
-                await send_telegram_message(self.token, chat_id, response_text, reply_markup=self.get_menu_keyboard())
+                await send_telegram_message(self.token, chat_id, response_text, reply_markup=self.get_menu_keyboard("main"))

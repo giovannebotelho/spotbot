@@ -55,3 +55,27 @@ def remove_ansi_codes(text: str) -> str:
         return ""
     ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
     return ansi_escape.sub('', text)
+
+def format_price(price: float, include_symbol: bool = True) -> str:
+    """
+    Formata valores de preços considerando moedas normais (ex: BTC, ETH, SOL)
+    e meme coins de baixíssimo valor (ex: SHIB, PEPE, BONK, FLOKI) sem zerar decimais.
+    """
+    if price is None:
+        return "$0.00" if include_symbol else "0.00"
+    
+    try:
+        val = float(price)
+    except (ValueError, TypeError):
+        return str(price)
+
+    prefix = "$" if include_symbol else ""
+    
+    if abs(val) >= 1.0:
+        return f"{prefix}{val:,.2f}"
+    elif abs(val) >= 0.001:
+        return f"{prefix}{val:.4f}"
+    elif abs(val) >= 0.00001:
+        return f"{prefix}{val:.6f}"
+    else:
+        return f"{prefix}{val:.8f}"
