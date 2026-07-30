@@ -101,6 +101,7 @@ async def change_chart_asset(val):
                     dates = [dt_module.datetime.fromtimestamp(int(k[0])/1000).strftime('%H:%M') for k in klines_raw]
                     candles = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in klines_raw]
                     closes = [float(k[4]) for k in klines_raw]
+                    volumes = [float(k[5]) for k in klines_raw]
                     s_closes = pd.Series(closes)
                     ma = s_closes.rolling(window=20).mean()
                     std = s_closes.rolling(window=20).std()
@@ -117,6 +118,7 @@ async def change_chart_asset(val):
             bb_upper = market_data.get('bb_upper', [])
             bb_lower = market_data.get('bb_lower', [])
             ema200 = market_data.get('ema200', [])
+            volumes = market_data.get('volumes', [])
 
         if dates and candles:
             pos_info = engine.active_positions.get(val, {})
@@ -150,6 +152,8 @@ async def change_chart_asset(val):
             candle_chart.options['series'][1]['data'] = bb_upper
             candle_chart.options['series'][2]['data'] = bb_lower
             candle_chart.options['series'][3]['data'] = ema200
+            if 'volumes' in locals():
+                candle_chart.options['series'][7]['data'] = volumes
             candle_chart.update()
     except Exception as e:
         print(f"Aviso ao alterar gráfico para {val}: {e}")
@@ -276,7 +280,7 @@ async def update_data():
                 candle_chart.options['series'][1]['data'] = market_data.get('bb_upper', [])
                 candle_chart.options['series'][2]['data'] = market_data.get('bb_lower', [])
                 candle_chart.options['series'][3]['data'] = market_data.get('ema200', [])
-                candle_chart.options['series'][4]['data'] = market_data.get('volumes', [])
+                candle_chart.options['series'][7]['data'] = market_data.get('volumes', [])
                 candle_chart.update()
 
         await update_recent_trades_table()
