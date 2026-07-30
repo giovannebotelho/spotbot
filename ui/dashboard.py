@@ -86,47 +86,64 @@ async def change_chart_asset(val):
     selected_chart_symbol = val
     _last_chart_sig = None
     try:
-        if engine.client and candle_chart:
-            klines_raw = await engine.client.get_klines(symbol=val, interval=engine.TRADING_CONFIG['interval'], limit=50)
-            if klines_raw:
-                dates = [dt_module.datetime.fromtimestamp(int(k[0])/1000).strftime('%H:%M') for k in klines_raw]
-                candles = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in klines_raw]
-                closes = [float(k[4]) for k in klines_raw]
-                s_closes = pd.Series(closes)
-                ma = s_closes.rolling(window=20).mean()
-                std = s_closes.rolling(window=20).std()
-                bb_upper = (ma + (2 * std)).fillna(0).tolist()
-                bb_lower = (ma - (2 * std)).fillna(0).tolist()
-                ema200 = s_closes.ewm(span=min(200, len(closes)), adjust=False).mean().fillna(0).tolist()
-                
-                pos_info = engine.active_positions.get(val, {})
-                e_p = pos_info.get('entry', 0.0)
-                tp_p = pos_info.get('tp', 0.0)
-                sl_p = pos_info.get('sl', 0.0)
-                
-                mark_lines = []
-                if e_p > 0:
-                    mark_lines.append({'yAxis': e_p, 'lineStyle': {'color': '#38BDF8', 'type': 'dashed', 'width': 1.5}, 'label': {'formatter': f' Entrada: ${e_p:.4f}', 'position': 'insideStartTop', 'color': '#38BDF8'}})
-                if tp_p > 0:
-                    mark_lines.append({'yAxis': tp_p, 'lineStyle': {'color': '#10B981', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🎯 TP: ${tp_p:.4f}', 'position': 'insideEndTop', 'color': '#10B981'}})
-                if sl_p > 0:
-                    mark_lines.append({'yAxis': sl_p, 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🛑 SL: ${sl_p:.4f}', 'position': 'insideEndBottom', 'color': '#F43F5E'}})
+        if not candle_chart:
+            return
 
-                candle_chart.options['title'] = {
-                    'text': f'📈 {val} (Posição Ativa OCO)',
-                    'subtext': f'Entrada: ${e_p:.4f} | TP: ${tp_p:.4f} | SL: ${sl_p:.4f}',
-                    'left': 15, 'top': 8,
-                    'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
-                    'subtextStyle': {'color': '#64748b', 'fontSize': 9}
-                }
-                candle_chart.options['xAxis'][0]['data'] = dates
-                candle_chart.options['xAxis'][1]['data'] = dates
-                candle_chart.options['series'][0]['data'] = candles
-                candle_chart.options['series'][0]['markLine'] = {'symbol': ['none', 'none'], 'data': mark_lines}
-                candle_chart.options['series'][1]['data'] = bb_upper
-                candle_chart.options['series'][2]['data'] = bb_lower
-                candle_chart.options['series'][3]['data'] = ema200
-                candle_chart.update()
+        dates, candles, bb_upper, bb_lower, ema200 = None, None, [], [], []
+        
+        if engine.client:
+            try:
+                klines_raw = await engine.client.get_klines(symbol=val, interval=engine.TRADING_CONFIG['interval'], limit=50)
+                if klines_raw:
+                    dates = [dt_module.datetime.fromtimestamp(int(k[0])/1000).strftime('%H:%M') for k in klines_raw]
+                    candles = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in klines_raw]
+                    closes = [float(k[4]) for k in klines_raw]
+                    s_closes = pd.Series(closes)
+                    ma = s_closes.rolling(window=20).mean()
+                    std = s_closes.rolling(window=20).std()
+                    bb_upper = (ma + (2 * std)).fillna(0).tolist()
+                    bb_lower = (ma - (2 * std)).fillna(0).tolist()
+                    ema200 = s_closes.ewm(span=min(200, len(closes)), adjust=False).mean().fillna(0).tolist()
+            except Exception as k_err:
+                print(f"Aviso ao buscar klines via client para {val}: {k_err}")
+
+        if not dates and engine.shared_market_data.get('dates'):
+            market_data = engine.shared_market_data
+            dates = market_data['dates']
+            candles = market_data['klines']
+            bb_upper = market_data.get('bb_upper', [])
+            bb_lower = market_data.get('bb_lower', [])
+            ema200 = market_data.get('ema200', [])
+
+        if dates and candles:
+            pos_info = engine.active_positions.get(val, {})
+            e_p = pos_info.get('entry', engine.bot_status_data.get('entry_price', 0.0))
+            tp_p = pos_info.get('tp', engine.bot_status_data.get('tp_price', 0.0))
+            sl_p = pos_info.get('sl', engine.bot_status_data.get('sl_price', 0.0))
+            
+            mark_lines = []
+            if e_p > 0:
+                mark_lines.append({'yAxis': e_p, 'lineStyle': {'color': '#38BDF8', 'type': 'dashed', 'width': 1.5}, 'label': {'formatter': f' Entrada: ${e_p:.4f}', 'position': 'insideStartTop', 'color': '#38BDF8'}})
+            if tp_p > 0:
+                mark_lines.append({'yAxis': tp_p, 'lineStyle': {'color': '#10B981', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🎯 TP: ${tp_p:.4f}', 'position': 'insideEndTop', 'color': '#10B981'}})
+            if sl_p > 0:
+                mark_lines.append({'yAxis': sl_p, 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🛑 SL: ${sl_p:.4f}', 'position': 'insideEndBottom', 'color': '#F43F5E'}})
+
+            candle_chart.options['title'] = {
+                'text': f'📈 {val} (Posição Ativa OCO)',
+                'subtext': f'Entrada: ${e_p:.4f} | TP: ${tp_p:.4f} | SL: ${sl_p:.4f}',
+                'left': 15, 'top': 8,
+                'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
+                'subtextStyle': {'color': '#64748b', 'fontSize': 9}
+            }
+            candle_chart.options['xAxis'][0]['data'] = dates
+            candle_chart.options['xAxis'][1]['data'] = dates
+            candle_chart.options['series'][0]['data'] = candles
+            candle_chart.options['series'][0]['markLine'] = {'symbol': ['none', 'none'], 'data': mark_lines}
+            candle_chart.options['series'][1]['data'] = bb_upper
+            candle_chart.options['series'][2]['data'] = bb_lower
+            candle_chart.options['series'][3]['data'] = ema200
+            candle_chart.update()
     except Exception as e:
         print(f"Aviso ao alterar gráfico para {val}: {e}")
 
@@ -174,13 +191,17 @@ async def update_data():
             if risk_profile_select.value != settings.ACTIVE_RISK_PROFILE:
                 risk_profile_select.value = settings.ACTIVE_RISK_PROFILE
 
-        active_symbols = engine.bot_status_data.get('active_symbols', [])
+        active_positions_keys = list(engine.active_positions.keys())
+        active_symbols = active_positions_keys if active_positions_keys else engine.bot_status_data.get('active_symbols', [])
         
         # Sincronização de Opções do Seletor de Ativo do Gráfico
         if chart_asset_select:
             curr_opts = ['⚡ Foco do Bot (Automático)'] + list(active_symbols)
             if chart_asset_select.options != curr_opts:
                 chart_asset_select.options = curr_opts
+                if active_symbols and (not selected_chart_symbol or chart_asset_select.value == '⚡ Foco do Bot (Automático)'):
+                    chart_asset_select.value = active_symbols[0]
+                    await change_chart_asset(active_symbols[0])
 
         active_symbol = engine.bot_status_data.get('target_asset', 'BTCUSDT')
         current_price = engine.bot_status_data.get('price', 0.0)
