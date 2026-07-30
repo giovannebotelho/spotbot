@@ -1013,8 +1013,8 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 acc_pnl = db_stats['total_net_profit']
 
                 # FASE 3: Gemini Auto-Tuning de Perfil de Risco a cada 30 min
-                if now_dt.minute % 30 == 0 and globals().get('_last_autotune_min') != now_dt.minute:
-                    globals()['_last_autotune_min'] = now_dt.minute
+                if current_dt.minute % 30 == 0 and globals().get('_last_autotune_min') != current_dt.minute:
+                    globals()['_last_autotune_min'] = current_dt.minute
                     try:
                         rec_profile, rec_just = auto_tune_risk_profile("ALTA", db_stats['win_rate'], acc_pnl)
                         from config.settings import RISK_PROFILES
