@@ -914,9 +914,9 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         df_rec = pd.DataFrame({'close': klines_rec})
                         sma20 = df_rec['close'].rolling(window=20).mean()
                         std20 = df_rec['close'].rolling(window=20).std()
-                        bb_upper = (sma20 + 2 * std20).fillna(0).tolist()
-                        bb_lower = (sma20 - 2 * std20).fillna(0).tolist()
-                        ema200 = df_rec['close'].ewm(span=min(200, len(klines_rec)), adjust=False).mean().fillna(0).tolist()
+                        bb_upper = (sma20 + 2 * std20).fillna('-').tolist()
+                        bb_lower = (sma20 - 2 * std20).fillna('-').tolist()
+                        ema200 = df_rec['close'].ewm(span=min(200, len(klines_rec)), adjust=False).mean().fillna('-').tolist()
 
                         shared_market_data['dates'] = dates_rec
                         shared_market_data['klines'] = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in klines_raw]
@@ -1100,10 +1100,10 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     r = s_closes.rolling(window=20)
                     ma = r.mean()
                     std = r.std()
-                    shared_market_data['bb_upper'] = (ma + (2 * std)).tail(chart_limit).fillna(0).tolist()
-                    shared_market_data['bb_middle'] = ma.tail(chart_limit).fillna(0).tolist()
-                    shared_market_data['bb_lower'] = (ma - (2 * std)).tail(chart_limit).fillna(0).tolist()
-                    shared_market_data['ema200'] = s_closes.ewm(span=200, adjust=False).mean().tail(chart_limit).fillna(0).tolist()
+                    shared_market_data['bb_upper'] = (ma + (2 * std)).tail(chart_limit).fillna('-').tolist()
+                    shared_market_data['bb_middle'] = ma.tail(chart_limit).fillna('-').tolist()
+                    shared_market_data['bb_lower'] = (ma - (2 * std)).tail(chart_limit).fillna('-').tolist()
+                    shared_market_data['ema200'] = s_closes.ewm(span=200, adjust=False).mean().tail(chart_limit).fillna('-').tolist()
             except Exception:
                 pass
 
