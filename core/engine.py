@@ -78,7 +78,7 @@ async def cancel_all_oco_orders(client, symbol):
         for order_list in open_oco_orders:
             if order_list['symbol'] == symbol:
                 order_list_id = order_list['orderListId']
-                await client.cancel_order(symbol=symbol, orderListId=order_list_id)
+                await client._delete('orderList', signed=True, data={'symbol': symbol, 'orderListId': order_list_id})
                 print(f"Ordem OCO ID {order_list_id} cancelada para {symbol}.")
     except Exception as e:
         print(f"Aviso ao cancelar ordens OCO: {e}")
@@ -222,7 +222,7 @@ async def monitor_oco_lifecycle(
                                     dca_val_usdt = max(min_not, min(usdt_avail * 0.98, order_val_usdt * 0.5))
                                     
                                     if usdt_avail >= min_not and dca_val_usdt >= min_not:
-                                        await client.cancel_order(symbol=active_target_symbol, orderListId=oco_order['orderListId'])
+                                        await client._delete('orderList', signed=True, data={'symbol': active_target_symbol, 'orderListId': oco_order['orderListId']})
                                         dca_buy = await client.order_market_buy(symbol=active_target_symbol, quoteOrderQty=round(dca_val_usdt, 2))
                                         dca_qty = float(dca_buy['executedQty'])
                                         dca_price = float(dca_buy['fills'][0]['price'])
@@ -273,7 +273,7 @@ async def monitor_oco_lifecycle(
                                 rem_qty = round(executed_qty - half_qty, prec_qty)
 
                                 if half_qty > 0 and rem_qty > 0:
-                                    await client.cancel_order(symbol=active_target_symbol, orderListId=oco_order['orderListId'])
+                                    await client._delete('orderList', signed=True, data={'symbol': active_target_symbol, 'orderListId': oco_order['orderListId']})
                                     venda_parcial = await client.order_market_sell(symbol=active_target_symbol, quantity=half_qty)
                                     p_price = float(venda_parcial['fills'][0]['price'])
                                     
@@ -309,7 +309,7 @@ async def monitor_oco_lifecycle(
                                 new_stop = adjust_price_to_tick_size(highest_price * (1 - TRAILING_STOP_CONFIG['callback_percent']), tick_size)
                                 if new_stop > current_stop_loss * 1.001:
                                     log(f"🔄 Trailing Stop acionado! Movendo stop para ${new_stop:.4f}")
-                                    await client.cancel_order(symbol=active_target_symbol, orderListId=oco_order['orderListId'])
+                                    await client._delete('orderList', signed=True, data={'symbol': active_target_symbol, 'orderListId': oco_order['orderListId']})
                                     new_stop_limit = adjust_price_to_tick_size(new_stop * 0.999, tick_size)
                                     prec_p = get_precision(tick_size)
                                     prec_q = get_precision(step_size)
@@ -469,7 +469,7 @@ async def panic_sell_position(symbol, client_instance=None):
         for oco in open_ocos:
             if oco['symbol'] == symbol:
                 try:
-                    await cli.cancel_order(symbol=symbol, orderListId=oco['orderListId'])
+                    await cli._delete('orderList', signed=True, data={'symbol': symbol, 'orderListId': oco['orderListId']})
                 except Exception as c_err:
                     print(f"⚠️ Aviso ao cancelar OCO de {symbol}: {c_err}")
 
