@@ -154,6 +154,21 @@ async def change_chart_asset(val):
     except Exception as e:
         print(f"Aviso ao alterar gráfico para {val}: {e}")
 
+@ui.refreshable
+def render_chart_tabs():
+    global chart_tabs, selected_chart_symbol, _last_rendered_tabs
+    
+    chart_tabs = ui.tabs(on_change=lambda e: asyncio.create_task(change_chart_asset(e.value))).props('dense active-color=sky-400 indicator-color=sky-400 text-color=slate-400 no-caps').classes('bg-transparent min-h-[40px] text-xs')
+    with chart_tabs:
+        ui.tab('foco', label='⚡ Foco do Bot (Scanner)', icon='center_focus_strong')
+        for sym in sorted(_last_rendered_tabs):
+            ui.tab(sym, label=f'🪙 {sym} (OCO)', icon='show_chart')
+            
+    if selected_chart_symbol and selected_chart_symbol in _last_rendered_tabs:
+        chart_tabs.value = selected_chart_symbol
+    else:
+        chart_tabs.value = 'foco'
+
 async def update_data():
     global start_btn, stop_btn, status_indicator, _last_chart_sig
     try:
@@ -204,17 +219,10 @@ async def update_data():
             global _last_rendered_tabs
             if current_active_keys != _last_rendered_tabs:
                 _last_rendered_tabs = current_active_keys.copy()
-                chart_tabs.clear()
-                with chart_tabs:
-                    ui.tab('foco', label='⚡ Foco do Bot (Scanner)', icon='center_focus_strong')
-                    for sym in sorted(current_active_keys):
-                        ui.tab(sym, label=f'🪙 {sym} (OCO)', icon='show_chart')
-                chart_tabs.update()
+                render_chart_tabs.refresh()
                 
-                if current_active_keys and (not selected_chart_symbol or chart_tabs.value == 'foco'):
+                if current_active_keys and (not selected_chart_symbol or selected_chart_symbol == 'foco'):
                     first_sym = sorted(current_active_keys)[0]
-                    chart_tabs.value = first_sym
-                    chart_tabs.update()
                     await change_chart_asset(first_sym)
 
         active_symbol = engine.bot_status_data.get('target_asset', 'BTCUSDT')
@@ -630,9 +638,7 @@ async def index():
             # Barra de Abas do Gráfico (Multi-Ativo) & Legenda Estilo Binance
             with ui.row().classes('w-full min-h-[48px] bg-[#0B0E14] border-b border-slate-800/80 px-2 sm:px-3 items-center justify-between gap-2 flex-shrink-0 z-20 overflow-x-auto flex-nowrap'):
                 with ui.row().classes('items-center gap-1 flex-shrink-0 min-h-[40px]'):
-                    chart_tabs = ui.tabs(on_change=lambda e: change_chart_asset(e.value)).props('dense active-color=sky-400 indicator-color=sky-400 text-color=slate-400 no-caps').classes('bg-transparent min-h-[40px] text-xs')
-                    with chart_tabs:
-                        ui.tab('foco', label='⚡ Foco do Bot (Scanner)', icon='center_focus_strong')
+                    render_chart_tabs()
 
                 with ui.row().classes('items-center gap-2.5 text-[0.6rem] font-mono text-slate-400 flex-shrink-0 hidden xl:flex ml-auto'):
                     ui.label('LEGENDA:').classes('font-bold text-slate-500')
