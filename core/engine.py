@@ -261,9 +261,9 @@ async def monitor_oco_lifecycle(
                                                 TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
                                                 f"🧪 <b>Smart Recovery DCA Executado!</b>\n\n"
                                                 f"🪙 Par: <b>{active_target_symbol}</b>\n"
-                                                f"📉 Recompra efetuada no Suporte Fibonacci 61.8% (<b>${dca_price:.4f}</b>)\n"
-                                                f"🎯 <b>Novo Preço Médio: ${new_pm:.4f}</b>\n"
-                                                f"🛡️ Take Profit de recuperação ajustado para <b>${new_tp:.4f} (+0.8%)</b>!"
+                                                f"📉 Recompra efetuada no Suporte Fibonacci 61.8% (<b>{format_price(dca_price)}</b>)\n"
+                                                f"🎯 <b>Novo Preço Médio: {format_price(new_pm)}</b>\n"
+                                                f"🛡️ Take Profit de recuperação ajustado para <b>{format_price(new_tp)} (+0.8%)</b>!"
                                             ))
                             except Exception as e_dca:
                                 log(f"Aviso no Smart Recovery DCA: {e_dca}")
@@ -279,7 +279,7 @@ async def monitor_oco_lifecycle(
                                     venda_parcial = await client.order_market_sell(symbol=active_target_symbol, quantity=half_qty)
                                     p_price = float(venda_parcial['fills'][0]['price'])
                                     
-                                    log(f"💰 Scalp Locking: Venda parcial de 50% executada em {active_target_symbol} a ${p_price:.4f}! (+{profit_pct*100:.2f}%)")
+                                    log(f"💰 Scalp Locking: Venda parcial de 50% executada em {active_target_symbol} a {format_price(p_price)}! (+{profit_pct*100:.2f}%)")
                                     
                                     be_stop = adjust_price_to_tick_size(price, tick_size)
                                     be_limit = adjust_price_to_tick_size(price * 0.999, tick_size)
@@ -299,8 +299,8 @@ async def monitor_oco_lifecycle(
                                             TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
                                             f"💰 <b>Scalp Locking (+1.5% Lucro Garantido)!</b>\n\n"
                                             f"🪙 Par: <b>{active_target_symbol}</b>\n"
-                                            f"🎯 50% da posição vendida a <b>${p_price:.2f}</b>!\n"
-                                            f"🛡️ 50% restante protegido no <b>Breakeven (Zero a Zero em ${price:.2f})</b>!"
+                                            f"🎯 50% da posição vendida a <b>{format_price(p_price)}</b>!\n"
+                                            f"🛡️ 50% restante protegido no <b>Breakeven (Zero a Zero em {format_price(price)})</b>!"
                                         ))
                             except Exception as e_partial:
                                 log(f"Aviso ao executar Scalp Locking: {e_partial}")
@@ -310,7 +310,7 @@ async def monitor_oco_lifecycle(
                             if highest_price > price * (1 + TRAILING_STOP_CONFIG['activation_percent']):
                                 new_stop = adjust_price_to_tick_size(highest_price * (1 - TRAILING_STOP_CONFIG['callback_percent']), tick_size)
                                 if new_stop > current_stop_loss * 1.001:
-                                    log(f"🔄 Trailing Stop acionado! Movendo stop para ${new_stop:.4f}")
+                                    log(f"🔄 Trailing Stop acionado! Movendo stop para {format_price(new_stop)}")
                                     await client._delete('orderList', signed=True, data={'symbol': active_target_symbol, 'orderListId': oco_order['orderListId']})
                                     new_stop_limit = adjust_price_to_tick_size(new_stop * 0.999, tick_size)
                                     prec_p = get_precision(tick_size)
@@ -578,17 +578,43 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             target_asset = bot_status_data.get('target_asset', 'BTCUSDT')
             mtf_sc = bot_status_data.get('mtf_score', 80)
             cur_price_str = format_price(bot_status_data.get('price', 0.0))
-            return (
-                f"⚡ <b>STATUS DO SPOTBOT PRO v4.0 (QUANT)</b>\n"
-                f"━━━━━━━━━━━━━━━━━━━\n"
-                f"🎯 <b>Modo</b>: {bot_status_data['symbol']}\n"
-                f"🪙 <b>Foco Atual</b>: <b>{target_asset}</b>\n"
-                f"💵 <b>Preço</b>: <b>{cur_price_str}</b>\n"
-                f"📊 <b>RSI</b>: <b>{bot_status_data['rsi']:.1f}</b>\n"
-                f"📐 <b>Confluência MTF (4H+1H+15M)</b>: <b>{mtf_sc}%</b> 🟢\n"
-                f"📈 <b>Tendência 4h</b>: <b>{bot_status_data['trend']}</b>\n"
-                f"⚡ <b>Estado</b>: <i>{bot_status_data['action']}</i>"
-            )
+            
+            status_lines = [
+                f"⚡ <b>STATUS DO SPOTBOT PRO v6.1 (QUANT)</b>",
+                f"━━━━━━━━━━━━━━━━━━━",
+                f"🎯 <b>Modo</b>: {bot_status_data['symbol']}",
+                f"⚡ <b>Estado</b>: <i>{bot_status_data['action']}</i>",
+                f"",
+                f"🔍 <b>Scanner Foco</b>: <b>{target_asset}</b> ({cur_price_str})",
+                f"📊 <b>RSI</b>: <b>{bot_status_data['rsi']:.1f}</b> | MTF: <b>{mtf_sc}%</b> 🟢",
+                f"📈 <b>Tendência 4h</b>: <b>{bot_status_data['trend']}</b>",
+                f"━━━━━━━━━━━━━━━━━━━",
+            ]
+            
+            if active_positions:
+                status_lines.append(f"🎰 <b>VAGAS OCO ATIVAS ({len(active_positions)}/{MAX_CONCURRENT_POSITIONS})</b>:")
+                c = None
+                try:
+                    c = await BinanceAsyncClient.create(api_key, api_secret)
+                    for i, (sym, pos_info) in enumerate(active_positions.items(), 1):
+                        entry = pos_info.get('entry', 0)
+                        try:
+                            ticker = await c.get_symbol_ticker(symbol=sym)
+                            current_p = float(ticker['price'])
+                            pnl_pct = ((current_p - entry) / entry) * 100 if entry > 0 else 0
+                            emoji = "🟢" if pnl_pct >= 0 else "🔴"
+                            status_lines.append(f"  • Slot {i}: <b>{sym}</b> {emoji} <b>{pnl_pct:+.2f}%</b> (Entrada: {format_price(entry)})")
+                        except Exception:
+                            status_lines.append(f"  • Slot {i}: <b>{sym}</b> (Entrada: {format_price(entry)})")
+                except Exception:
+                    pass
+                finally:
+                    if c: await c.close_connection()
+            else:
+                status_lines.append(f"🎰 <b>VAGAS OCO ATIVAS (0/{MAX_CONCURRENT_POSITIONS})</b>:")
+                status_lines.append(f"  • Nenhuma posição aberta no momento.")
+                
+            return "\n".join(status_lines)
         
         elif cmd == '/saldo':
             c = None
@@ -1159,7 +1185,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                 TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
                                 f"🛒 <b>Ordem de COMPRA Executada!</b>\n\n"
                                 f"🪙 Par: <b>{active_target_symbol}</b>\n"
-                                f"💵 Preço: <b>${closes[-1]:.2f}</b>\n"
+                                f"💵 Preço: <b>{format_price(closes[-1])}</b>\n"
                                 f"🎯 Motivo: <i>{executed_condition}</i>\n"
                                 f"💰 Valor: <b>${order_val_usdt:.2f} USDT</b> (Slot {len(active_positions)+1}/{MAX_CONCURRENT_POSITIONS})"
                             ))
@@ -1170,7 +1196,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         price = float(compra['fills'][0]['price'])
                         timestamp = dt_module.datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
                         
-                        log(f"✅️ ({order_count:02d}) Comprado: {active_target_symbol} - Qtd: {executed_qty} - Preço: ${price:.4f}")
+                        log(f"✅️ ({order_count:02d}) Comprado: {active_target_symbol} - Qtd: {executed_qty} - Preço: {format_price(price)}")
                         purchase_timestamp = timestamp
                         gemini_response = buy_result.get("gemini_response")
 
@@ -1180,8 +1206,8 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                 TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
                                 f"🎯 <b>Ordem OCO Posicionada!</b>\n\n"
                                 f"🪙 Par: <b>{active_target_symbol}</b>\n"
-                                f"🟢 Take Profit (TP): <b>${lucro_alvo:.4f}</b> (+4.0%)\n"
-                                f"🔴 Stop Loss (SL): <b>${stop_loss:.4f}</b> (-2.0%)"
+                                f"🟢 Take Profit (TP): <b>{format_price(lucro_alvo)}</b> (+4.0%)\n"
+                                f"🔴 Stop Loss (SL): <b>{format_price(stop_loss)}</b> (-2.0%)"
                             ))
                         last_operation_time = dt_module.datetime.now()
 
