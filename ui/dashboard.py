@@ -659,7 +659,9 @@ async def index():
             # Seção Central do Gráfico (+30% de Altura Explicita)
             with ui.element('div').classes('w-full h-[470px] lg:h-[64vh] min-h-[420px] relative border-b border-slate-800 flex-shrink-0 bg-[#0B0E14]'):
                 # Badge Flutuante no Canto Superior Direito
-                chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('absolute top-3 right-4 z-20 obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-sky-400 border border-sky-500/30 backdrop-blur-md shadow-lg')
+                with ui.row().classes('absolute top-3 right-4 z-20 items-center gap-2'):
+                    ui.button(icon='refresh', on_click=lambda: asyncio.create_task(change_chart_asset(selected_chart_symbol if selected_chart_symbol else 'foco'))).props('dense flat color=sky-400 size=sm').classes('bg-[#121722] border border-sky-500/30 rounded-lg shadow-md px-2 py-1').tooltip('Recarregar Gráfico')
+                    chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-sky-400 border border-sky-500/30 backdrop-blur-md shadow-lg')
 
                 # ECharts 100% Visível e Nítido com Titulo Alinhado a Esquerda (Sem colidir com a Badge da Direita!)
                 with ui.element('div').classes('w-full h-full'):
@@ -673,10 +675,14 @@ async def index():
                            'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
                            'subtextStyle': {'color': '#64748b', 'fontSize': 9}
                        },
-                       'grid': [{'left': '45', 'right': '15', 'top': '60', 'height': '55%'}, {'left': '45', 'right': '15', 'top': '82%', 'height': '14%'}],
-                       'legend': {'data': ['Preço', 'BB Upper', 'BB Lower', 'EMA 200'], 'top': 8, 'right': 140, 'textStyle': {'color': '#94a3b8', 'fontSize': 10}},
+                       'grid': [{'left': '45', 'right': '15', 'top': '70', 'height': '45%'}, {'left': '45', 'right': '15', 'top': '82%', 'height': '14%'}],
+                       'legend': {'data': ['Preço', 'BB Upper', 'BB Lower', 'EMA 200'], 'top': 40, 'left': 15, 'textStyle': {'color': '#94a3b8', 'fontSize': 10}},
                        'tooltip': {'trigger': 'axis', 'axisPointer': {'type': 'cross'}, 'backgroundColor': 'rgba(18, 23, 34, 0.95)', 'borderColor': '#0284C7', 'textStyle': {'color': '#f8fafc'}},
-                       'dataZoom': [{'type': 'inside', 'xAxisIndex': [0, 1]}, {'type': 'slider', 'xAxisIndex': [0, 1], 'bottom': 3, 'height': 16, 'borderColor': '#1e293b', 'dataBackground': {'lineStyle': {'color': '#38BDF8'}, 'areaStyle': {'color': '#121722'}}}],
+                       'dataZoom': [
+                           {'type': 'inside', 'xAxisIndex': [0, 1]},
+                           {'type': 'inside', 'yAxisIndex': [0]},
+                           {'type': 'slider', 'xAxisIndex': [0, 1], 'bottom': 3, 'height': 16, 'borderColor': '#1e293b', 'dataBackground': {'lineStyle': {'color': '#38BDF8'}, 'areaStyle': {'color': '#121722'}}}
+                       ],
                        'xAxis': [{'type': 'category', 'data': [], 'gridIndex': 0, 'axisLine': {'lineStyle': {'color': '#334155'}}}, {'type': 'category', 'data': [], 'gridIndex': 1, 'axisLabel': {'show': False}, 'axisTick': {'show': False}, 'axisLine': {'show': False}}],
                        'yAxis': [{'type': 'value', 'scale': True, 'gridIndex': 0, 'splitLine': {'lineStyle': {'color': 'rgba(255, 255, 255, 0.05)'}}, 'position': 'right'}, {'type': 'value', 'scale': True, 'gridIndex': 1, 'splitLine': {'show': False}, 'axisLabel': {'show': False}, 'axisTick': {'show': False}}],
                        'series': [
