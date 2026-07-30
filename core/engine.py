@@ -838,8 +838,26 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 lucro_alvo = float(limit_details.get('price', 0))
                 stop_loss = float(stop_details.get('stopPrice', stop_details.get('price', 0)))
                 
-                ticker_cur = await client.get_symbol_ticker(symbol=active_target_symbol)
-                price = float(ticker_cur['price'])
+                price = 0.0
+                try:
+                    all_orders = await client.get_all_orders(symbol=active_target_symbol, limit=20)
+                    # Busca a última ordem de COMPRA preenchida
+                    buy_orders = [o for o in all_orders if o['side'] == 'BUY' and o['status'] == 'FILLED']
+                    if buy_orders:
+                        last_buy = buy_orders[-1]
+                        price = float(last_buy['cummulativeQuoteQty']) / float(last_buy['executedQty']) if float(last_buy['executedQty']) > 0 else float(last_buy['price'])
+                        if price == 0.0:
+                            # Fallback if price is 0 for market orders where price field is 0
+                            ticker_cur = await client.get_symbol_ticker(symbol=active_target_symbol)
+                            price = float(ticker_cur['price'])
+                    else:
+                        ticker_cur = await client.get_symbol_ticker(symbol=active_target_symbol)
+                        price = float(ticker_cur['price'])
+                except Exception as e:
+                    log(f"⚠️ Aviso ao buscar preço de entrada histórico para {active_target_symbol}: {e}")
+                    ticker_cur = await client.get_symbol_ticker(symbol=active_target_symbol)
+                    price = float(ticker_cur['price'])
+                    
                 order_val_usdt = round(executed_qty * price, 2)
                 purchase_timestamp = dt_module.datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
                 active_positions[active_target_symbol] = {
@@ -948,8 +966,8 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 
                 if daily_pnl <= circuit_breaker_limit:
                     status(f"🚨 DAILY CIRCUIT BREAKER ATIVADO ({daily_pnl:+.2f} USDT). Novas compras pausadas por 12h...")
-                    if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id') and globals().get('_last_cb_alert') != now_dt.date():
-                        globals()['_last_cb_alert'] = now_dt.date()
+                    if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id') and globals().get('_last_cb_alert') != current_dt.date():
+                        globals()['_last_cb_alert'] = current_dt.date()
                         asyncio.create_task(send_telegram_message(
                             TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
                             f"🚨 <b>DAILY CIRCUIT BREAKER ATIVADO!</b>\n\n"

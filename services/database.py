@@ -257,7 +257,8 @@ class DatabaseManager:
         FASE 2 (v6.0): Retorna estatísticas de PnL e operações do dia informado (ou hoje).
         """
         if not date_str:
-            date_str = dt_module.datetime.now().strftime("%d/%m/%Y")
+            brt_tz = dt_module.timezone(dt_module.timedelta(hours=-3))
+            date_str = dt_module.datetime.now(brt_tz).strftime("%d/%m/%Y")
             
         self.connect()
         cursor = self.conn.cursor()
