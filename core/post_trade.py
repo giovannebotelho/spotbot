@@ -32,7 +32,7 @@ async def process_order_details(symbol, client, limit_order_details, stop_order_
     oco_timestamp = datetime.now().strftime("%d/%m/%Y at %H:%M:%S") if oco_order_result else None
     return symbol, oco_order_result, trade_result, novo_saldo_usdt, oco_timestamp, fee, trade_result_liquid
 
-def log_and_notify_results(order_result, symbol, trade_result, total_difference, timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_usdt, log=print):
+async def log_and_notify_results(order_result, symbol, trade_result, total_difference, timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_usdt, log=print):
     if order_result == 'profit':
         log(f"🎉 Ordem OCO concluída com \033[1;32mlucro (PROFIT)\033[0m em \033[1;33m{symbol}\033[0m ({timestamp})")
         message = f'🎉 <b>Ordem OCO concluída com PROFIT!</b>\n\n🪙 Par: <b>{symbol}</b>\n⏱️ Horário: <i>{timestamp}</i>'
@@ -41,7 +41,7 @@ def log_and_notify_results(order_result, symbol, trade_result, total_difference,
         message = f'⛔ <b>Ordem OCO concluída em STOP LOSS!</b>\n\n🪙 Par: <b>{symbol}</b>\n⏱️ Horário: <i>{timestamp}</i>'
     
     if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
-        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
+        await send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], message)
 
     if trade_result >= 0:
         result_message = f"Lucro Parcial Bruto: 🟢 ${trade_result:.2f} | Taxa: 🔴 ${fee:.2f} | Lucro Líquido: 🟢 ${trade_result_liquid:.2f}"
@@ -52,7 +52,7 @@ def log_and_notify_results(order_result, symbol, trade_result, total_difference,
     
     log(result_message)
     if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
-        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message1)
+        await send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message1)
 
     if total_difference_liquid >= 0:
         total_balance_liquid_message = f"📈 PnL Acumulado Líquido no Saldo: 🟢 ${total_difference_liquid:.2f} USDT"
@@ -63,7 +63,7 @@ def log_and_notify_results(order_result, symbol, trade_result, total_difference,
     
     log(total_balance_liquid_message)
     if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
-        send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message3)
+        await send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message3)
     
     log(f"🪙 Saldo BNB na carteira: ${bnb_balance_usdt:.2f} USDT")
 

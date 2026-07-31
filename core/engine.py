@@ -343,7 +343,7 @@ async def monitor_oco_lifecycle(
                         bnb_price = await get_bnb_price(client)
                         
                         if order_result:
-                            log_and_notify_results(order_result, active_target_symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_free * bnb_price, log=log)
+                            await log_and_notify_results(order_result, active_target_symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_free * bnb_price, log=log)
                             
                             # FASE 3: Síntese Pós-Trade via IA Gemini
                             try:
@@ -415,7 +415,7 @@ async def monitor_oco_lifecycle(
                     bnb_price = await get_bnb_price(client)
                     
                     if order_result:
-                        log_and_notify_results(order_result, active_target_symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_free * bnb_price, log=log)
+                        await log_and_notify_results(order_result, active_target_symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_free * bnb_price, log=log)
                         data_row = create_data_row(
                             order_count, saldo_inicial_usdt, novo_saldo_usdt, active_target_symbol,
                             executed_qty, price, purchase_timestamp, lucro_alvo, stop_loss, stop_loss,
