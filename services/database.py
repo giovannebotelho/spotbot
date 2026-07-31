@@ -99,6 +99,11 @@ class DatabaseManager:
                 bb_upper REAL,
                 trend_up TEXT,
                 gemini_response TEXT,
+                confluence_score REAL,
+                slippage REAL,
+                initial_stop_loss REAL,
+                dca_levels INTEGER,
+                bot_version TEXT,
                 raw_data TEXT
             )
             """
@@ -114,6 +119,27 @@ class DatabaseManager:
             )
             """
             cursor.execute(events_table_sql)
+            
+            # Migrações seguras (adiciona colunas em bancos existentes)
+            new_columns = {
+                'confluence_score': 'REAL',
+                'slippage': 'REAL',
+                'initial_stop_loss': 'REAL',
+                'dca_levels': 'INTEGER',
+                'bot_version': 'TEXT'
+            }
+            
+            for col_name, col_type in new_columns.items():
+                if self.is_postgres:
+                    try:
+                        cursor.execute(f"ALTER TABLE trades ADD COLUMN IF NOT EXISTS {col_name} {col_type}")
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        cursor.execute(f"ALTER TABLE trades ADD COLUMN {col_name} {col_type}")
+                    except Exception:
+                        pass
             
             conn.commit()
         except Exception as e:
@@ -132,7 +158,7 @@ class DatabaseManager:
                 return data_row.get(key, default)
 
             placeholder = "%s" if self.is_postgres else "?"
-            placeholders = ", ".join([placeholder] * 46)
+            placeholders = ", ".join([placeholder] * 51)
 
             sql = f"""
             INSERT INTO trades (
@@ -143,7 +169,8 @@ class DatabaseManager:
                 final_balance_usdt, bnb_balance_usdt, rsi, condition_met, time_interval,
                 candle_open, candle_high, candle_low, candle_close, candle_variation, candle_amplitude,
                 variation_24h, candle_volume, candle_patterns, macd, signal_line,
-                bb_lower, bb_middle, bb_upper, trend_up, gemini_response, raw_data
+                bb_lower, bb_middle, bb_upper, trend_up, gemini_response, 
+                confluence_score, slippage, initial_stop_loss, dca_levels, bot_version, raw_data
             ) VALUES ({placeholders})
             """
             
@@ -193,6 +220,11 @@ class DatabaseManager:
                 get_val("Banda Superior BB"),
                 str(get_val("Tendência de Alta")),
                 get_val("Resposta do Gemini"),
+                get_val("confluence_score", 0.0),
+                get_val("slippage", 0.0),
+                get_val("initial_stop_loss", 0.0),
+                get_val("dca_levels", 0),
+                get_val("bot_version", "v6.0"),
                 json.dumps(data_row, default=str)
             )
             

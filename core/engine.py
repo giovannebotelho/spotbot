@@ -177,7 +177,7 @@ async def monitor_oco_lifecycle(
     executed_condition, rsi, vwap, candle_open, candle_high, candle_low, candle_close,
     candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100,
     ema200, candle_patterns, amplitude, macd_current, signal_line_current, lower_band,
-    middle_band, upper_band, trend_is_up, gemini_response, db
+    middle_band, upper_band, trend_is_up, gemini_response, db, confluence_score=0.0, slippage=0.0
 ):
     global stop_loss_count, last_stop_loss_time
     total_difference = 0
@@ -186,6 +186,7 @@ async def monitor_oco_lifecycle(
     current_stop_loss = stop_loss
     partial_take_done = False
     dca_done = False
+    dca_count = 0
 
     active_positions[active_target_symbol] = {
         'tp': lucro_alvo,
@@ -259,6 +260,7 @@ async def monitor_oco_lifecycle(
                                         stop_loss = new_sl
                                         current_stop_loss = new_sl
                                         dca_done = True
+                                        dca_count += 1
                                         
                                         if bot_status_data.get('target_asset') == active_target_symbol:
                                             bot_status_data['entry_price'] = new_pm
@@ -385,7 +387,8 @@ async def monitor_oco_lifecycle(
                                 rsi, executed_condition, vwap, candle_open, candle_high, candle_low, candle_close, candle_volume, 
                                 variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, TRADING_CONFIG['volume_avg'], 
                                 amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid,
-                                total_difference_liquid, gemini_response, bnb_balance_free * bnb_price
+                                total_difference_liquid, gemini_response, bnb_balance_free * bnb_price,
+                                confluence_score, slippage, stop_loss, dca_count, "v6.0"
                             )
                             try:
                                 save_to_csv(data_row)
@@ -445,7 +448,8 @@ async def monitor_oco_lifecycle(
                             rsi, executed_condition, vwap, candle_open, candle_high, candle_low, candle_close, candle_volume, 
                             variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, TRADING_CONFIG['volume_avg'], 
                             amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid,
-                            total_difference_liquid, gemini_response, bnb_balance_free * bnb_price
+                            total_difference_liquid, gemini_response, bnb_balance_free * bnb_price,
+                            confluence_score, slippage, stop_loss, dca_count, "v6.0"
                         )
                         try:
                             save_to_csv(data_row)
@@ -879,6 +883,10 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         f"🛡️ Ordem OCO recuperada da Binance. Retomando monitoramento de lucro e stop automaticamente!"
                     ))
                 
+                # Para ordens recuperadas, não temos o score exato nem slippage originais sem buscar do BD, entao deixaremos 0.0
+                rec_confluence_score = 0.0
+                rec_slippage = 0.0
+
                 limit_order_id = oco_order['orders'][1]['orderId']
                 stop_order_id = oco_order['orders'][0]['orderId']
                 target_symbol_info = await client.get_symbol_info(active_target_symbol)
@@ -952,13 +960,16 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 except Exception as k_err:
                     log(f"⚠️ Aviso ao carregar klines no State Recovery ({active_target_symbol}): {k_err}")
 
+                rec_confluence_score = 0.0
+                rec_slippage = 0.0
+
                 # Lança o monitoramento em background para NÃO bloquear o scanner das vagas restantes!
                 task = asyncio.create_task(monitor_oco_lifecycle(
                     client, bsm, active_target_symbol, oco_order, limit_order_id, stop_order_id,
                     price, executed_qty, order_val_usdt, lucro_alvo, stop_loss, target_symbol_info,
                     tick_size, step_size, log, status, saldo_inicial_usdt, 1, purchase_timestamp,
                     "State Recovery (Posição Retomada)", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                    [], 0, 0, 0, 0, 0, 0, True, None, db
+                    [], 0, 0, 0, 0, 0, 0, True, None, db, rec_confluence_score, rec_slippage
                 ))
                 active_monitoring_tasks.append(task)
 
@@ -1253,6 +1264,9 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                             ))
                         last_operation_time = dt_module.datetime.now()
 
+                        confluence_score = float(buy_result.get('mtf_score', buy_result.get('gemini_analysis', {}).get('score', 0))) if buy_result else 0.0
+                        slippage = ((price - closes[-1]) / closes[-1]) * 100 if closes[-1] > 0 else 0.0
+
                         # Lança o monitoramento em background para NÃO bloquear o scanner!
                         task = asyncio.create_task(monitor_oco_lifecycle(
                             client, bsm, active_target_symbol, oco_order, limit_order_id, stop_order_id,
@@ -1261,7 +1275,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                             executed_condition, rsi, vwap, candle_open, candle_high, candle_low, candle_close,
                             candle_volume, variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100,
                             ema200, candle_patterns, amplitude, macd_current, signal_line_current, lower_band,
-                            middle_band, upper_band, trend_is_up, gemini_response, db
+                            middle_band, upper_band, trend_is_up, gemini_response, db, confluence_score, slippage
                         ))
                         active_monitoring_tasks.append(task)
             except Exception as trade_exec_err:

@@ -72,7 +72,8 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
                     order_result, oco_timestamp, trade_result, total_difference, saldo_atual_usdt,
                     rsi, executed_condition, vwap, candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation,
                     ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, volume_avg, amplitude, macd_current, signal_line_current, 
-                    lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid, total_difference_liquid, gemini_response, bnb_balance_usdt):
+                    lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid, total_difference_liquid, gemini_response, bnb_balance_usdt,
+                    confluence_score=0.0, slippage=0.0, initial_stop_loss=0.0, dca_levels=0, bot_version="v6.0"):
     return {
         "Índice da Ordem": order_count,
         "Saldo Inicial em USDT": round(saldo_inicial_usdt, 2),
@@ -139,6 +140,11 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
         "Tamanho máximo para deque": TRADING_CONFIG['maxlen'],
         "Condicional volume": TRADING_CONFIG['volume_avg'],
         "Resposta do Gemini": gemini_response if gemini_response is not None else "N/A",
+        "confluence_score": confluence_score,
+        "slippage": slippage,
+        "initial_stop_loss": initial_stop_loss,
+        "dca_levels": dca_levels,
+        "bot_version": bot_version,
     }
 
 def save_to_csv(data_row):

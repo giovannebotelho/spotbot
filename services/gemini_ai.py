@@ -13,7 +13,7 @@ def analyze_with_gemini(
     candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation, 
     ema7, ema15, ema25, ema50, ema100, ema200, vwap, trend_is_up, SELL_PRESSURE_THRESHOLD_1,
     period, num_std, short_period, long_period, limit, depth, maxlen, volume_avg, historical_trades_data,
-    api_key=None, model_name="gemini-2.5-flash"
+    api_key=None, model_name="gemini-1.5-flash"
 ):
     global _last_429_time
     now = time.time()
@@ -30,9 +30,8 @@ def analyze_with_gemini(
     current_datetime_str = datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
 
     models_to_try = [
-        "gemini-2.5-flash",
-        "gemini-2.5-flash-lite",
-        "gemini-flash-latest"
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-8b"
     ]
 
     if model_name and model_name not in models_to_try:
@@ -208,7 +207,7 @@ def analyze_news_sentiment_with_gemini(headlines, api_key=None):
         from google import genai
         client = genai.Client(api_key=api_key)
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=prompt
         )
         if response and response.text:
@@ -248,7 +247,7 @@ def generate_post_trade_synthesis(symbol, outcome, entry_price, exit_price, pnl_
         from google import genai
         client = genai.Client(api_key=api_key)
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=prompt
         )
         if response and response.text:
@@ -285,7 +284,7 @@ def auto_tune_risk_profile(btc_trend, win_rate, recent_pnl, api_key=None):
         from google import genai
         client = genai.Client(api_key=api_key)
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=prompt
         )
         if response and response.text:
