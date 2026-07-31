@@ -44,6 +44,7 @@ else:
 
 bot_running = True
 active_positions = {}
+active_monitoring_tasks = []
 
 bot_status_data = {
     "rsi": 0, "price": 0, "symbol": "", "action": "Iniciando...", "trend": "N/A", "target_asset": "BTCUSDT",
@@ -928,13 +929,14 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     log(f"⚠️ Aviso ao carregar klines no State Recovery ({active_target_symbol}): {k_err}")
 
                 # Lança o monitoramento em background para NÃO bloquear o scanner das vagas restantes!
-                asyncio.create_task(monitor_oco_lifecycle(
+                task = asyncio.create_task(monitor_oco_lifecycle(
                     client, bsm, active_target_symbol, oco_order, limit_order_id, stop_order_id,
                     price, executed_qty, order_val_usdt, lucro_alvo, stop_loss, target_symbol_info,
                     tick_size, step_size, log, status, saldo_inicial_usdt, 1, purchase_timestamp,
                     "State Recovery (Posição Retomada)", 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                     [], 0, 0, 0, 0, 0, 0, True, None, db
                 ))
+                active_monitoring_tasks.append(task)
 
         symbol_info = await client.get_symbol_info(symbol)
         tick_size = float(next(filter for filter in symbol_info['filters'] if filter['filterType'] == 'PRICE_FILTER')['tickSize'])
@@ -1226,7 +1228,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         last_operation_time = dt_module.datetime.now()
 
                         # Lança o monitoramento em background para NÃO bloquear o scanner!
-                        asyncio.create_task(monitor_oco_lifecycle(
+                        task = asyncio.create_task(monitor_oco_lifecycle(
                             client, bsm, active_target_symbol, oco_order, limit_order_id, stop_order_id,
                             price, executed_qty, order_val_usdt, lucro_alvo, stop_loss, target_symbol_info,
                             tick_size, step_size, log, status, saldo_inicial_usdt, order_count, purchase_timestamp,
@@ -1235,6 +1237,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                             ema200, candle_patterns, amplitude, macd_current, signal_line_current, lower_band,
                             middle_band, upper_band, trend_is_up, gemini_response, db
                         ))
+                        active_monitoring_tasks.append(task)
             except Exception as trade_exec_err:
                 log(f"⚠️ Erro recuperável na execução de ordem: {trade_exec_err}")
 
@@ -1252,5 +1255,9 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
     finally:
         bot_running = False
         bot_status_data['is_running'] = False
+        for t in active_monitoring_tasks:
+            if not t.done():
+                t.cancel()
+        active_monitoring_tasks.clear()
         if client:
             await client.close_connection()
