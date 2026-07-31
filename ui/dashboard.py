@@ -105,9 +105,9 @@ async def change_chart_asset(val):
                     s_closes = pd.Series(closes)
                     ma = s_closes.rolling(window=20).mean()
                     std = s_closes.rolling(window=20).std()
-                    bb_upper = (ma + (2 * std)).fillna('-').tolist()
-                    bb_lower = (ma - (2 * std)).fillna('-').tolist()
-                    ema200 = s_closes.ewm(span=min(200, len(closes)), adjust=False).mean().fillna('-').tolist()
+                    bb_upper = (ma + (2 * std)).where(pd.notnull(ma), None).tolist()
+                    bb_lower = (ma - (2 * std)).where(pd.notnull(ma), None).tolist()
+                    ema200 = s_closes.ewm(span=min(200, len(closes)), adjust=False).mean().where(pd.notnull(s_closes), None).tolist()
             except Exception as k_err:
                 print(f"Aviso ao buscar klines via client para {val}: {k_err}")
 
