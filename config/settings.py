@@ -65,7 +65,7 @@ RESERVE_FRACTION_FOR_DCA = SCANNER_CONFIG['reserve_fraction_for_dca']
 
 TRADING_CONFIG = {
     'symbol': 'BTCUSDT',
-    'interval': '1h',
+    'interval': '4h',
     'limit': 300,
     'depth': 20,
     'maxlen': 10,

@@ -547,8 +547,8 @@ async def index():
                 ui.label('PAPER TRADING').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
                 paper_trading_switch = ui.switch('Simulação', value=False, on_change=toggle_paper_trading).props('dense color=sky-600').classes('text-xs text-slate-400')
 
-                ui.label('TIMEFRAME ADAPTATIVO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
-                ui.toggle(['Adaptativo (1h/15m)', '15m (Scalping)', '1h (Swing)'], value='Adaptativo (1h/15m)').props('unelevated dense spread size=xs color=slate-900 text-color=slate-400 toggle-color=sky-700').classes('w-full border border-slate-800 rounded-lg overflow-hidden text-[0.6rem]')
+                ui.label('TIMEFRAME ADAPTATIVO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
+                timeframe_toggle = ui.toggle({'4h': '4h (Macro)', '1h': '1h (Swing)', '15m': '15m (Scalping)'}, value='4h', on_change=lambda e: update_timeframe(e.value)).props('unelevated dense spread size=xs color=slate-900 text-color=slate-400 toggle-color=sky-700').classes('w-full border border-slate-800 rounded-lg overflow-hidden text-[0.6rem]')
 
             with ui.column().classes('w-full gap-2 mt-1'):
                 ui.label('PERFORMANCE').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')

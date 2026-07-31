@@ -468,6 +468,43 @@ async def should_sell(rsi, macd_current, signal_line_current, last_close, upper_
         return True, "MACD Baixista + Preço acima da Banda Superior"
     return False, ""
 
+def frontrun_round_numbers(price, log=print):
+    """
+    Anticipates psychological resistance levels (round numbers).
+    If the target price is slightly above a major round number, 
+    pulls it just below the round number to ensure execution before the 'wall'.
+    """
+    if price >= 1000:
+        magnitude = 100
+        tolerance = 0.02
+        frontrun_pct = 0.002 
+    elif price >= 100:
+        magnitude = 10
+        tolerance = 0.02
+        frontrun_pct = 0.002
+    elif price >= 10:
+        magnitude = 1
+        tolerance = 0.02
+        frontrun_pct = 0.003
+    elif price >= 1:
+        magnitude = 0.1
+        tolerance = 0.02
+        frontrun_pct = 0.005
+    elif price >= 0.1:
+        magnitude = 0.01
+        tolerance = 0.02
+        frontrun_pct = 0.005
+    else:
+        return price
+        
+    nearest_round_down = math.floor(price / magnitude) * magnitude
+    if nearest_round_down > 0 and (price - nearest_round_down) / nearest_round_down <= tolerance:
+        adj_price = nearest_round_down * (1 - frontrun_pct)
+        log(f"🧠 \033[1;36mPsychological Resistance\033[0m: TP ajustado de ${price:.4f} para \033[1;33m${adj_price:.4f}\033[0m (Front-running ${nearest_round_down:.0f})")
+        return adj_price
+        
+    return price
+
 async def adjust_and_place_oco_order(client, symbol, quantity, price_tick_size, qty_step_size, klines, log=print):
     symbol_info = await client.get_symbol_info(symbol)
 
@@ -518,6 +555,8 @@ async def adjust_and_place_oco_order(client, symbol, quantity, price_tick_size, 
             take_profit_price = raw_tp
     except Exception:
         take_profit_price = raw_tp
+
+    take_profit_price = frontrun_round_numbers(take_profit_price, log=log)
 
     stop_loss_price = raw_sl
     stop_limit_price = stop_loss_price * 0.999

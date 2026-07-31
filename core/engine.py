@@ -723,13 +723,13 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     if o_type == 'LIMIT_MAKER':
                         price_v = float(o.get('price', 0))
                         if price_v > 0:
-                            grouped[key]['tp'] = f"${price_v:.4f}"
+                            grouped[key]['tp'] = format_price(price_v)
                     elif 'STOP' in o_type:
                         stop_v = float(o.get('stopPrice', 0))
                         if stop_v == 0:
                             stop_v = float(o.get('price', 0))
                         if stop_v > 0:
-                            grouped[key]['sl'] = f"${stop_v:.4f}"
+                            grouped[key]['sl'] = format_price(stop_v)
 
                 lines = ["🎯 <b>ORDENS OCO & POSIÇÕES ATIVAS</b>\n━━━━━━━━━━━━━━━━━━━"]
                 for (sym, list_id), data in grouped.items():
