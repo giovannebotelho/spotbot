@@ -2,6 +2,7 @@ import asyncio
 import json
 import re
 import math
+from decimal import Decimal, ROUND_DOWN
 from datetime import datetime
 import pandas as pd
 
@@ -514,9 +515,15 @@ async def adjust_and_place_oco_order(client, symbol, quantity, price_tick_size, 
     price_precision = get_precision(tick_size)
     quantity_precision = get_precision(step_size)
 
-    quantity = round(math.floor(quantity / step_size) * step_size, quantity_precision)
+    # Use Decimal for strict LOT_SIZE compliance to avoid floating point issues
+    qty_dec = Decimal(str(quantity))
+    step_dec = Decimal(str(step_size))
+    # Round down to the nearest multiple of step_size
+    quantized_qty = (qty_dec / step_dec).quantize(Decimal('1'), rounding=ROUND_DOWN) * step_dec
+    quantity = float(quantized_qty)
 
     ticker = await client.get_symbol_ticker(symbol=symbol)
+
     current_price = float(ticker['price'])
 
     min_notional = get_min_notional(symbol_info)
@@ -524,7 +531,12 @@ async def adjust_and_place_oco_order(client, symbol, quantity, price_tick_size, 
 
     if notional_value < min_notional:
         log(f"⚠️ Valor nocional ({notional_value:.2f}) é menor que o mínimo exigido ({min_notional:.2f}). Ajustando...")
-        quantity = round(math.ceil((min_notional / current_price) / step_size) * step_size, quantity_precision)
+        required_qty = Decimal(str(min_notional / current_price))
+        quantized_adj = (required_qty / step_dec).quantize(Decimal('1'), rounding=ROUND_DOWN)
+        # If rounding down makes it smaller than required, add one step
+        if quantized_adj * step_dec < required_qty:
+            quantized_adj += Decimal('1')
+        quantity = float(quantized_adj * step_dec)
 
     # FASE 4 (v4.0): Dynamic ATR Volatility Protection anti-Stop Hunt
     try:

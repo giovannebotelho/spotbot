@@ -12,21 +12,23 @@ warnings.filterwarnings("ignore", category=UserWarning)
 _stats_cache = None
 _last_stats_time = 0
 
+_pg_pool = None
+
 class DatabaseManager:
     def __init__(self, db_url=None):
         self.db_url = db_url or DATABASE_URL
         self.is_postgres = self.db_url.startswith("postgresql://") or self.db_url.startswith("postgres://")
         self.sqlite_conn = None
-        self.pg_pool = None
 
     def get_connection(self):
+        global _pg_pool
         if self.is_postgres:
-            if self.pg_pool is None:
+            if _pg_pool is None:
                 import psycopg2
                 from psycopg2.pool import ThreadedConnectionPool
                 from psycopg2.extras import RealDictCursor
-                self.pg_pool = ThreadedConnectionPool(1, 10, self.db_url, cursor_factory=RealDictCursor)
-            return self.pg_pool.getconn()
+                _pg_pool = ThreadedConnectionPool(1, 10, self.db_url, cursor_factory=RealDictCursor)
+            return _pg_pool.getconn()
         else:
             if self.sqlite_conn is None:
                 if self.db_url.startswith("sqlite:///"):
@@ -38,8 +40,9 @@ class DatabaseManager:
             return self.sqlite_conn
 
     def release_connection(self, conn):
-        if self.is_postgres and self.pg_pool is not None and conn is not None:
-            self.pg_pool.putconn(conn)
+        global _pg_pool
+        if self.is_postgres and _pg_pool is not None and conn is not None:
+            _pg_pool.putconn(conn)
 
     def create_tables(self):
         conn = self.get_connection()

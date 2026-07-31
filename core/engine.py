@@ -324,8 +324,8 @@ async def monitor_oco_lifecycle(
                                     limit_order_id = oco_order['orders'][1]['orderId']
                                     stop_order_id = oco_order['orders'][0]['orderId']
                                     current_stop_loss = new_stop
-                    except Exception:
-                        pass
+                    except Exception as tsl_err:
+                        log(f"⚠️ Erro ao atualizar Trailing Stop Loss para {active_target_symbol}: {tsl_err}")
                     continue
 
                 if msg.get('e') == 'listStatus' and msg.get('s') == active_target_symbol and msg.get('g') == oco_order['orderListId']:
