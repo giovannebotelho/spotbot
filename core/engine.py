@@ -42,9 +42,10 @@ else:
     api_key = API_KEYS.get('mainnet', {}).get('key', '')
     api_secret = API_KEYS.get('mainnet', {}).get('secret', '')
 
-bot_running = True
+bot_running = False
 active_positions = {}
 active_monitoring_tasks = []
+_last_autotune_time = 0
 
 bot_status_data = {
     "rsi": 0, "price": 0, "symbol": "", "action": "Iniciando...", "trend": "N/A", "target_asset": "BTCUSDT",
@@ -235,6 +236,8 @@ async def monitor_oco_lifecycle(
                                         
                                         log(f"🧪 \033[1;36mSmart Recovery DCA Executado\033[0m em \033[1;33m{active_target_symbol}\033[0m no Suporte de Fibonacci 61.8% (${dca_price:.4f})!")
                                         log(f"📉 Preço Médio ajustado de ${price:.4f} para \033[1;32m${new_pm:.4f}\033[0m! Re-posicionando TP/SL de recuperação...")
+                                        if db:
+                                            db.add_event(active_target_symbol, "DCA", f"Smart Recovery DCA a ${dca_price:.4f}. Preço médio alterado para ${new_pm:.4f}.")
                                         
                                         prec_p = get_precision(tick_size)
                                         prec_q = get_precision(step_size)
@@ -281,6 +284,8 @@ async def monitor_oco_lifecycle(
                                     p_price = float(venda_parcial['fills'][0]['price'])
                                     
                                     log(f"💰 Scalp Locking: Venda parcial de 50% executada em {active_target_symbol} a {format_price(p_price)}! (+{profit_pct*100:.2f}%)")
+                                    if db:
+                                        db.add_event(active_target_symbol, "SCALP_LOCK", f"Venda parcial a {format_price(p_price)} (+{profit_pct*100:.2f}%).")
                                     
                                     be_stop = adjust_price_to_tick_size(price, tick_size)
                                     be_limit = adjust_price_to_tick_size(price * 0.999, tick_size)
@@ -312,6 +317,8 @@ async def monitor_oco_lifecycle(
                                 new_stop = adjust_price_to_tick_size(highest_price * (1 - TRAILING_STOP_CONFIG['callback_percent']), tick_size)
                                 if new_stop > current_stop_loss * 1.001:
                                     log(f"🔄 Trailing Stop acionado! Movendo stop para {format_price(new_stop)}")
+                                    if db:
+                                        db.add_event(active_target_symbol, "TRAILING_STOP", f"Trailing Stop movido para {format_price(new_stop)}")
                                     await client._delete('orderList', signed=True, data={'symbol': active_target_symbol, 'orderListId': oco_order['orderListId']})
                                     new_stop_limit = adjust_price_to_tick_size(new_stop * 0.999, tick_size)
                                     prec_p = get_precision(tick_size)
@@ -369,7 +376,10 @@ async def monitor_oco_lifecycle(
                                 amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid,
                                 total_difference_liquid, gemini_response, bnb_balance_free * bnb_price
                             )
-                            save_to_csv(data_row)
+                            try:
+                                save_to_csv(data_row)
+                            except Exception as csv_err:
+                                log(f"⚠️ Erro ao salvar CSV local: {csv_err}")
                             if db:
                                 try:
                                     db.add_trade(data_row)
@@ -426,7 +436,10 @@ async def monitor_oco_lifecycle(
                             amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid,
                             total_difference_liquid, gemini_response, bnb_balance_free * bnb_price
                         )
-                        save_to_csv(data_row)
+                        try:
+                            save_to_csv(data_row)
+                        except Exception as csv_err:
+                            log(f"⚠️ Erro ao salvar CSV local: {csv_err}")
                         if db:
                             try:
                                 db.add_trade(data_row)
@@ -1017,9 +1030,11 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 db_stats = db.get_stats()
                 acc_pnl = db_stats['total_net_profit']
 
-                # FASE 3: Gemini Auto-Tuning de Perfil de Risco a cada 30 min
-                if current_dt.minute % 30 == 0 and globals().get('_last_autotune_min') != current_dt.minute:
-                    globals()['_last_autotune_min'] = current_dt.minute
+                # FASE 3: Gemini Auto-Tuning de Perfil de Risco a cada 90 min (1h30m)
+                import time
+                current_timestamp = time.time()
+                if current_timestamp - globals().get('_last_autotune_time', 0) >= 5400:
+                    globals()['_last_autotune_time'] = current_timestamp
                     try:
                         rec_profile, rec_just = auto_tune_risk_profile("ALTA", db_stats['win_rate'], acc_pnl)
                         from config.settings import RISK_PROFILES

@@ -103,7 +103,21 @@ class DatabaseManager:
             )
             """
             cursor.execute(create_table_sql)
+            
+            events_table_sql = f"""
+            CREATE TABLE IF NOT EXISTS trade_events (
+                id {pk_sql},
+                symbol TEXT,
+                event_type TEXT,
+                message TEXT,
+                created_at TEXT
+            )
+            """
+            cursor.execute(events_table_sql)
+            
             conn.commit()
+        except Exception as e:
+            print(f"⚠️ Erro ao criar tabelas no banco de dados: {e}")
         finally:
             self.release_connection(conn)
 
@@ -184,6 +198,23 @@ class DatabaseManager:
             
             cursor.execute(sql, values)
             conn.commit()
+        except Exception as e:
+            print(f"⚠️ Erro no INSERT em add_trade: {e}")
+            raise e
+        finally:
+            self.release_connection(conn)
+            
+    def add_event(self, symbol, event_type, message):
+        conn = self.get_connection()
+        try:
+            cursor = conn.cursor()
+            placeholder = "%s" if self.is_postgres else "?"
+            sql = f"INSERT INTO trade_events (symbol, event_type, message, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})"
+            now_str = dt_module.datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            cursor.execute(sql, (symbol, event_type, message, now_str))
+            conn.commit()
+        except Exception as e:
+            print(f"⚠️ Erro ao registrar evento {event_type} para {symbol}: {e}")
         finally:
             self.release_connection(conn)
 
