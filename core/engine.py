@@ -260,6 +260,11 @@ async def monitor_oco_lifecycle(
                                         current_stop_loss = new_sl
                                         dca_done = True
                                         
+                                        if bot_status_data.get('target_asset') == active_target_symbol:
+                                            bot_status_data['entry_price'] = new_pm
+                                            bot_status_data['tp_price'] = new_tp
+                                            bot_status_data['sl_price'] = new_sl
+                                        
                                         if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
                                             asyncio.create_task(send_telegram_message(
                                                 TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
@@ -299,6 +304,9 @@ async def monitor_oco_lifecycle(
                                     stop_order_id = oco_order['orders'][0]['orderId']
                                     current_stop_loss = be_stop
                                     partial_take_done = True
+                                    
+                                    if bot_status_data.get('target_asset') == active_target_symbol:
+                                        bot_status_data['sl_price'] = be_stop
 
                                     if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
                                         asyncio.create_task(send_telegram_message(
@@ -331,6 +339,9 @@ async def monitor_oco_lifecycle(
                                     limit_order_id = oco_order['orders'][1]['orderId']
                                     stop_order_id = oco_order['orders'][0]['orderId']
                                     current_stop_loss = new_stop
+                                    
+                                    if bot_status_data.get('target_asset') == active_target_symbol:
+                                        bot_status_data['sl_price'] = new_stop
                     except Exception as tsl_err:
                         log(f"⚠️ Erro ao atualizar Trailing Stop Loss para {active_target_symbol}: {tsl_err}")
                     continue
