@@ -7,7 +7,7 @@ from datetime import datetime
 import pandas as pd
 
 from config.settings import API_KEYS, TRADING_CONFIG, RSI_CONFIG
-from services.binance_client import get_order_details, get_futures_analytics, get_order_book, get_multi_timeframe_klines, get_lead_lag_btc_klines, get_recent_trades_cvd
+from services.binance_client import get_order_details, get_futures_analytics, get_order_book, get_multi_timeframe_klines, get_lead_lag_btc_klines, get_recent_trades_cvd, get_klines
 from core.indicators import (
     detect_market_regime, detect_liquidity_sweep, calculate_ema, calculate_adx,
     analyze_futures_squeeze_potential, calculate_orderbook_imbalance, calculate_multi_timeframe_confluence,
