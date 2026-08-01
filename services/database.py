@@ -126,7 +126,8 @@ class DatabaseManager:
                 'slippage': 'REAL',
                 'initial_stop_loss': 'REAL',
                 'dca_levels': 'INTEGER',
-                'bot_version': 'TEXT'
+                'bot_version': 'TEXT',
+                'raw_data': 'TEXT'
             }
             
             for col_name, col_type in new_columns.items():
