@@ -639,6 +639,12 @@ async def index():
 
                 ai_toggle_btn = ui.button('🧠 Ver Análise IA ❯', on_click=toggle_ai_drawer).props('flat dense size=xs color=sky-400').classes('text-[0.65rem] font-semibold')
 
+            # Conteúdo Expansível do Painel IA Gemini (Movido para cima a pedido do usuário)
+            ai_reason_container = ui.card().classes('w-full p-3 bg-[#121722] border-b border-slate-800 text-xs text-slate-300 transition-all flex-shrink-0')
+            ai_reason_container.set_visibility(False)
+            with ai_reason_container:
+                ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-xs text-slate-300 leading-relaxed')
+
             # Barra de Abas do Gráfico (Multi-Ativo) & Legenda Estilo Binance
             with ui.row().classes('w-full min-h-[48px] bg-[#0B0E14] border-b border-slate-800/80 px-2 sm:px-3 items-center justify-between gap-2 flex-shrink-0 z-20 overflow-x-auto flex-nowrap'):
                 with ui.row().classes('items-center gap-1 flex-shrink-0 min-h-[40px]'):
@@ -653,12 +659,6 @@ async def index():
                     ui.label('🎯 TP').classes('text-emerald-400 font-bold')
                     ui.label('🛑 SL').classes('text-rose-400 font-bold')
                     ui.label('🩵 Entrada').classes('text-sky-400 font-bold')
-
-            # Conteúdo Expansível do Painel IA Gemini
-            ai_reason_container = ui.card().classes('w-full p-3 bg-[#121722] border-b border-slate-800 text-xs text-slate-300 transition-all flex-shrink-0')
-            ai_reason_container.set_visibility(False)
-            with ai_reason_container:
-                ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-xs text-slate-300 leading-relaxed')
 
             # Seção Central do Gráfico (+30% de Altura Explicita)
             with ui.element('div').classes('w-full h-[470px] lg:h-[64vh] min-h-[420px] relative border-b border-slate-800 flex-shrink-0 bg-[#0B0E14]'):
