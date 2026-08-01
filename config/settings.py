@@ -78,7 +78,8 @@ TRADING_CONFIG = {
     'macd_fast': 12,
     'macd_slow': 26,
     'macd_signal': 9,
-    'use_ema_filter': True
+    'use_ema_filter': True,
+    'use_candle_close_confirmation': True
 }
 
 RISK_PROFILES = {

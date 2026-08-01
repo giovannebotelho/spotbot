@@ -244,8 +244,8 @@ async def monitor_oco_lifecycle(
                                         prec_q = get_precision(step_size)
                                         prec_qty_val = round(math.floor(total_qty / step_size) * step_size, prec_q)
                                         
-                                        new_tp = adjust_price_to_tick_size(new_pm * 1.008, tick_size)
-                                        new_sl = adjust_price_to_tick_size(new_pm * 0.985, tick_size)
+                                        new_tp = adjust_price_to_tick_size(new_pm * 1.015, tick_size)
+                                        new_sl = adjust_price_to_tick_size(new_pm * 0.975, tick_size)
                                         new_sl_limit = adjust_price_to_tick_size(new_sl * 0.999, tick_size)
                                         
                                         oco_order = await place_safe_oco_sell_order(

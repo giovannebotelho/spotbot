@@ -231,6 +231,14 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
     
     # (Movido para o final da função para economia de tokens)
 
+    # 0. Breakout Confirmation (Filtro Anti-Whipsaw)
+    if TRADING_CONFIG.get('use_candle_close_confirmation', False) and len(klines) >= 1:
+        current_candle_open = float(klines[-1][1])
+        current_candle_close = float(klines[-1][4])
+        # Se o candle atual (fechado ou rodando) estiver vermelho (fechamento < abertura), recusa a entrada para evitar "falling knives" e violinadas.
+        if current_candle_close <= current_candle_open:
+            return {"buy": False, "message": "Aguardando confirmação de reversão (Vela atual ainda está vermelha).", "candle_data": "", "gemini_response": None, "regime": "N/A"}
+
     # 1. Validação de Regime de Mercado (Fase 1: Regime Switcher)
     regime, hurst_val = detect_market_regime(klines)
     if regime == "REGIME_CRASH_PANIC":
@@ -540,12 +548,12 @@ async def adjust_and_place_oco_order(client, symbol, quantity, price_tick_size, 
     # FASE 4 (v4.0): Dynamic ATR Volatility Protection anti-Stop Hunt
     try:
         atr_val, atr_pct = calculate_atr(klines, period=14)
-        stop_loss_pct = max(0.025, min(0.045, atr_pct * 1.8))
-        take_profit_pct = max(0.045, stop_loss_pct * 1.8)
-        log(f"⚡ \033[1;36mVolatility Adaptive Protection\033[0m: ATR(14)={atr_pct*100:.2f}%. Stop Loss ajustado para \033[1;31m-{stop_loss_pct*100:.2f}%\033[0m | Take Profit: \033[1;32m+{take_profit_pct*100:.2f}%\033[0m (Ratio 1.8x)")
+        stop_loss_pct = max(0.020, min(0.045, atr_pct * 2.0))
+        take_profit_pct = max(0.040, stop_loss_pct * 1.6)
+        log(f"⚡ \033[1;36mVolatility Adaptive Protection\033[0m: ATR(14)={atr_pct*100:.2f}%. Stop Loss ajustado para \033[1;31m-{stop_loss_pct*100:.2f}%\033[0m | Take Profit: \033[1;32m+{take_profit_pct*100:.2f}%\033[0m (Ratio 1.6x)")
     except Exception:
-        stop_loss_pct = 0.028
-        take_profit_pct = 0.052
+        stop_loss_pct = 0.030
+        take_profit_pct = 0.048
 
     raw_tp = current_price * (1 + take_profit_pct)
     raw_sl = current_price * (1 - stop_loss_pct)

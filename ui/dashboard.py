@@ -679,7 +679,7 @@ async def index():
                            'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
                            'subtextStyle': {'color': '#64748b', 'fontSize': 9}
                        },
-                       'grid': [{'left': '45', 'right': '15', 'top': '70', 'height': '45%'}, {'left': '45', 'right': '15', 'top': '82%', 'height': '14%'}],
+                       'grid': [{'left': '45', 'right': '15', 'top': '70', 'height': '65%'}, {'left': '45', 'right': '15', 'top': '85%', 'height': '10%'}],
                        'legend': {'data': ['Preço', 'BB Upper', 'BB Lower', 'EMA 200', 'TP', 'SL', 'Entrada'], 'top': 48, 'left': 15, 'textStyle': {'color': '#94a3b8', 'fontSize': 10}},
                        'tooltip': {'trigger': 'axis', 'axisPointer': {'type': 'cross'}, 'backgroundColor': 'rgba(18, 23, 34, 0.95)', 'borderColor': '#0284C7', 'textStyle': {'color': '#f8fafc'}},
                        'dataZoom': [
