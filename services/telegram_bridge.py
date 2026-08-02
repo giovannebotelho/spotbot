@@ -334,6 +334,12 @@ class PlanFileHandler(FileSystemEventHandler):
 
 
 def main():
+    if hasattr(sys.stdout, 'reconfigure'):
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+        except Exception:
+            pass
+
     if not DEV_BOT_TOKEN or DEV_BOT_TOKEN == "SEU_BOT_TOKEN_TELEGRAM_AQUI":
         logger.error("❌ TELEGRAM_DEV_BOT_TOKEN não configurado no arquivo .env!")
         print("Erro: Por favor, adicione TELEGRAM_DEV_BOT_TOKEN=seu_token no arquivo .env")
@@ -353,7 +359,11 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message_input))
 
     # Iniciar File Watcher para notificar quando novos planos forem gerados
-    loop = asyncio.get_event_loop()
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
     if AUTHORIZED_USER_ID:
         event_handler = PlanFileHandler(loop, app, AUTHORIZED_USER_ID)
         observer = Observer()
