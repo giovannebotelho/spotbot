@@ -193,11 +193,77 @@ async def diff_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(msg, parse_mode="Markdown")
 
 
+async def query_gemini_ai(prompt: str) -> str:
+    """Consulta a IA Gemini com o contexto do projeto e retorna a resposta."""
+    gemini_key = os.getenv("gemini_api") or os.getenv("GEMINI_API_KEY") or os.getenv("gemini_api_key")
+    if not gemini_key:
+        return "⚠️ Chave API do Gemini (`gemini_api`) não encontrada no arquivo `.env`."
+    
+    try:
+        from google import genai
+        from google.genai import types
+        
+        client = genai.Client(api_key=gemini_key)
+        
+        instr_file = WORKSPACE_DIR / "gemini_instructions.txt"
+        sys_instruction = (
+            "Você é a IA assistente do projeto SpotBot Pro / Antigravity.\n"
+            "Responda sempre em Português do Brasil (pt-BR) de forma direta, clara, elegante e tecnicamente precisa.\n"
+        )
+        if instr_file.exists():
+            sys_instruction += f"\nInstruções do Projeto:\n{instr_file.read_text(encoding='utf-8')[:1500]}\n"
+
+        config = types.GenerateContentConfig(
+            system_instruction=sys_instruction,
+            temperature=0.7,
+            top_p=0.95,
+            max_output_tokens=4096
+        )
+        
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=config
+            )
+        )
+        if response and response.text:
+            return response.text
+        return "⚠️ Não foi possível obter uma resposta da IA."
+    except Exception as e:
+        try:
+            from google import genai
+            from google.genai import types
+            client = genai.Client(api_key=gemini_key)
+            config = types.GenerateContentConfig(
+                system_instruction=sys_instruction,
+                temperature=0.7,
+                top_p=0.95,
+                max_output_tokens=4096
+            )
+            loop = asyncio.get_running_loop()
+            response = await loop.run_in_executor(
+                None,
+                lambda: client.models.generate_content(
+                    model="gemini-1.5-flash",
+                    contents=prompt,
+                    config=config
+                )
+            )
+            if response and response.text:
+                return response.text
+        except Exception as err2:
+            logger.error(f"Erro ao consultar Gemini AI: {err2}")
+        return f"⚠️ Erro ao consultar a IA Gemini: {e}"
+
+
 @restricted
 async def prompt_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Recebe um prompt ou comentário via Telegram e salva em MOBILE_PROMPTS.md."""
+    """Recebe um prompt via Telegram, salva o registro e responde usando a IA Gemini."""
     if not context.args:
-        await update.message.reply_text("💡 **Uso:** `/prompt <sua instrução ou comentário aqui>`")
+        await update.message.reply_text("💡 **Uso:** `/prompt <sua mensagem ou dúvida aqui>`")
         return
 
     instruction = " ".join(context.args)
@@ -206,7 +272,20 @@ async def prompt_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     with open(prompt_file, "a", encoding="utf-8") as f:
         f.write(f"\n- [{update.message.date.strftime('%Y-%m-%d %H:%M:%S')}] {instruction}\n")
 
-    await update.message.reply_text(f"📥 **Instrução registrada com sucesso!**\n`{instruction}`")
+    status_msg = await update.message.reply_text("🧠 *Analisando com Antigravity IA...*", parse_mode="Markdown")
+
+    ai_reply = await query_gemini_ai(instruction)
+    
+    # Se a resposta for grande, divide para o limite do Telegram
+    if len(ai_reply) > 4000:
+        await status_msg.edit_text(ai_reply[:4000])
+        for chunk in [ai_reply[i:i+4000] for i in range(4000, len(ai_reply), 4000)]:
+            await update.message.reply_text(chunk)
+    else:
+        try:
+            await status_msg.edit_text(ai_reply, parse_mode="Markdown")
+        except Exception:
+            await status_msg.edit_text(ai_reply)
 
 
 @restricted
@@ -269,29 +348,50 @@ async def handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @restricted
 async def handle_message_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Recebe mensagens de texto normais (incluindo respostas com comentários)."""
+    """Recebe mensagens de texto normais (respostas com comentários ou conversas diretas com a IA)."""
     user_id = update.effective_user.id
+    user_text = update.message.text
+
+    # Se estiver aguardando comentário de aprovação do plano
     if WAITING_FOR_COMMENT.get(user_id):
-        comment_text = update.message.text
         WAITING_FOR_COMMENT[user_id] = False
         
-        # Salva o comentário
         prompt_file = WORKSPACE_DIR / "MOBILE_PROMPTS.md"
         with open(prompt_file, "a", encoding="utf-8") as f:
-            f.write(f"\n- [Comentário de Aprovação - {update.message.date.strftime('%Y-%m-%d %H:%M:%S')}] {comment_text}\n")
+            f.write(f"\n- [Comentário de Aprovação - {update.message.date.strftime('%Y-%m-%d %H:%M:%S')}] {user_text}\n")
             
         try:
             subprocess.run(["git", "add", "."], check=True, cwd=str(WORKSPACE_DIR))
-            subprocess.run(["git", "commit", "-m", f"feat: plano aprovado com comentario via Telegram: {comment_text}"], capture_output=True, text=True, cwd=str(WORKSPACE_DIR))
+            subprocess.run(["git", "commit", "-m", f"feat: plano aprovado com comentario via Telegram: {user_text}"], capture_output=True, text=True, cwd=str(WORKSPACE_DIR))
             subprocess.run(["git", "push", "origin", "master"], capture_output=True, text=True, cwd=str(WORKSPACE_DIR))
             
             await update.message.reply_text(
                 f"✅ **Plano Aprovado com Comentário!**\n\n"
-                f"💬 Comentário registrado: *\"{comment_text}\"*\n"
+                f"💬 Comentário registrado: *\"{user_text}\"*\n"
                 f"🚀 Commit & Push para o GitHub efetuados (Railway atualizado)."
             )
         except Exception as e:
             await update.message.reply_text(f"⚠️ Erro ao registrar aprovação com comentário: {e}")
+        return
+
+    # Caso contrário: conversar diretamente com a IA Gemini!
+    prompt_file = WORKSPACE_DIR / "MOBILE_PROMPTS.md"
+    with open(prompt_file, "a", encoding="utf-8") as f:
+        f.write(f"\n- [{update.message.date.strftime('%Y-%m-%d %H:%M:%S')}] {user_text}\n")
+
+    status_msg = await update.message.reply_text("🧠 *Analisando sua mensagem com Antigravity IA...*", parse_mode="Markdown")
+
+    ai_reply = await query_gemini_ai(user_text)
+
+    if len(ai_reply) > 4000:
+        await status_msg.edit_text(ai_reply[:4000])
+        for chunk in [ai_reply[i:i+4000] for i in range(4000, len(ai_reply), 4000)]:
+            await update.message.reply_text(chunk)
+    else:
+        try:
+            await status_msg.edit_text(ai_reply, parse_mode="Markdown")
+        except Exception:
+            await status_msg.edit_text(ai_reply)
 
 
 class PlanFileHandler(FileSystemEventHandler):
