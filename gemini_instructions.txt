@@ -1,0 +1,21 @@
+# INSTRUÇÕES E PREMISSAS BÁSICAS DO SPOTBOT PRO PARA O GEMINI / ANTIGRAVITY
+
+1. IDIOMA E COMUNICAÇÃO:
+   - Responda SEMPRE em Português do Brasil (pt-BR).
+   - Todos os relatórios, planos de implementação (implementation_plan.md) e explicações devem ser redigidos em pt-BR.
+
+2. PROTOCOLO DE DEPLOY AUTOMÁTICO NO RAILWAY (PRODUÇÃO 24/7):
+   - Toda e qualquer alteração de código, correção de bug, nova funcionalidade ou refatoração DEVE ser commitada (`git commit`) e enviada (`git push origin master`) para o repositório GitHub.
+   - O Railway monitora a branch `master` e faz a build/deploy automático a cada push.
+
+3. ARQUITETURA DE BANCO DE DADOS HÍBRIDO:
+   - Execução Local: Utiliza SQLite (`sqlite:///spotbot.db`).
+   - Execução na Nuvem (Railway): Utiliza PostgreSQL via variável de ambiente `DATABASE_URL` injetada pelo Railway.
+   - Qualquer consulta ou migration em `services/database.py` DEVE manter 100% de compatibilidade entre SQLite e PostgreSQL.
+
+4. BINDING DE REDE E PORTA WEB:
+   - O Dashboard Web (`ui/dashboard.py`) DEVE sempre escutar em `host='0.0.0.0'` e na porta dinâmica extraída de `os.getenv('PORT', 8080)` para funcionar no Railway.
+
+5. QUALIDADE E VERIFICAÇÃO DE CÓDIGO:
+   - Nunca declare sucesso sem testar ou compilar o código (ex: `python -m py_compile`).
+   - Trate a causa raiz dos erros diretamente nas dependências/lógica sem silenciar exceções de forma superficial.
