@@ -1264,7 +1264,12 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                             ))
                         last_operation_time = dt_module.datetime.now()
 
-                        confluence_score = float(buy_result.get('mtf_score', buy_result.get('gemini_analysis', {}).get('score', 0))) if buy_result else 0.0
+                        confluence_score = 0.0
+                        if buy_result:
+                            if buy_result.get('mtf_score') is not None:
+                                confluence_score = float(buy_result['mtf_score'])
+                            elif isinstance(buy_result.get('gemini_analysis'), dict):
+                                confluence_score = float(buy_result['gemini_analysis'].get('score', 0))
                         slippage = ((price - closes[-1]) / closes[-1]) * 100 if closes[-1] > 0 else 0.0
 
                         # Lança o monitoramento em background para NÃO bloquear o scanner!
