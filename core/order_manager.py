@@ -2,7 +2,7 @@ import asyncio
 import time
 import math
 import datetime as dt_module
-from config.settings import TELEGRAM_CONFIG, TRADING_CONFIG, TRAILING_STOP_CONFIG
+from config.settings import TELEGRAM_CONFIG, TRADING_CONFIG, TRAILING_STOP_CONFIG, TIMEZONE
 from services.binance_client import get_usdt_balance, get_klines, get_bnb_price
 from core.indicators import calculate_fibonacci_supports
 from core.decision import get_min_notional, adjust_price_to_tick_size, get_precision
@@ -273,7 +273,7 @@ async def monitor_oco_lifecycle(
                             
                             if stop_details['status'] == 'FILLED':
                                 globals_dict['stop_loss_count'] += 1
-                                globals_dict['last_stop_loss_time'] = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo'))
+                                globals_dict['last_stop_loss_time'] = dt_module.datetime.now(TIMEZONE)
                                 await check_stop_losses(globals_dict['last_stop_loss_time'], log=log)
                             else:
                                 globals_dict['stop_loss_count'] = 0
@@ -334,7 +334,7 @@ async def monitor_oco_lifecycle(
                         
                         if stop_details['status'] == 'FILLED':
                             globals_dict['stop_loss_count'] += 1
-                            globals_dict['last_stop_loss_time'] = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo'))
+                            globals_dict['last_stop_loss_time'] = dt_module.datetime.now(TIMEZONE)
                             await check_stop_losses(globals_dict['last_stop_loss_time'], log=log)
                         else:
                             globals_dict['stop_loss_count'] = 0

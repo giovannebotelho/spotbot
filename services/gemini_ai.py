@@ -2,7 +2,7 @@ import os
 import json
 import time
 from datetime import datetime
-from config.settings import API_KEYS
+from config.settings import API_KEYS, TIMEZONE
 from utils.formatting import RESET, GREEN, RED, YELLOW, CYAN
 from zoneinfo import ZoneInfo
 
@@ -28,7 +28,7 @@ def analyze_with_gemini(
         print("⚠️ Chave API do Gemini não configurada no .env.")
         return None
 
-    current_datetime_str = datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%d/%m/%Y às %H:%M:%S")
+    current_datetime_str = datetime.now(TIMEZONE).strftime("%d/%m/%Y às %H:%M:%S")
 
     models_to_try = [
         "gemini-1.5-flash",

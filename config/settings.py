@@ -1,8 +1,11 @@
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from zoneinfo import ZoneInfo
 
 load_dotenv()
+
+TIMEZONE = ZoneInfo('America/Sao_Paulo')
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 

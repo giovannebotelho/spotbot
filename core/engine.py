@@ -10,7 +10,7 @@ from binance import BinanceSocketManager
 from binance import AsyncClient as BinanceAsyncClient
 from binance.exceptions import BinanceAPIException
 
-from config.settings import API_KEYS, TELEGRAM_CONFIG, TRADING_CONFIG, RSI_CONFIG, TRAILING_STOP_CONFIG, SCANNER_CONFIG, TOP_20_SYMBOLS, MAX_CONCURRENT_POSITIONS, RESERVE_FRACTION_FOR_DCA
+from config.settings import API_KEYS, TELEGRAM_CONFIG, TRADING_CONFIG, RSI_CONFIG, TRAILING_STOP_CONFIG, SCANNER_CONFIG, TOP_20_SYMBOLS, MAX_CONCURRENT_POSITIONS, RESERVE_FRACTION_FOR_DCA, TIMEZONE
 from services.binance_client import extract_closes, extract_volumes, get_usdt_balance, get_order_details, get_klines, get_bnb_price, get_multi_klines
 from core.indicators import (
     calculate_rsi, calculate_macd, calculate_bollinger_bands, check_trend, check_candle_patterns,
@@ -121,7 +121,7 @@ async def check_stop_losses(current_time, log=print):
 
 async def check_rsi_reset(symbol, log=print):
     global last_operation_time
-    if last_operation_time and (dt_module.datetime.now(ZoneInfo('America/Sao_Paulo')) - last_operation_time) > timedelta(seconds=6*60*60):
+    if last_operation_time and (dt_module.datetime.now(TIMEZONE) - last_operation_time) > timedelta(seconds=6*60*60):
         current_levels = [RSI_CONFIG['dynamic_low'][i] for i in range(6)]
         default_levels = [RSI_CONFIG['levels'][i] for i in range(6)]
         
@@ -129,7 +129,7 @@ async def check_rsi_reset(symbol, log=print):
             for i in range(6):
                 RSI_CONFIG['dynamic_low'][i] = RSI_CONFIG['levels'][i]
             log(f"\n⏳ Níveis de RSI resetados para {symbol} por inatividade.")
-        last_operation_time = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo'))
+        last_operation_time = dt_module.datetime.now(TIMEZONE)
 
 _cached_balances = {'bnb': 0.0, 'bnb_usdt': 0.0, 'usdt': 0.0}
 _last_balance_time = 0
@@ -227,7 +227,7 @@ async def panic_sell_position(symbol, client_instance=None):
         trade_result = (sell_price - entry_price) * executed_qty
         trade_result_liquid = trade_result * 0.999 # Desconto de taxa estimado
 
-        timestamp = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%d/%m/%Y at %H:%M:%S")
+        timestamp = dt_module.datetime.now(TIMEZONE).strftime("%d/%m/%Y at %H:%M:%S")
 
         # 3. Salva no banco de dados PostgreSQL/SQLite
         db_mgr = DatabaseManager()
@@ -569,7 +569,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         tick_size = float(next(filter for filter in symbol_info['filters'] if filter['filterType'] == 'PRICE_FILTER')['tickSize'])
         quote_precision = int(symbol_info['quoteAssetPrecision'])
 
-        last_sync_hour = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo')).hour
+        last_sync_hour = dt_module.datetime.now(TIMEZONE).hour
         last_pdf_sent_day = None
         order_count = 0
 
@@ -841,7 +841,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         executed_qty = min(nominal_qty, available_qty)
                         
                         price = float(compra['fills'][0]['price'])
-                        timestamp = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%d/%m/%Y at %H:%M:%S")
+                        timestamp = dt_module.datetime.now(TIMEZONE).strftime("%d/%m/%Y at %H:%M:%S")
                         
                         log(f"✅️ ({order_count:02d}) Comprado: {active_target_symbol} - Qtd: {executed_qty} - Preço: {format_price(price)}")
                         purchase_timestamp = timestamp
@@ -856,7 +856,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                 f"🟢 Take Profit (TP): <b>{format_price(lucro_alvo)}</b> (+4.0%)\n"
                                 f"🔴 Stop Loss (SL): <b>{format_price(stop_loss)}</b> (-2.0%)"
                             ))
-                        last_operation_time = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo'))
+                        last_operation_time = dt_module.datetime.now(TIMEZONE)
 
                         confluence_score = 0.0
                         if buy_result:

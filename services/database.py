@@ -5,7 +5,7 @@ import warnings
 import datetime as dt_module
 from datetime import datetime
 from pathlib import Path
-from config.settings import DATABASE_URL, BASE_DIR
+from config.settings import DATABASE_URL, BASE_DIR, TIMEZONE
 from zoneinfo import ZoneInfo
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -244,7 +244,7 @@ class DatabaseManager:
             cursor = conn.cursor()
             placeholder = "%s" if self.is_postgres else "?"
             sql = f"INSERT INTO trade_events (symbol, event_type, message, created_at) VALUES ({placeholder}, {placeholder}, {placeholder}, {placeholder})"
-            now_str = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%d/%m/%Y %H:%M:%S")
+            now_str = dt_module.datetime.now(TIMEZONE).strftime("%d/%m/%Y %H:%M:%S")
             cursor.execute(sql, (symbol, event_type, message, now_str))
             conn.commit()
         except Exception as e:

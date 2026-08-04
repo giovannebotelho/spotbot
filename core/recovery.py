@@ -2,7 +2,7 @@ import asyncio
 import pandas as pd
 import datetime as dt_module
 from zoneinfo import ZoneInfo
-from config.settings import TELEGRAM_CONFIG, TRADING_CONFIG, MAX_CONCURRENT_POSITIONS
+from config.settings import TELEGRAM_CONFIG, TRADING_CONFIG, MAX_CONCURRENT_POSITIONS, TIMEZONE
 from services.binance_client import get_order_details
 from core.order_manager import monitor_oco_lifecycle
 from services.telegram_notifier import send_telegram_message
@@ -62,7 +62,7 @@ async def recover_state(client, bsm, db, log, status, saldo_inicial_usdt, active
                 price = float(ticker_cur['price'])
                 
             order_val_usdt = round(executed_qty * price, 2)
-            purchase_timestamp = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%d/%m/%Y at %H:%M:%S")
+            purchase_timestamp = dt_module.datetime.now(TIMEZONE).strftime("%d/%m/%Y at %H:%M:%S")
             active_positions[active_target_symbol] = {
                 'entry': price,
                 'tp': lucro_alvo,

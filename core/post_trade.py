@@ -1,7 +1,7 @@
 from datetime import datetime
 from core.indicators import calculate_trade_result, calculate_fee
 from services.telegram_notifier import send_telegram_message
-from config.settings import TELEGRAM_CONFIG, RSI_CONFIG, OCO_CONFIG, TRADING_CONFIG
+from config.settings import TELEGRAM_CONFIG, RSI_CONFIG, OCO_CONFIG, TRADING_CONFIG, TIMEZONE
 from core.decision import adjust_rsi_levels
 from services.database import DatabaseManager
 from zoneinfo import ZoneInfo
@@ -30,7 +30,7 @@ async def process_order_details(symbol, client, limit_order_details, stop_order_
         fee = 0
         trade_result_liquid = 0
 
-    oco_timestamp = datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%d/%m/%Y at %H:%M:%S") if oco_order_result else None
+    oco_timestamp = datetime.now(TIMEZONE).strftime("%d/%m/%Y at %H:%M:%S") if oco_order_result else None
     return symbol, oco_order_result, trade_result, novo_saldo_usdt, oco_timestamp, fee, trade_result_liquid
 
 async def log_and_notify_results(order_result, symbol, trade_result, total_difference, timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_usdt, log=print):
