@@ -1074,21 +1074,14 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     await asyncio.sleep(600)
                     continue
 
-                if len(active_positions) >= MAX_CONCURRENT_POSITIONS:
-                    active_list_str = ", ".join(active_positions.keys())
-                    status(f"⏳ Posições Máximas Atingidas ({len(active_positions)}/{MAX_CONCURRENT_POSITIONS}): [{active_list_str}]. Monitorando operações...")
-                    await asyncio.sleep(6)
-                    continue
-
-                db_stats = db.get_stats()
-                acc_pnl = db_stats['total_net_profit']
-
-                # FASE 3: Gemini Auto-Tuning de Perfil de Risco a cada 90 min (1h30m)
+                # FASE 3: Gemini Auto-Tuning de Perfil de Risco a cada 120 min (2h)
                 import time
                 current_timestamp = time.time()
-                if current_timestamp - globals().get('_last_autotune_time', 0) >= 5400:
+                if current_timestamp - globals().get('_last_autotune_time', 0) >= 7200:
                     globals()['_last_autotune_time'] = current_timestamp
                     try:
+                        db_stats = db.get_stats()
+                        acc_pnl = db_stats['total_net_profit']
                         rec_profile, rec_just = auto_tune_risk_profile("ALTA", db_stats['win_rate'], acc_pnl)
                         from config.settings import RISK_PROFILES
                         import config.settings as setts
@@ -1104,6 +1097,15 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                 ))
                     except Exception as at_err:
                         log(f"⚠️ Aviso no Gemini Auto-Tuning: {at_err}")
+
+                if len(active_positions) >= MAX_CONCURRENT_POSITIONS:
+                    active_list_str = ", ".join(active_positions.keys())
+                    status(f"⏳ Posições Máximas Atingidas ({len(active_positions)}/{MAX_CONCURRENT_POSITIONS}): [{active_list_str}]. Monitorando operações...")
+                    await asyncio.sleep(6)
+                    continue
+
+                db_stats = db.get_stats()
+                acc_pnl = db_stats['total_net_profit']
 
                 slots, slot_value = calculate_dynamic_position_slots(
                     usdt_balance,
