@@ -548,12 +548,12 @@ async def adjust_and_place_oco_order(client, symbol, quantity, price_tick_size, 
     # FASE 4 (v4.0): Dynamic ATR Volatility Protection anti-Stop Hunt
     try:
         atr_val, atr_pct = calculate_atr(klines, period=14)
-        stop_loss_pct = max(0.020, min(0.045, atr_pct * 2.0))
-        take_profit_pct = max(0.040, stop_loss_pct * 1.6)
-        log(f"⚡ \033[1;36mVolatility Adaptive Protection\033[0m: ATR(14)={atr_pct*100:.2f}%. Stop Loss ajustado para \033[1;31m-{stop_loss_pct*100:.2f}%\033[0m | Take Profit: \033[1;32m+{take_profit_pct*100:.2f}%\033[0m (Ratio 1.6x)")
+        stop_loss_pct = max(0.015, min(0.020, atr_pct * 1.5))
+        take_profit_pct = max(0.020, min(0.030, stop_loss_pct * 1.5))
+        log(f"⚡ \033[1;36mVolatility Adaptive Protection\033[0m: ATR(14)={atr_pct*100:.2f}%. Stop Loss ajustado para \033[1;31m-{stop_loss_pct*100:.2f}%\033[0m | Take Profit: \033[1;32m+{take_profit_pct*100:.2f}%\033[0m")
     except Exception:
-        stop_loss_pct = 0.030
-        take_profit_pct = 0.048
+        stop_loss_pct = 0.018
+        take_profit_pct = 0.025
 
     raw_tp = current_price * (1 + take_profit_pct)
     raw_sl = current_price * (1 - stop_loss_pct)

@@ -5,6 +5,7 @@ import math
 import pandas as pd
 import datetime as dt_module
 from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from binance import BinanceSocketManager
 from binance import AsyncClient as BinanceAsyncClient
 from binance.exceptions import BinanceAPIException
@@ -120,7 +121,7 @@ async def check_stop_losses(current_time, log=print):
 
 async def check_rsi_reset(symbol, log=print):
     global last_operation_time
-    if last_operation_time and (dt_module.datetime.now() - last_operation_time) > timedelta(seconds=6*60*60):
+    if last_operation_time and (dt_module.datetime.now(ZoneInfo('America/Sao_Paulo')) - last_operation_time) > timedelta(seconds=6*60*60):
         current_levels = [RSI_CONFIG['dynamic_low'][i] for i in range(6)]
         default_levels = [RSI_CONFIG['levels'][i] for i in range(6)]
         
@@ -128,7 +129,7 @@ async def check_rsi_reset(symbol, log=print):
             for i in range(6):
                 RSI_CONFIG['dynamic_low'][i] = RSI_CONFIG['levels'][i]
             log(f"\n⏳ Níveis de RSI resetados para {symbol} por inatividade.")
-        last_operation_time = dt_module.datetime.now()
+        last_operation_time = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo'))
 
 _cached_balances = {'bnb': 0.0, 'bnb_usdt': 0.0, 'usdt': 0.0}
 _last_balance_time = 0
@@ -256,6 +257,7 @@ async def monitor_oco_lifecycle(
                                         
                                         price = new_pm
                                         executed_qty = prec_qty_val
+                                        order_val_usdt = round(price * executed_qty, 2)
                                         lucro_alvo = new_tp
                                         stop_loss = new_sl
                                         current_stop_loss = new_sl
@@ -321,29 +323,58 @@ async def monitor_oco_lifecycle(
                             except Exception as e_partial:
                                 log(f"Aviso ao executar Scalp Locking: {e_partial}")
 
-                        if TRAILING_STOP_CONFIG['enabled'] and cur_price > highest_price:
+                        # FASE 5: Trailing Profit Lock (Venda a mercado após 75% do TP alvo)
+                        if cur_price > highest_price:
                             highest_price = cur_price
-                            if highest_price > price * (1 + TRAILING_STOP_CONFIG['activation_percent']):
-                                new_stop = adjust_price_to_tick_size(highest_price * (1 - TRAILING_STOP_CONFIG['callback_percent']), tick_size)
-                                if new_stop > current_stop_loss * 1.001:
-                                    log(f"🔄 Trailing Stop acionado! Movendo stop para {format_price(new_stop)}")
-                                    if db:
-                                        db.add_event(active_target_symbol, "TRAILING_STOP", f"Trailing Stop movido para {format_price(new_stop)}")
+                        
+                        tp_distance = lucro_alvo - price
+                        trigger_price = price + (tp_distance * 0.75)
+                        
+                        if highest_price >= trigger_price:
+                            # Queda de 0.2% em relação ao pico -> Executa Market Sell direto
+                            if cur_price < highest_price * 0.998:
+                                log(f"🔒 \033[1;36mTrailing Profit Lock Acionado!\033[0m Preço caiu 0.2% do pico ${highest_price:.4f}. Garantindo lucro...")
+                                if db:
+                                    db.add_event(active_target_symbol, "TRAILING_LOCK", f"Market Sell executado a ${cur_price:.4f} via Trailing Profit Lock")
+                                
+                                try:
                                     await client._delete('orderList', signed=True, data={'symbol': active_target_symbol, 'orderListId': oco_order['orderListId']})
-                                    new_stop_limit = adjust_price_to_tick_size(new_stop * 0.999, tick_size)
-                                    prec_p = get_precision(tick_size)
-                                    prec_q = get_precision(step_size)
-                                    qty_to_sell = executed_qty if not partial_take_done else rem_qty
-                                    
-                                    oco_order = await place_safe_oco_sell_order(
-                                        client, active_target_symbol, qty_to_sell, lucro_alvo, new_stop, new_stop_limit, prec_p, prec_q
-                                    )
-                                    limit_order_id = oco_order['orders'][1]['orderId']
-                                    stop_order_id = oco_order['orders'][0]['orderId']
-                                    current_stop_loss = new_stop
-                                    
-                                    if bot_status_data.get('target_asset') == active_target_symbol:
-                                        bot_status_data['sl_price'] = new_stop
+                                except Exception as e:
+                                    log(f"Aviso ao cancelar OCO para Trailing Lock: {e}")
+                                
+                                qty_to_sell = executed_qty if not partial_take_done else rem_qty
+                                prec_qty = get_precision(step_size)
+                                qty_to_sell = round(qty_to_sell, prec_qty)
+                                
+                                # Envia venda a mercado
+                                await client.order_market_sell(symbol=active_target_symbol, quantity=qty_to_sell)
+                                
+                                # Obter detalhes (como se a ordem limit fosse 'FILLED' antecipadamente) para consolidar o PnL
+                                limit_details = await get_order_details(client, active_target_symbol, limit_order_id)
+                                stop_details = await get_order_details(client, active_target_symbol, stop_order_id)
+                                limit_details['status'] = 'FILLED'
+                                limit_details['price'] = str(cur_price) # Simulando o preenchimento ao preço de mercado
+                                
+                                active_target_symbol, order_result, trade_result, novo_saldo_usdt, oco_timestamp, fee, trade_result_liquid = await process_order_details(
+                                    active_target_symbol, client, limit_details, stop_details, price, executed_qty, order_val_usdt
+                                )
+                                
+                                total_difference += trade_result
+                                total_difference_liquid += trade_result_liquid
+                                bnb_balance_free = float((await client.get_asset_balance(asset='BNB'))['free'])
+                                bnb_price = await get_bnb_price(client)
+                                
+                                if order_result:
+                                    await log_and_notify_results(order_result, active_target_symbol, trade_result, total_difference, oco_timestamp, vwap, fee, trade_result_liquid, total_difference_liquid, bnb_balance_free * bnb_price, log=log)
+                                    if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                                        asyncio.create_task(send_telegram_message(
+                                            TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                                            f"🔒 <b>Trailing Profit Lock Acionado!</b>\n\n"
+                                            f"🪙 Par: <b>{active_target_symbol}</b>\n"
+                                            f"🎯 Lucro garantido via Market Sell em <b>{format_price(cur_price)}</b>!\n"
+                                        ))
+                                        
+                                break # Sai do loop do socket (posição fechada)
                     except Exception as tsl_err:
                         log(f"⚠️ Erro ao atualizar Trailing Stop Loss para {active_target_symbol}: {tsl_err}")
                     continue
@@ -402,7 +433,7 @@ async def monitor_oco_lifecycle(
                             
                             if stop_details['status'] == 'FILLED':
                                 stop_loss_count += 1
-                                last_stop_loss_time = dt_module.datetime.now()
+                                last_stop_loss_time = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo'))
                                 await check_stop_losses(last_stop_loss_time, log=log)
                             else:
                                 stop_loss_count = 0
@@ -463,7 +494,7 @@ async def monitor_oco_lifecycle(
                         
                         if stop_details['status'] == 'FILLED':
                             stop_loss_count += 1
-                            last_stop_loss_time = dt_module.datetime.now()
+                            last_stop_loss_time = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo'))
                             await check_stop_losses(last_stop_loss_time, log=log)
                         else:
                             stop_loss_count = 0
@@ -531,7 +562,7 @@ async def panic_sell_position(symbol, client_instance=None):
         trade_result = (sell_price - entry_price) * executed_qty
         trade_result_liquid = trade_result * 0.999 # Desconto de taxa estimado
 
-        timestamp = dt_module.datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
+        timestamp = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%d/%m/%Y at %H:%M:%S")
 
         # 3. Salva no banco de dados PostgreSQL/SQLite
         db_mgr = DatabaseManager()
@@ -921,7 +952,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     price = float(ticker_cur['price'])
                     
                 order_val_usdt = round(executed_qty * price, 2)
-                purchase_timestamp = dt_module.datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
+                purchase_timestamp = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%d/%m/%Y at %H:%M:%S")
                 active_positions[active_target_symbol] = {
                     'entry': price,
                     'tp': lucro_alvo,
@@ -977,7 +1008,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         tick_size = float(next(filter for filter in symbol_info['filters'] if filter['filterType'] == 'PRICE_FILTER')['tickSize'])
         quote_precision = int(symbol_info['quoteAssetPrecision'])
 
-        last_sync_hour = dt_module.datetime.now().hour
+        last_sync_hour = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo')).hour
         last_pdf_sent_day = None
         order_count = 0
 
@@ -1247,7 +1278,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         executed_qty = min(nominal_qty, available_qty)
                         
                         price = float(compra['fills'][0]['price'])
-                        timestamp = dt_module.datetime.now().strftime("%d/%m/%Y at %H:%M:%S")
+                        timestamp = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%d/%m/%Y at %H:%M:%S")
                         
                         log(f"✅️ ({order_count:02d}) Comprado: {active_target_symbol} - Qtd: {executed_qty} - Preço: {format_price(price)}")
                         purchase_timestamp = timestamp
@@ -1262,7 +1293,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                 f"🟢 Take Profit (TP): <b>{format_price(lucro_alvo)}</b> (+4.0%)\n"
                                 f"🔴 Stop Loss (SL): <b>{format_price(stop_loss)}</b> (-2.0%)"
                             ))
-                        last_operation_time = dt_module.datetime.now()
+                        last_operation_time = dt_module.datetime.now(ZoneInfo('America/Sao_Paulo'))
 
                         confluence_score = 0.0
                         if buy_result:

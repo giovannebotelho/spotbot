@@ -4,6 +4,7 @@ import time
 from datetime import datetime
 from config.settings import API_KEYS
 from utils.formatting import RESET, GREEN, RED, YELLOW, CYAN
+from zoneinfo import ZoneInfo
 
 _last_429_time = 0
 COOLDOWN_429_SECONDS = 300  # 5 minutos de pausa no Gemini se der erro 429 de cota/crédito
@@ -27,7 +28,7 @@ def analyze_with_gemini(
         print("⚠️ Chave API do Gemini não configurada no .env.")
         return None
 
-    current_datetime_str = datetime.now().strftime("%d/%m/%Y às %H:%M:%S")
+    current_datetime_str = datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%d/%m/%Y às %H:%M:%S")
 
     models_to_try = [
         "gemini-1.5-flash",
