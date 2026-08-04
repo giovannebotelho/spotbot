@@ -5,7 +5,7 @@ import datetime as dt_module
 from config.settings import TELEGRAM_CONFIG, TRADING_CONFIG, TRAILING_STOP_CONFIG, TIMEZONE
 from services.binance_client import get_usdt_balance, get_klines, get_bnb_price, get_order_details
 from core.indicators import calculate_fibonacci_supports
-from core.decision import get_min_notional, adjust_price_to_tick_size, get_precision
+from core.decision import get_min_notional, adjust_price_to_tick_size, get_precision, place_safe_oco_sell_order
 from core.post_trade import process_order_details, save_to_csv, create_data_row, log_and_notify_results
 from services.telegram_notifier import send_telegram_message
 from services.gemini_ai import generate_post_trade_synthesis
@@ -314,7 +314,7 @@ async def monitor_oco_lifecycle(
                             if stop_details['status'] == 'FILLED':
                                 globals_dict['stop_loss_count'] += 1
                                 globals_dict['last_stop_loss_time'] = dt_module.datetime.now(TIMEZONE)
-                                await check_stop_losses(globals_dict['last_stop_loss_time'], log=log)
+                                await globals_dict['check_stop_losses'](globals_dict['last_stop_loss_time'], log=log)
                             else:
                                 globals_dict['stop_loss_count'] = 0
                             active_positions.pop(active_target_symbol, None)
@@ -375,7 +375,7 @@ async def monitor_oco_lifecycle(
                         if stop_details['status'] == 'FILLED':
                             globals_dict['stop_loss_count'] += 1
                             globals_dict['last_stop_loss_time'] = dt_module.datetime.now(TIMEZONE)
-                            await check_stop_losses(globals_dict['last_stop_loss_time'], log=log)
+                            await globals_dict['check_stop_losses'](globals_dict['last_stop_loss_time'], log=log)
                         else:
                             globals_dict['stop_loss_count'] = 0
                         active_positions.pop(active_target_symbol, None)
