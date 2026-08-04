@@ -858,6 +858,13 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                             ))
                         last_operation_time = dt_module.datetime.now(TIMEZONE)
 
+                        # Atualizar dicionário de status para o UI Dashboard exibir as linhas
+                        bot_status_data['target_asset'] = active_target_symbol
+                        bot_status_data['price'] = price
+                        bot_status_data['entry_price'] = price
+                        bot_status_data['tp_price'] = lucro_alvo
+                        bot_status_data['sl_price'] = stop_loss
+
                         confluence_score = 0.0
                         if buy_result:
                             if buy_result.get('mtf_score') is not None:
