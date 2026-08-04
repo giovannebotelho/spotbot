@@ -448,21 +448,35 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     if o_type == 'LIMIT_MAKER':
                         price_v = float(o.get('price', 0))
                         if price_v > 0:
+                            grouped[key]['tp_raw'] = price_v
                             grouped[key]['tp'] = format_price(price_v)
                     elif 'STOP' in o_type:
                         stop_v = float(o.get('stopPrice', 0))
                         if stop_v == 0:
                             stop_v = float(o.get('price', 0))
                         if stop_v > 0:
+                            grouped[key]['sl_raw'] = stop_v
                             grouped[key]['sl'] = format_price(stop_v)
 
                 lines = ["🎯 <b>ORDENS OCO & POSIÇÕES ATIVAS</b>\n━━━━━━━━━━━━━━━━━━━"]
                 for (sym, list_id), data in grouped.items():
+                    entry_price = active_positions.get(sym, {}).get('entry_price', 0.0)
+                    tp_pct = ""
+                    sl_pct = ""
+                    
+                    if entry_price > 0:
+                        tp_raw = data.get('tp_raw', 0.0)
+                        sl_raw = data.get('sl_raw', 0.0)
+                        if tp_raw > 0:
+                            tp_pct = f" (+{((tp_raw / entry_price) - 1) * 100:.2f}%)"
+                        if sl_raw > 0:
+                            sl_pct = f" ({((sl_raw / entry_price) - 1) * 100:.2f}%)"
+
                     lines.append(
                         f"🪙 Par: <b>{data['symbol']}</b>\n"
                         f"📦 Quantidade: <b>{data['qty']}</b>\n"
-                        f"🟢 Take Profit (TP): <b>{data['tp']}</b> (+4.0%)\n"
-                        f"🔴 Stop Loss (SL): <b>{data['sl']}</b> (-2.0%)\n"
+                        f"🟢 Take Profit (TP): <b>{data['tp']}</b>{tp_pct}\n"
+                        f"🔴 Stop Loss (SL): <b>{data['sl']}</b>{sl_pct}\n"
                     )
                 return "\n".join(lines)
             except Exception as e:
