@@ -56,11 +56,11 @@ async def log_and_notify_results(order_result, symbol, trade_result, total_diffe
         await send_telegram_message(TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'], telegram_message1)
 
     if total_difference_liquid >= 0:
-        total_balance_liquid_message = f"📈 PnL Acumulado Líquido no Saldo: 🟢 ${total_difference_liquid:.2f} USDT"
-        telegram_message3 = f"📈 <b>PnL Acumulado Líquido no Saldo</b>: 🟢 <b>${total_difference_liquid:.2f} USDT</b>"
+        total_balance_liquid_message = f"📈 Resultado Líquido Total da Operação (Inc. DCA): 🟢 ${total_difference_liquid:.2f} USDT"
+        telegram_message3 = f"📈 <b>Resultado Líquido Total da Operação (Inc. DCA)</b>: 🟢 <b>${total_difference_liquid:.2f} USDT</b>"
     else:
-        total_balance_liquid_message = f"📉 PnL Acumulado Líquido no Saldo: 🔴 ${total_difference_liquid:.2f} USDT"
-        telegram_message3 = f"📉 <b>PnL Acumulado Líquido no Saldo</b>: 🔴 <b>${total_difference_liquid:.2f} USDT</b>"
+        total_balance_liquid_message = f"📉 Resultado Líquido Total da Operação (Inc. DCA): 🔴 ${total_difference_liquid:.2f} USDT"
+        telegram_message3 = f"📉 <b>Resultado Líquido Total da Operação (Inc. DCA)</b>: 🔴 <b>${total_difference_liquid:.2f} USDT</b>"
     
     log(total_balance_liquid_message)
     if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):

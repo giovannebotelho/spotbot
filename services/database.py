@@ -271,6 +271,7 @@ class DatabaseManager:
                 if raw:
                     try:
                         data = json.loads(raw)
+                        data['id'] = row['id']
                         restored_rows.append(data)
                     except Exception:
                         pass
