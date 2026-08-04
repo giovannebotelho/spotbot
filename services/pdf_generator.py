@@ -119,7 +119,8 @@ def generate_weekly_telemetry_pdf(db_manager, output_path="docs/Relatorio_Semana
 
     # Cabeçalho do Relatório
     now_str = datetime.now(ZoneInfo('America/Sao_Paulo')).strftime("%d/%m/%Y - %H:%M:%S")
-    story.append(Paragraph("🚀 SPOTBOT PRO — RELATÓRIO DE TELEMETRIA SEMANAL", title_style))
+    story.append(Paragraph("<b>SpotBot Pro v6.0</b>", title_style))
+    story.append(Paragraph("Relatório Executivo Semanal", h2_style))
     story.append(Paragraph(f"Auditoria de Performance Quantitativa | Gerado em: <b>{now_str}</b>", subtitle_style))
     story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor('#0284C7'), spaceAfter=15))
 

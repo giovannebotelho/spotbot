@@ -468,8 +468,8 @@ def login():
         with ui.card().classes('w-full max-w-sm p-6 lg:p-8 bg-[#121722] border border-sky-500/20 shadow-[0_0_40px_rgba(2,132,199,0.1)] items-center gap-6 rounded-2xl'):
             with ui.column().classes('items-center gap-2'):
                 ui.image('/assets/logo.png').classes('w-12 h-12 rounded-xl shadow-lg border border-sky-500/30')
-                ui.label('SPOTBOT PRO').classes('text-2xl font-bold tracking-wider text-white')
-                ui.label('INSTITUTIONAL TERMINAL').classes('text-[0.6rem] font-bold text-sky-400/70 tracking-[0.25em]')
+                ui.label('SPOTBOT PRO v6.0').classes('text-2xl font-bold tracking-wider text-white')
+                ui.label('v6.0 - PRECISION & SECURITY EDITION').classes('text-xs text-emerald-400 tracking-widest uppercase ml-2')
             
             username = ui.input('Usuário').classes('w-full zinc-input').props('dark outlined dense')
             password = ui.input('Senha', password=True, password_toggle_button=True).classes('w-full zinc-input').props('dark outlined dense').on('keydown.enter', try_login)
@@ -582,7 +582,7 @@ async def index():
             with ui.row().classes('w-full h-10 bg-[#080B10] border-b border-slate-800 items-center px-3 justify-between flex-shrink-0 relative text-xs flex-nowrap'):
                 with ui.row().classes('items-center gap-2 z-10 bg-[#080B10] pr-3 border-r border-slate-800 flex-shrink-0'):
                     ui.image('/assets/logo.png').classes('w-6 h-6 rounded-md shadow-md')
-                    ui.label('SPOTBOT PRO').classes('font-bold tracking-wider text-white text-xs')
+                    ui.label('SPOTBOT PRO v6.0').classes('font-bold tracking-wider text-white text-xs')
                     ui.label('v6.0 QUANT').classes('text-[0.55rem] font-bold text-sky-400/80 tracking-widest hidden sm:inline')
                 
                 # Container do Marquee
@@ -744,8 +744,8 @@ async def index():
 def start_dashboard():
     port = DASHBOARD_CONFIG['port']
     secret = DASHBOARD_CONFIG['secret_key']
-    print(f"Iniciando SpotBot Pro em modo Dashboard Web (NiceGUI)...")
-    ui.run(title='SpotBot Pro | Institutional Terminal', host='0.0.0.0', dark=True, reload=False, port=port, storage_secret=secret)
+    print(f"Iniciando SpotBot Pro v6.0 em modo Dashboard Web (NiceGUI)...")
+    ui.run(title='SpotBot Pro v6.0 | Institutional Terminal', host='0.0.0.0', dark=True, reload=False, port=port, storage_secret=secret)
 
 if __name__ in {"__main__", "__mp_main__"}:
     start_dashboard()

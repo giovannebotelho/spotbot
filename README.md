@@ -1,4 +1,4 @@
-# SpotBot Pro 🤖📈 — Institutional Quantitative AI Engine (v5.0-WALL_STREET_QUANT)
+# SpotBot Pro 🤖📈 — Institutional Quantitative AI Engine (v6.0)
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -6,27 +6,27 @@
 [![Google Gemini](https://img.shields.io/badge/Google-Gemini%202.5--Flash-4285F4.svg)](https://aistudio.google.com/)
 [![Architecture](https://img.shields.io/badge/Architecture-Wall%20Street%20Quant%20v5.0-purple.svg)](https://github.com/giovannebotelho/spotbot-pro-hedgefund)
 
-**SpotBot Pro v5.0** é um algoritmo de negociação quantitativa de nível institucional projetado com os pilares da microestrutura de mercado das grandes mesas de Wall Street (**Order Flow CVD Tape Reading, Cointegration Pair Trading, Correlation Lead-Lag Alpha, Smart Recovery DCA em Suportes de Fibonacci e Kelly Criterion Position Sizing**), integrado à **Inteligência Artificial Generativa do Google Gemini (SDK `google-genai`)**.
+**SpotBot Pro v6.0** é um algoritmo de negociação quantitativa de nível institucional projetado com os pilares da microestrutura de mercado das grandes mesas de Wall Street (**Order Flow CVD Tape Reading, Cointegration Pair Trading, Correlation Lead-Lag Alpha, Smart Recovery DCA em Suportes de Fibonacci e Kelly Criterion Position Sizing**), integrado à **Inteligência Artificial Generativa do Google Gemini (SDK `google-genai`)**.
 
 ---
 
-## 🏛️ Arquitetura Quantitativa v5.0 (Wall Street Edition)
+## 🏛️ Arquitetura Quantitativa v6.0
 
 ```mermaid
 graph TD
-    subgraph Quant_Engine_v5 ["🚀 SpotBot Pro v5.0 Wall Street Architecture"]
+    subgraph Quant_Engine_v6 ["🚀 SpotBot Pro v6.0 Architecture"]
         F5["📰 FASE 5 (v4.0): AI Panic News Scanner<br/>CryptoPanic + IA Gemini 2.5 Flash (Score 0-100)"] --> F1
-        F1["🧪 FASE 1 (v5.0): Smart Recovery DCA & Flash Dump Protection<br/>Recompra em Suporte Fibonacci 61.8% e TP em +0.8%"] --> F2
+        F1["🧪 FASE 1 (v5.0): Smart Recovery DCA & Flash Dump Protection<br/>Recompra em Suporte Fibonacci 61.8% e Override de PnL"] --> F2
         F2["⚡ FASE 2 (v5.0): Correlation Lead-Lag Alpha Engine<br/>Antecipação de impulso do BTC 1m em Altcoins (1.5x)"] --> F3
         F3["📊 FASE 3 (v5.0): Order Flow CVD Tape Reading<br/>Análise de agressão a mercado em 500 trades (Buys >= 60%)"] --> F4
-        F4["⚖️ FASE 4 (v5.0): Cointegration Pair Trading & Stat-Arb<br/>Reversão à Média quando Z-Score <= -2.0 sigma"] --> KC
-        KC["🏆 FASE 5 (v5.0): Kelly Criterion Position Sizing<br/>Dimensionamento ótimo (Half-Kelly) via estatísticas do SQLite"] --> OCO["🎯 Ordem OCO Institucional Enviada para a Binance"]
+        F4["🔒 FASE 4 (v6.0): Trailing Profit Lock (Market Sell)<br/>Trava de lucro aos 75% da meta TP com Market Sell"] --> KC
+        KC["🏆 FASE 5 (v5.0): Kelly Criterion Position Sizing<br/>Dimensionamento ótimo (Half-Kelly) via estatísticas do SQLite"] --> OCO["🎯 Ordem OCO Enviada para a Binance (BRT Timezone)"]
     end
 ```
 
 ---
 
-## 🚀 Armas Quantitativas da Versão v5.0
+## 🚀 Armas Quantitativas da Versão v6.0
 
 ### 1. 🧪 Smart Recovery DCA em Suportes de Fibonacci
 - **Proteção Contra Pavios**: Em *flash dumps* causados por liquidações de derivativos na Binance, o robô efetua uma única recompra de 50% no Suporte Institucional de Fibonacci (61.8% / 78.6%).
@@ -48,7 +48,15 @@ graph TD
 - **Dimensionamento Matemático**: Substitui valores estáticos de ordem pela Fórmula do **Critério de Kelly** ($f^* = \frac{p \cdot b - q}{b}$), onde $p$ é a taxa de vitória real calculada a partir das operações salvas no banco SQLite.
 - **Half-Kelly Safety**: Aplica 50% de $f^*$ para manter a banca totalmente imune ao risco de ruína.
 
+### 6. 🔒 Trailing Profit Lock (Market Sell Direto)
+- **Trava de Segurança (v6.0)**: Diferente do trailing clássico, a v6.0 aguarda o preço atingir 75% do alvo de Take Profit (TP Conservador 2~3%).
+- **Liquidação a Mercado (v6.0)**: Ao atingir a trava e apresentar uma queda de 0.2% a partir do pico, o bot cancela a OCO e manda uma Market Sell para assegurar os lucros imediatos.
+
+### 7. ⏱️ Sincronização Absoluta de Fuso Horário (BRT)
+- **Horário de Brasília (v6.0)**: Todo o ciclo de operação, logs, inserções de banco de dados e relatórios (Diários e Telemetria em PDF) utilizam estritamente o fuso `America/Sao_Paulo`, prevenindo distorções de *roll-over* diário causadas pelo relógio UTC dos servidores na nuvem.
+
 ---
+
 
 ## 📱 Bot Telegram & Interface Web Dashboard
 
@@ -138,7 +146,7 @@ cd spotbot-pro-hedgefund
 .\env_spotbot\Scripts\activate
 pip install -r requirements.txt
 
-# 3. Executar o Dashboard Web e Robô SpotBot Pro v5.0
+# 3. Executar o Dashboard Web e Robô SpotBot Pro v6.0
 python run.py --mode dashboard
 ```
 
