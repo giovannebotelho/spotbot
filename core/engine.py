@@ -853,8 +853,8 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                 TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
                                 f"🎯 <b>Ordem OCO Posicionada!</b>\n\n"
                                 f"🪙 Par: <b>{active_target_symbol}</b>\n"
-                                f"🟢 Take Profit (TP): <b>{format_price(lucro_alvo)}</b> (+4.0%)\n"
-                                f"🔴 Stop Loss (SL): <b>{format_price(stop_loss)}</b> (-2.0%)"
+                                f"🟢 Take Profit (TP): <b>{format_price(lucro_alvo)}</b> (+{((lucro_alvo/price)-1)*100:.2f}%)\n"
+                                f"🔴 Stop Loss (SL): <b>{format_price(stop_loss)}</b> ({((stop_loss/price)-1)*100:.2f}%)"
                             ))
                         last_operation_time = dt_module.datetime.now(TIMEZONE)
 
