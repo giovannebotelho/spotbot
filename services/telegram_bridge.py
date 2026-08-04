@@ -205,7 +205,7 @@ async def query_gemini_ai(prompt: str) -> str:
         
         client = genai.Client(api_key=gemini_key)
         
-        instr_file = WORKSPACE_DIR / "gemini_instructions.txt"
+        instr_file = WORKSPACE_DIR / ".agents" / "gemini_instructions.txt"
         sys_instruction = (
             "Você é a IA assistente do projeto SpotBot Pro v6.0 / Antigravity.\n"
             "Responda sempre em Português do Brasil (pt-BR) de forma direta, clara, elegante e tecnicamente precisa.\n"
