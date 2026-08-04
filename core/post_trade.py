@@ -149,9 +149,4 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
     }
 
 def save_to_csv(data_row):
-    try:
-        db = DatabaseManager()
-        db.add_trade(data_row)
-        print("✅ Dados salvos no banco de dados com sucesso.")
-    except Exception as e:
-        print(f"❌ Erro ao salvar no banco de dados: {e}")
+    pass # Removido para evitar inserções duplicadas, pois engine.py já insere no DB.

@@ -319,8 +319,10 @@ async def update_recent_trades_table():
 
     if 'id' in trades_df.columns:
         trades_df = trades_df.sort_values('id', ascending=False)
-    
-    current_sig = len(trades_df)
+        current_sig = trades_df['id'].max()
+    else:
+        current_sig = len(trades_df)
+
     if current_sig != _last_trades_sig:
         _last_trades_sig = current_sig
         rows = []

@@ -185,7 +185,8 @@ def generate_weekly_telemetry_pdf(db_manager, output_path="docs/Relatorio_Semana
     ]
 
     if not df.empty:
-        recent_10 = df.head(10)
+        # Pega as 10 mais recentes (últimas do dataframe, já que está em ordem ascendente) e inverte para exibir da mais nova para a mais velha
+        recent_10 = df.tail(10).iloc[::-1]
         for _, r in recent_10.iterrows():
             ts = str(r.get('Data/Hora da Compra', 'N/A'))[:16]
             sym = str(r.get('Símbolo', 'N/A'))
