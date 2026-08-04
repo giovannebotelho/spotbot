@@ -3,7 +3,7 @@ import time
 import math
 import datetime as dt_module
 from config.settings import TELEGRAM_CONFIG, TRADING_CONFIG, TRAILING_STOP_CONFIG, TIMEZONE
-from services.binance_client import get_usdt_balance, get_klines, get_bnb_price
+from services.binance_client import get_usdt_balance, get_klines, get_bnb_price, get_order_details
 from core.indicators import calculate_fibonacci_supports
 from core.decision import get_min_notional, adjust_price_to_tick_size, get_precision
 from core.post_trade import process_order_details, save_to_csv, create_data_row, log_and_notify_results
