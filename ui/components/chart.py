@@ -24,9 +24,9 @@ def get_main_chart_options():
            {'name': 'BB Upper', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'opacity': 0.4, 'color': '#F59E0B', 'width': 1.5}},
            {'name': 'BB Lower', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'opacity': 0.4, 'color': '#F59E0B', 'width': 1.5}},
            {'name': 'EMA 200', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'smooth': True, 'symbol': 'none', 'lineStyle': {'color': '#38BDF8', 'width': 2}},
-           {'name': 'TP', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'symbol': 'none', 'lineStyle': {'color': '#10B981', 'type': 'dashed', 'width': 2}},
-           {'name': 'SL', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'symbol': 'none', 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}},
-           {'name': 'Entrada', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'symbol': 'none', 'lineStyle': {'color': '#38BDF8', 'type': 'dashed', 'width': 1.5}},
+           {'name': 'TP', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'symbol': 'none', 'lineStyle': {'color': '#10B981', 'type': 'dashed', 'width': 2}, 'markLine': {'data': []}},
+           {'name': 'SL', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'symbol': 'none', 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'markLine': {'data': []}},
+           {'name': 'Entrada', 'type': 'line', 'xAxisIndex': 0, 'yAxisIndex': 0, 'data': [], 'symbol': 'none', 'lineStyle': {'color': '#38BDF8', 'type': 'dashed', 'width': 1.5}, 'markLine': {'data': []}},
            {'name': 'Volume', 'type': 'bar', 'xAxisIndex': 1, 'yAxisIndex': 1, 'data': [], 'itemStyle': {'color': '#38BDF8', 'opacity': 0.25}, 'large': True}
        ]
     }
