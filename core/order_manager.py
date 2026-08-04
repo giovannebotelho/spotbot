@@ -214,7 +214,47 @@ async def monitor_oco_lifecycle(
                                             f"🎯 Lucro garantido via Market Sell em <b>{format_price(cur_price)}</b>!\n"
                                         ))
                                         
-                                break # Sai do loop do socket (posição fechada)
+                                    try:
+                                        cur_exit_price = cur_price
+                                        post_synthesis = generate_post_trade_synthesis(active_target_symbol, order_result, price, cur_exit_price, trade_result_liquid)
+                                        log(f"🧠 \033[1;36mAnálise Pós-Trade (IA Gemini)\033[0m: {post_synthesis}")
+                                        if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                                            asyncio.create_task(send_telegram_message(
+                                                TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                                                f"🧠 <b>ANÁLISE PÓS-TRADE (IA GEMINI)</b>\n\n"
+                                                f"🪙 Par: <b>{active_target_symbol}</b>\n"
+                                                f"📝 Resumo IA: <i>{post_synthesis}</i>"
+                                            ))
+                                    except Exception as ai_post_err:
+                                        log(f"⚠️ Aviso na análise pós-trade IA Gemini: {ai_post_err}")
+                                    data_row = create_data_row(
+                                        order_count, saldo_inicial_usdt, novo_saldo_usdt, active_target_symbol,
+                                        executed_qty, price, purchase_timestamp, lucro_alvo, stop_loss, stop_loss,
+                                        order_result, oco_timestamp, trade_result, total_difference, novo_saldo_usdt,
+                                        rsi, executed_condition, vwap, candle_open, candle_high, candle_low, candle_close, candle_volume, 
+                                        variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, TRADING_CONFIG['volume_avg'], 
+                                        amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid,
+                                        total_difference_liquid, gemini_response, bnb_balance_free * bnb_price,
+                                        confluence_score, slippage, stop_loss, dca_count, "v6.0"
+                                    )
+                                    try:
+                                        save_to_csv(data_row)
+                                    except Exception as csv_err:
+                                        log(f"⚠️ Erro ao salvar CSV local: {csv_err}")
+                                    if db:
+                                        try:
+                                            db.add_trade(data_row)
+                                        except Exception as db_save_err:
+                                            log(f"⚠️ Erro ao registrar trade no banco de dados: {db_save_err}")
+                                    
+                                    globals_dict['stop_loss_count'] = 0
+                                    active_positions.pop(active_target_symbol, None)
+                                    bot_status_data['active_symbols'] = list(active_positions.keys())
+                                    if bot_status_data.get('target_asset') == active_target_symbol:
+                                        bot_status_data['tp_price'] = 0.0
+                                        bot_status_data['sl_price'] = 0.0
+                                        bot_status_data['entry_price'] = 0.0
+                                    return
                     except Exception as tsl_err:
                         log(f"⚠️ Erro ao atualizar Trailing Stop Loss para {active_target_symbol}: {tsl_err}")
                     continue
