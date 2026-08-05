@@ -22,6 +22,36 @@ async def monitor_futures_lifecycle(
     highest_price = entry_price
     lowest_price = entry_price
     
+    async def check_and_handle_closure():
+        try:
+            pos_info = await client.futures_position_information(symbol=symbol)
+            is_manually_closed = pos_info and float(pos_info[0]['positionAmt']) == 0.0
+            
+            tp_details = await get_futures_order_details(client, symbol, tp_order_id)
+            sl_details = await get_futures_order_details(client, symbol, sl_order_id)
+            
+            if tp_details['status'] in ['FILLED'] or sl_details['status'] in ['FILLED'] or is_manually_closed:
+                if is_manually_closed and tp_details['status'] != 'FILLED' and sl_details['status'] != 'FILLED':
+                    log(f"⚠️ Posição de {symbol} foi fechada manualmente ou externamente!")
+                    await close_futures_position(client, symbol, 'SELL' if position_side == 'LONG' else 'BUY', 0, tp_order_id, sl_order_id, log)
+                    exit_price = float(bot_futures_status_data.get('price', entry_price))
+                else:
+                    log(f"🎯 Posição de Futuros fechada! TP: {tp_details['status']}, SL: {sl_details['status']}")
+                    
+                    if tp_details['status'] == 'FILLED':
+                        await close_futures_position(client, symbol, 'SELL' if position_side == 'LONG' else 'BUY', 0, None, sl_order_id, log)
+                        exit_price = float(tp_details.get('avgPrice', tp_details.get('actualPrice', 0))) if float(tp_details.get('avgPrice', tp_details.get('actualPrice', 0))) > 0 else float(tp_details.get('stopPrice', tp_details.get('triggerPrice', 0)))
+                    else:
+                        await close_futures_position(client, symbol, 'SELL' if position_side == 'LONG' else 'BUY', 0, tp_order_id, None, log)
+                        exit_price = float(sl_details.get('avgPrice', sl_details.get('actualPrice', 0))) if float(sl_details.get('avgPrice', sl_details.get('actualPrice', 0))) > 0 else float(sl_details.get('stopPrice', sl_details.get('triggerPrice', 0)))
+
+                await register_futures_trade(client, db, symbol, position_side, entry_price, exit_price, executed_qty, log)
+                return True
+        except Exception as e:
+            log(f"⚠️ Erro na verificação de posição: {e}")
+        return False
+    
+    
     try:
         # WebSocket connection para klines/trades (Futuros)
         async with bsm.aggtrade_futures_socket(symbol=symbol.lower()) as ts:
@@ -35,11 +65,7 @@ async def monitor_futures_lifecycle(
                     now = time.time()
                     if now - locals().get('_last_pos_check', 0) > 15:
                         locals()['_last_pos_check'] = now
-                        pos_info = await client.futures_position_information(symbol=symbol)
-                        if pos_info and float(pos_info[0]['positionAmt']) == 0.0:
-                            log(f"⚠️ Posição de {symbol} foi fechada manualmente ou externamente!")
-                            await close_futures_position(client, symbol, 'SELL' if position_side == 'LONG' else 'BUY', executed_qty, tp_order_id, sl_order_id, log)
-                            await register_futures_trade(client, db, symbol, position_side, entry_price, cur_price, executed_qty, log)
+                        if await check_and_handle_closure():
                             break
                     
                     if 'p' in msg:
@@ -84,35 +110,8 @@ async def monitor_futures_lifecycle(
         while True:
             await asyncio.sleep(3)
             try:
-                tp_details = await get_futures_order_details(client, symbol, tp_order_id)
-                sl_details = await get_futures_order_details(client, symbol, sl_order_id)
-                
-                pos_info = await client.futures_position_information(symbol=symbol)
-                is_manually_closed = pos_info and float(pos_info[0]['positionAmt']) == 0.0
-                
-                if tp_details['status'] in ['FILLED'] or sl_details['status'] in ['FILLED'] or is_manually_closed:
-                    if is_manually_closed and tp_details['status'] != 'FILLED' and sl_details['status'] != 'FILLED':
-                        log(f"⚠️ Posição de {symbol} foi fechada manualmente ou externamente!")
-                        await close_futures_position(client, symbol, 'SELL' if position_side == 'LONG' else 'BUY', executed_qty, tp_order_id, sl_order_id, log)
-                        exit_price = float(bot_futures_status_data.get('price', entry_price))
-                    else:
-                        log(f"🎯 Posição de Futuros fechada! TP: {tp_details['status']}, SL: {sl_details['status']}")
-                        
-                        # Cancel the other orphan order
-                        if tp_details['status'] == 'FILLED':
-                            try:
-                                await cancel_futures_order(client, symbol, sl_order_id)
-                            except: pass
-                            exit_price = float(tp_details.get('avgPrice', tp_details.get('actualPrice', 0))) if float(tp_details.get('avgPrice', tp_details.get('actualPrice', 0))) > 0 else float(tp_details.get('stopPrice', tp_details.get('triggerPrice', 0)))
-                        else:
-                            try:
-                                await cancel_futures_order(client, symbol, tp_order_id)
-                            except: pass
-                            exit_price = float(sl_details.get('avgPrice', sl_details.get('actualPrice', 0))) if float(sl_details.get('avgPrice', sl_details.get('actualPrice', 0))) > 0 else float(sl_details.get('stopPrice', sl_details.get('triggerPrice', 0)))
-
-                    await register_futures_trade(client, db, symbol, position_side, entry_price, exit_price, executed_qty, log)
+                if await check_and_handle_closure():
                     break
-                    
             except Exception as poll_err:
                 log(f"⚠️ Polling Futuros Erro: {poll_err}")
 
@@ -123,17 +122,21 @@ async def monitor_futures_lifecycle(
 
 async def close_futures_position(client, symbol, side, qty, tp_order, sl_order, log):
     """Fecha a posição a mercado e cancela ordens orfãs."""
-    try:
-        await cancel_futures_order(client, symbol, tp_order)
-    except: pass
-    try:
-        await cancel_futures_order(client, symbol, sl_order)
-    except: pass
+    if tp_order:
+        try:
+            await cancel_futures_order(client, symbol, tp_order)
+        except: pass
+    if sl_order:
+        try:
+            await cancel_futures_order(client, symbol, sl_order)
+        except: pass
     
-    try:
-        await client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=qty, reduceOnly='true')
-    except Exception as e:
-        log(f"⚠️ Erro ao fechar posição a mercado: {e}")
+    if qty > 0:
+        try:
+            await client.futures_create_order(symbol=symbol, side=side, type='MARKET', quantity=qty, reduceOnly='true')
+        except Exception as e:
+            if "ReduceOnly" not in str(e) and "-2022" not in str(e):
+                log(f"⚠️ Erro ao fechar posição a mercado: {e}")
 
 async def register_futures_trade(client, db, symbol, direction, entry, exit, qty, log):
     """Registra o trade no DB e avisa no Telegram."""
