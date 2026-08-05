@@ -138,13 +138,18 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                     
                 status(f"🔍 [FUTUROS] Analisando {symbol}...")
                 
-                # Setup alavancagem 20x Isolada
-                await setup_futures_margin(client, symbol, leverage=20, margin_type='ISOLATED')
-                
-                # Fetch Klines 15m
-                from config.settings import TRADING_CONFIG
-                interval = TRADING_CONFIG['interval']
-                klines = await get_futures_klines(client, symbol, interval=interval, limit=100)
+                try:
+                    # Setup alavancagem 20x Isolada
+                    await setup_futures_margin(client, symbol, leverage=20, margin_type='ISOLATED')
+                    
+                    # Fetch Klines 15m
+                    from config.settings import TRADING_CONFIG
+                    interval = TRADING_CONFIG['interval']
+                    klines = await get_futures_klines(client, symbol, interval=interval, limit=100)
+                except Exception as e:
+                    # Ignora silenciosamente erros de símbolos inválidos no futuros (ex: SHIBUSDT -> 1000SHIBUSDT)
+                    continue
+                    
                 if not klines or len(klines) < 20:
                     continue
                     
@@ -181,6 +186,12 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                     direction = 'SHORT'
                     
                 if direction:
+                    # Re-avalia o saldo antes de entrar, pois operações anteriores no mesmo ciclo podem ter consumido a margem
+                    current_balance = await get_futures_usdt_balance(client)
+                    if current_balance < 10.0:
+                        log(f"⚠️ Saldo insuficiente para novas entradas (${current_balance:.2f}). Pausando scanner...")
+                        break
+                        
                     log(f"🚨 [FUTUROS] Oportunidade {direction} detectada em {symbol} (RSI: {rsi:.1f})")
                         
                     # Usa $10 dólares de margem por trade (com 20x = $200 de posição)
