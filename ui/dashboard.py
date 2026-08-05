@@ -46,6 +46,8 @@ recent_trades_table = None
 
 candle_chart = None
 scanner_table = None
+futures_candle_chart = None
+futures_chart_symbol_badge = None
 
 ai_card = None
 ai_signal_label = None
@@ -652,7 +654,12 @@ async def index():
             with ai_reason_container:
                 ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-xs text-slate-300 leading-relaxed')
 
-            # Barra de Abas do Gráfico (Multi-Ativo) & Legenda Estilo Binance
+            # Abas Principais (SPOT / FUTUROS)
+            with ui.tabs().classes('w-full h-16 bg-[#080B10] border-b border-slate-800 text-sm font-bold').props('active-color=sky-400 align=left indicator-color=sky-400') as main_tabs:
+                spot_tab = ui.tab('SPOT', icon='show_chart').classes('py-2')
+                futures_tab = ui.tab('FUTUROS', icon='rocket_launch').classes('text-rose-400 py-2')
+
+            # Barra de Abas do Gráfico (Multi-Ativo) & Legenda Estilo Binance (Sub-abas)
             with ui.row().classes('w-full min-h-[48px] bg-[#0B0E14] border-b border-slate-800/80 px-2 sm:px-3 items-center justify-between gap-2 flex-shrink-0 z-20 overflow-x-auto flex-nowrap'):
                 with ui.row().classes('items-center gap-1 flex-shrink-0 min-h-[40px]'):
                     render_chart_tabs()
@@ -667,11 +674,8 @@ async def index():
                     ui.label('🛑 SL').classes('text-rose-400 font-bold')
                     ui.label('🩵 Entrada').classes('text-sky-400 font-bold')
 
-            # Área do Gráfico (com sistema de Tabs)
+            # Área do Gráfico
             with ui.column().classes('w-full flex-shrink-0 h-[470px] lg:h-[64vh] min-h-[420px] p-0 border-b border-slate-800 relative'):
-                with ui.tabs().classes('w-full h-16 bg-[#080B10] border-b border-slate-800 text-sm font-bold').props('active-color=sky-400 align=left indicator-color=sky-400') as main_tabs:
-                    spot_tab = ui.tab('SPOT', icon='show_chart').classes('py-2')
-                    futures_tab = ui.tab('FUTUROS', icon='rocket_launch').classes('text-rose-400 py-2')
                 
                 with ui.tab_panels(main_tabs, value=spot_tab).classes('w-full h-full bg-[#0B0E14] p-0'):
                     with ui.tab_panel(spot_tab).classes('w-full h-full p-0 relative'):

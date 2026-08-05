@@ -523,6 +523,71 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 return f"🔥 <b>PANIC SELL DISPARADO!</b>\nEncerrando {count} posição(ões) ativa(s) a mercado imediatamente..."
             return "ℹ️ Nenhuma posição ativa no momento para encerrar."
 
+        elif cmd == '/status_futures':
+            try:
+                c = await db.get_connection()
+                total_trades_raw = await c.execute("SELECT COUNT(*) FROM historico_trades WHERE market_type = 'FUTURES'")
+                total_trades = (await total_trades_raw.fetchone())[0]
+                
+                wins_raw = await c.execute("SELECT COUNT(*) FROM historico_trades WHERE market_type = 'FUTURES' AND `Resultado Total Liquido` > 0")
+                wins = (await wins_raw.fetchone())[0]
+                
+                win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
+                
+                lines = [
+                    f"🚀 <b>STATUS DO MOTOR DE FUTUROS</b>",
+                    f"━━━━━━━━━━━━━━━━━━━",
+                    f"🎯 <b>Trades Realizados (Futuros)</b>: {total_trades}",
+                    f"🏆 <b>Win Rate (Futuros)</b>: {win_rate:.1f}%\n"
+                ]
+                
+                if not active_futures_positions:
+                    lines.append("ℹ️ Nenhuma posição alavancada ativa no momento.")
+                else:
+                    lines.append("📈 <b>Posições Abertas:</b>")
+                    for sym, data in active_futures_positions.items():
+                        dir_str = "🟢 LONG" if data.get('direction') == 'LONG' else "🔴 SHORT"
+                        lines.append(
+                            f"🪙 Par: <b>{sym}</b> | {dir_str}\n"
+                            f"🩵 Entrada: <b>${data.get('entry', 0):.4f}</b>\n"
+                            f"🎯 TP: <b>${data.get('tp', 0):.4f}</b>\n"
+                            f"🛑 SL: <b>${data.get('sl', 0):.4f}</b>\n"
+                        )
+                return "\n".join(lines)
+            except Exception as e:
+                return f"Erro ao buscar status do futuros: {e}"
+            finally:
+                if c: await c.close_connection()
+
+        elif cmd == '/saldo_futures':
+            try:
+                from services.binance_client import get_futures_usdt_balance
+                usdt_balance = await get_futures_usdt_balance(client)
+                
+                c = await db.get_connection()
+                pnl_raw = await c.execute("SELECT SUM(`Resultado Total Liquido`) FROM historico_trades WHERE market_type = 'FUTURES'")
+                pnl = (await pnl_raw.fetchone())[0] or 0.0
+                
+                return (
+                    f"💰 <b>SALDOS E PNL (FUTUROS USDS-M)</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━\n"
+                    f"💵 Saldo Disponível: <b>${usdt_balance:.2f} USDT</b>\n"
+                    f"📈 PnL Acumulado: <b>${pnl:+.2f} USDT</b>"
+                )
+            except Exception as e:
+                return f"Erro ao buscar saldos de futuros: {e}"
+            finally:
+                if 'c' in locals() and c: await c.close_connection()
+
+        elif cmd == '/panic_sell_futures':
+            if active_futures_positions:
+                count = len(active_futures_positions)
+                for sym in list(active_futures_positions.keys()):
+                    # panic_sell_futures_position expects (client, symbol, qty=0, log=print)
+                    asyncio.create_task(panic_sell_futures_position(client, sym, 0, log))
+                return f"🔥 <b>PANIC SELL FUTUROS DISPARADO!</b>\nEncerrando {count} posição(ões) alavancada(s) imediatamente..."
+            return "ℹ️ Nenhuma posição de Futuros ativa para encerrar."
+
         elif cmd in ['/ajuda', '/help', '/menu']:
             return (
                 "📚 <b>COMANDOS DISPONÍVEIS (SPOTBOT PRO v6.1)</b>\n"
