@@ -477,7 +477,7 @@ async def index():
         return ui.navigate.to('/login')
 
     global log_ui, status_ui, investment_input, symbol_select, bnb_val, bnb_usdt_val, usdt_val
-    global total_profit_val, win_rate_val, recent_trades_table, status_indicator, candle_chart, scanner_table
+    global total_profit_val, win_rate_val, recent_trades_table, status_indicator, candle_chart, scanner_table, futures_candle_chart, futures_chart_symbol_badge
     global ai_signal_label, ai_reason_markdown, ai_reason_container, ai_card, risk_profile_select, paper_trading_switch
     global chart_symbol_badge, start_btn, stop_btn, cancel_btn
     
@@ -668,19 +668,23 @@ async def index():
                     ui.label('🩵 Entrada').classes('text-sky-400 font-bold')
 
             # Área do Gráfico (com sistema de Tabs)
-            with ui.column().classes('w-full flex-shrink-0 h-[400px] lg:h-[450px] p-0 border-b border-slate-800 relative'):
-                with ui.tabs().classes('w-full h-10 border-b border-slate-800 text-xs font-semibold').props('dense active-color=sky-400 align=left') as main_tabs:
-                    spot_tab = ui.tab('SPOT', icon='show_chart')
-                    futures_tab = ui.tab('FUTUROS', icon='rocket_launch').classes('text-rose-400')
+            with ui.column().classes('w-full flex-shrink-0 h-[470px] lg:h-[64vh] min-h-[420px] p-0 border-b border-slate-800 relative'):
+                with ui.tabs().classes('w-full h-14 bg-[#080B10] border-b border-slate-800 text-sm font-bold').props('active-color=sky-400 align=left indicator-color=sky-400') as main_tabs:
+                    spot_tab = ui.tab('SPOT', icon='show_chart').classes('py-2')
+                    futures_tab = ui.tab('FUTUROS', icon='rocket_launch').classes('text-rose-400 py-2')
                 
                 with ui.tab_panels(main_tabs, value=spot_tab).classes('w-full h-full bg-[#0B0E14] p-0'):
                     with ui.tab_panel(spot_tab).classes('w-full h-full p-0 relative'):
-                        chart_symbol_badge = ui.label('BTCUSDT').classes('absolute top-4 left-4 z-10 bg-[#121722]/80 backdrop-blur-sm text-sky-400 px-3 py-1 rounded border border-sky-500/20 text-xs font-mono font-bold tracking-widest shadow-lg')
+                        with ui.row().classes('absolute top-3 right-4 z-20 items-center gap-2'):
+                            ui.button(icon='refresh', on_click=lambda: asyncio.create_task(change_chart_asset(selected_chart_symbol if selected_chart_symbol else 'foco'))).props('dense flat color=sky-400 size=sm').classes('bg-[#121722] border border-sky-500/30 rounded-lg shadow-md px-2 py-1').tooltip('Recarregar Gráfico (Spot)')
+                            chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-sky-400 border border-sky-500/30 backdrop-blur-md shadow-lg')
                         candle_chart = ui.echart(get_main_chart_options()).classes('w-full h-full')
                     
-                    with ui.tab_panel(futures_tab).classes('w-full h-full p-0 relative flex items-center justify-center'):
-                        ui.label('Terminal de Futuros').classes('text-rose-400 font-bold text-xl')
-                        ui.label('Em breve: Multi-gráficos independentes.').classes('text-slate-400 mt-2')
+                    with ui.tab_panel(futures_tab).classes('w-full h-full p-0 relative'):
+                        with ui.row().classes('absolute top-3 right-4 z-20 items-center gap-2'):
+                            ui.button(icon='refresh', on_click=lambda: asyncio.create_task(change_chart_asset(selected_chart_symbol if selected_chart_symbol else 'foco'))).props('dense flat color=rose-400 size=sm').classes('bg-[#2a1215] border border-rose-900/50 rounded-lg shadow-md px-2 py-1').tooltip('Recarregar Gráfico (Futuros)')
+                            futures_chart_symbol_badge = ui.label('🚀 BTCUSDT').classes('obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-rose-400 border border-rose-900/50 backdrop-blur-md shadow-lg')
+                        futures_candle_chart = ui.echart(get_main_chart_options()).classes('w-full h-full')
 
             # Painel Inferior (Execuções + Terminal Output Sincronizado)
             with ui.row().classes('w-full flex-shrink-0 flex-col lg:flex-row gap-0 bg-[#0B0E14] min-h-[280px]'):
