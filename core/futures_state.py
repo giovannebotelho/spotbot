@@ -9,6 +9,10 @@ class FuturesStateManager:
         self._positions = {}
         self._lock = asyncio.Lock()
         
+    def get_all_sync(self):
+        """Retorna as posições sincronamente (para dashboards e UI)."""
+        return dict(self._positions)
+        
     async def get_all(self):
         """Retorna uma cópia do dicionário de posições ativas."""
         async with self._lock:
