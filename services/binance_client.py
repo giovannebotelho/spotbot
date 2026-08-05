@@ -132,6 +132,12 @@ async def get_recent_trades_cvd(client, symbol, limit=500):
 async def get_futures_usdt_balance(client):
     """Obtém o saldo disponível de USDT na conta de Futuros (USDS-M)."""
     try:
+        if hasattr(client, 'session') and client.session:
+            client.session.headers.update({
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "application/json",
+            })
+            
         balances = await client.futures_account_balance()
         for asset in balances:
             if asset['asset'] == 'USDT':
@@ -139,7 +145,10 @@ async def get_futures_usdt_balance(client):
                 return float(asset.get('availableBalance', asset.get('withdrawAvailable', asset.get('balance', 0.0))))
         return 0.0
     except Exception as e:
-        print(f"Error fetching futures balance: {e}")
+        if '403 Forbidden' in str(e) or 'CloudFront' in str(e) or 'APIError(code=0)' in str(e):
+            print(f"⚠️ Aviso WAF/CloudFront ao buscar saldo Futuros: {e}. Retornando 0 para proteger o loop.")
+        else:
+            print(f"⚠️ Erro ao buscar saldo USDT Futuros: {e}")
         return 0.0
 
 async def setup_futures_margin(client, symbol, leverage=20, margin_type='ISOLATED'):

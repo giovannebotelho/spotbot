@@ -149,7 +149,7 @@ async def get_account_balances():
 
     try:
         if _balance_client is None:
-            _balance_client = await BinanceAsyncClient.create(api_key, api_secret)
+            _balance_client = await BinanceAsyncClient.create(api_key, api_secret, requests_params={'headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', 'Accept': 'application/json'}})
             await sync_binance_time(_balance_client, log=lambda m: None)
 
         bnb_balance = await _balance_client.get_asset_balance(asset='BNB')
@@ -191,7 +191,7 @@ async def panic_sell_position(symbol, client_instance=None):
     cli = client_instance or globals().get('client')
     if not cli:
         try:
-            cli = await BinanceAsyncClient.create(api_key, api_secret)
+            cli = await BinanceAsyncClient.create(api_key, api_secret, requests_params={'headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', 'Accept': 'application/json'}})
             await sync_binance_time(cli, log=lambda m: None)
         except Exception as e:
             return False, f"Erro ao conectar com a Binance: {e}"
@@ -326,7 +326,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 status_lines.append(f"🎰 <b>VAGAS OCO ATIVAS ({len(active_positions)}/{MAX_CONCURRENT_POSITIONS})</b>:")
                 c = None
                 try:
-                    c = await BinanceAsyncClient.create(api_key, api_secret)
+                    c = await BinanceAsyncClient.create(api_key, api_secret, requests_params={'headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', 'Accept': 'application/json'}})
                     for i, (sym, pos_info) in enumerate(active_positions.items(), 1):
                         entry = pos_info.get('entry', 0)
                         try:
@@ -350,7 +350,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         elif cmd == '/saldo':
             c = None
             try:
-                c = await BinanceAsyncClient.create(api_key, api_secret)
+                c = await BinanceAsyncClient.create(api_key, api_secret, requests_params={'headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', 'Accept': 'application/json'}})
                 await sync_binance_time(c, log=lambda m: None)
                 usdt = await get_usdt_balance(c)
                 bnb = await c.get_asset_balance(asset='BNB')
@@ -381,7 +381,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         elif cmd in ['/top20', '/scanner']:
             c = None
             try:
-                c = await BinanceAsyncClient.create(api_key, api_secret)
+                c = await BinanceAsyncClient.create(api_key, api_secret, requests_params={'headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', 'Accept': 'application/json'}})
                 await sync_binance_time(c, log=lambda m: None)
                 multi_klines = await get_multi_klines(c, TOP_40_SYMBOLS, TRADING_CONFIG['interval'], 50)
                 ranked_assets = calculate_relative_strength_rank(multi_klines)
@@ -428,7 +428,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         elif cmd in ['/ocos', '/ordens', '/posicoes']:
             c = None
             try:
-                c = await BinanceAsyncClient.create(api_key, api_secret)
+                c = await BinanceAsyncClient.create(api_key, api_secret, requests_params={'headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', 'Accept': 'application/json'}})
                 await sync_binance_time(c, log=lambda m: None)
                 open_orders = await c.get_open_orders()
                 
@@ -627,7 +627,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
     await asyncio.sleep(1)
     global client
     try:
-        client = await BinanceAsyncClient.create(api_key, api_secret)
+        client = await BinanceAsyncClient.create(api_key, api_secret, requests_params={'headers': {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36', 'Accept': 'application/json'}})
         await sync_binance_time(client, log=log)
         bsm = BinanceSocketManager(client)
         
