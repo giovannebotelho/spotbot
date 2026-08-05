@@ -68,7 +68,7 @@ class TelegramBot:
                         {"text": "📈 PnL & Performance", "callback_data": "/lucro"},
                     ],
                     [
-                        {"text": "🔙 Voltar ao Menu Principal", "callback_data": "sub_main"},
+                        {"text": "🔙 Voltar", "callback_data": "sub_spot"},
                     ]
                 ]
             }
@@ -82,7 +82,7 @@ class TelegramBot:
                         {"text": "🔥 PANIC SELL (Venda Geral)", "callback_data": "/panic_sell_all"},
                     ],
                     [
-                        {"text": "🔙 Voltar ao Menu Principal", "callback_data": "sub_main"},
+                        {"text": "🔙 Voltar", "callback_data": "sub_spot"},
                     ]
                 ]
             }
@@ -97,7 +97,7 @@ class TelegramBot:
                         {"text": "🚀 Agressivo", "callback_data": "/set_risk_agressivo"},
                     ],
                     [
-                        {"text": "🔙 Voltar ao Menu Principal", "callback_data": "sub_main"},
+                        {"text": "🔙 Voltar", "callback_data": "sub_spot"},
                     ]
                 ]
             }
@@ -109,7 +109,7 @@ class TelegramBot:
                         {"text": "🔄 Rescan de Mercado", "callback_data": "/status"},
                     ],
                     [
-                        {"text": "🔙 Voltar ao Menu Principal", "callback_data": "sub_main"},
+                        {"text": "🔙 Voltar", "callback_data": "sub_spot"},
                     ]
                 ]
             }
@@ -121,7 +121,7 @@ class TelegramBot:
                         {"text": "📊 Relatório PDF", "callback_data": "/relatorio"},
                     ],
                     [
-                        {"text": "🔙 Voltar ao Menu Principal", "callback_data": "sub_main"},
+                        {"text": "🔙 Voltar", "callback_data": "sub_spot"},
                     ]
                 ]
             }
@@ -137,7 +137,7 @@ class TelegramBot:
                         {"text": "📱 Ajuda Completa", "callback_data": "/ajuda"},
                     ],
                     [
-                        {"text": "🔙 Voltar ao Menu Principal", "callback_data": "sub_main"},
+                        {"text": "🔙 Voltar", "callback_data": "sub_spot"},
                     ]
                 ]
             }
@@ -158,15 +158,12 @@ class TelegramBot:
                     ]
                 ]
             }
-        else: # "main"
+        elif menu_type == "spot":
             return {
                 "inline_keyboard": [
                     [
-                        {"text": "📊 Status & Saldos (Spot)", "callback_data": "sub_status"},
-                        {"text": "📈 Posições OCO (Spot)", "callback_data": "sub_posicoes"},
-                    ],
-                    [
-                        {"text": "🚀 MERCADO FUTUROS", "callback_data": "sub_futures"},
+                        {"text": "📊 Status & Saldos", "callback_data": "sub_status"},
+                        {"text": "📈 Posições OCO", "callback_data": "sub_posicoes"},
                     ],
                     [
                         {"text": "⚡ Top 20 Scanner", "callback_data": "sub_scanner"},
@@ -175,6 +172,20 @@ class TelegramBot:
                     [
                         {"text": "🤖 Análise IA Gemini", "callback_data": "sub_ia"},
                         {"text": "🛠️ Configs & Operações", "callback_data": "sub_config"},
+                    ],
+                    [
+                        {"text": "🔙 Voltar ao Menu Principal", "callback_data": "sub_main"},
+                    ]
+                ]
+            }
+        else: # "main"
+            return {
+                "inline_keyboard": [
+                    [
+                        {"text": "🟢 MERCADO SPOT", "callback_data": "sub_spot"},
+                    ],
+                    [
+                        {"text": "🚀 MERCADO FUTUROS", "callback_data": "sub_futures"},
                     ]
                 ]
             }
@@ -225,7 +236,8 @@ class TelegramBot:
                 if cmd_data.startswith('sub_'):
                     menu_type = cmd_data.replace('sub_', '')
                     titles = {
-                        "main": "🤖 <b>MENU PRINCIPAL — SPOTBOT PRO v6.0</b>\nSelecione um painel abaixo para navegar:",
+                        "main": "🤖 <b>MENU PRINCIPAL — SPOTBOT PRO v6.0</b>\nSelecione o ambiente de operação:",
+                        "spot": "🟢 <b>MERCADO SPOT</b>\nGerencie suas posições OCO e análises sem alavancagem:",
                         "status": "📊 <b>PAINEL SPOT (Status & Saldos)</b>\nConsulte o estado do robô, saldos e performance acumulada:",
                         "posicoes": "📈 <b>PAINEL SPOT (Posições OCO)</b>\nMonitore ordens ativas ou execute encerramentos:",
                         "futures": "🚀 <b>PAINEL DE MERCADO FUTUROS (HedgeFund)</b>\nControle posições alavancadas Long/Short de forma independente:",
@@ -239,7 +251,8 @@ class TelegramBot:
                 elif cmd_data.startswith('/'):
                     response_text = await self.command_handler(cmd_data)
                     if response_text:
-                        await send_telegram_message(self.token, chat_id, response_text, reply_markup=self.get_menu_keyboard("main"))
+                        target_menu = "futures" if 'futures' in cmd_data else "spot"
+                        await send_telegram_message(self.token, chat_id, response_text, reply_markup=self.get_menu_keyboard(target_menu))
             return
 
         message = update.get('message', {})
@@ -252,4 +265,5 @@ class TelegramBot:
         if text.startswith('/'):
             response_text = await self.command_handler(text)
             if response_text:
-                await send_telegram_message(self.token, chat_id, response_text, reply_markup=self.get_menu_keyboard("main"))
+                target_menu = "futures" if 'futures' in text else "spot"
+                await send_telegram_message(self.token, chat_id, response_text, reply_markup=self.get_menu_keyboard(target_menu))
