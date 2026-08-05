@@ -152,7 +152,7 @@ async def change_chart_asset(val):
             # OCO/Spot
             pos_info = engine.active_positions.get(base_val, {})
             # Futures
-            fut_pos_info = futures_engine.active_futures_positions.get(base_val, {})
+            fut_pos_info = futures_state.get_all_sync().get(base_val, {})
             
             if is_fut:
                 e_p = fut_pos_info.get('entry', futures_engine.bot_futures_status_data.get('entry_price', 0.0))
@@ -290,7 +290,7 @@ async def update_data():
 
         # Sincronização Dinâmica de Abas do Gráfico (Multi-Ativo)
         if 'chart_tabs' in globals() and chart_tabs:
-            current_active_keys = set([s + '_spot' for s in engine.active_positions.keys()]).union(set([s + '_fut' for s in futures_engine.active_futures_positions.keys()]))
+            current_active_keys = set([s + '_spot' for s in engine.active_positions.keys()]).union(set([s + '_fut' for s in futures_state.get_all_sync().keys()]))
             global _last_rendered_tabs
             if current_active_keys != _last_rendered_tabs:
                 _last_rendered_tabs = current_active_keys.copy()
@@ -313,7 +313,7 @@ async def update_data():
                 chart_symbol_badge.text = f"🪙 {active_symbol} ({price_str})"
 
         if futures_chart_symbol_badge:
-            fut_active_symbols = list(futures_engine.active_futures_positions.keys())
+            fut_active_symbols = list(futures_state.get_all_sync().keys())
             if fut_active_symbols:
                 fut_active_str = " | ".join([f"{s}" for s in fut_active_symbols])
                 futures_chart_symbol_badge.text = f"🚀 VAGAS FUTUROS ({len(fut_active_symbols)}/{futures_engine.MAX_CONCURRENT_POSITIONS_FUTURES}): [{fut_active_str}]"
@@ -374,7 +374,7 @@ async def update_data():
         fut_entry_price = futures_engine.bot_futures_status_data.get('entry_price', 0.0)
 
         fut_market_data = getattr(futures_engine, 'shared_futures_market_data', None)
-        if fut_market_data and fut_market_data['dates'] and candle_chart and (not selected_chart_symbol or (selected_chart_symbol.endswith('_fut') and base_selected in futures_engine.active_futures_positions)):
+        if fut_market_data and fut_market_data['dates'] and candle_chart and (not selected_chart_symbol or (selected_chart_symbol.endswith('_fut') and base_selected in futures_state.get_all_sync())):
             fut_sig = (fut_active_symbol, fut_price_str, len(fut_market_data['dates']), fut_market_data['dates'][-1] if fut_market_data['dates'] else '', fut_tp_price, fut_sl_price, fut_entry_price)
             # using same _last_chart_sig check logic but for futures (create a new one)
             global _last_fut_chart_sig

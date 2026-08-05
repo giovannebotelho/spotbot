@@ -1,7 +1,9 @@
 import asyncio
 import time
 
-async def run_trailing_lock_monitor(client, active_futures_positions, log=print):
+from core.futures_state import futures_state
+
+async def run_trailing_lock_monitor(client, log=print):
     """
     Monitora posições ativas de futuros a cada 1 segundo.
     Se o preço atingir 75% da meta (TP), engatilha a Trava Trailing.
@@ -10,14 +12,20 @@ async def run_trailing_lock_monitor(client, active_futures_positions, log=print)
     log("🛡️ Trailing Lock Monitor iniciado...")
     while True:
         try:
+            active_futures_positions = await futures_state.get_all()
             symbols_to_check = list(active_futures_positions.keys())
             if not symbols_to_check:
                 await asyncio.sleep(2)
                 continue
                 
-            # Busca o preço atual de todos os tickers de uma vez
-            tickers = await client.futures_symbol_ticker()
-            price_map = {t['symbol']: float(t['price']) for t in tickers}
+            # Busca o preço atual apenas dos tickers ativos (Otimização de Rate Limit)
+            tasks = [client.futures_symbol_ticker(symbol=s) for s in symbols_to_check]
+            tickers = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            price_map = {}
+            for t in tickers:
+                if isinstance(t, dict) and 'symbol' in t and 'price' in t:
+                    price_map[t['symbol']] = float(t['price'])
             
             for symbol in symbols_to_check:
                 if symbol not in active_futures_positions:
@@ -69,13 +77,13 @@ async def run_trailing_lock_monitor(client, active_futures_positions, log=print)
                             log(f"⚡ [TRAILING-LOCK] Recuo detectado em {symbol} (Pico: {peak:.4f}, Atual: {cur_price:.4f}). Fechando a mercado!")
                             await execute_trailing_close(client, symbol, direction, qty, log)
                             # Remove localmente para não disparar de novo
-                            active_futures_positions.pop(symbol, None)
+                            await futures_state.remove(symbol)
                     else: # SHORT
                         drawdown_price = peak * 1.0025
                         if cur_price >= drawdown_price:
                             log(f"⚡ [TRAILING-LOCK] Recuo detectado em {symbol} (Pico: {peak:.4f}, Atual: {cur_price:.4f}). Fechando a mercado!")
                             await execute_trailing_close(client, symbol, direction, qty, log)
-                            active_futures_positions.pop(symbol, None)
+                            await futures_state.remove(symbol)
                             
         except Exception as e:
             log(f"⚠️ Erro no Trailing Lock Monitor: {e}")

@@ -29,8 +29,9 @@ from services.gemini_ai import analyze_news_sentiment_with_gemini, generate_post
 from services.database import DatabaseManager
 from services.pdf_generator import generate_weekly_telemetry_pdf
 from utils.formatting import remove_ansi_codes, format_price
+from core.futures_state import futures_state
 from core.futures_engine import (
-    run_futures_bot, active_futures_positions, bot_futures_status_data, panic_sell_futures_position
+    run_futures_bot, bot_futures_status_data, panic_sell_futures_position
 )
 
 client = None
@@ -545,6 +546,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     f"🏆 <b>Win Rate (Futuros)</b>: {win_rate:.1f}%\n"
                 ]
                 
+                active_futures_positions = await futures_state.get_all()
                 if not active_futures_positions:
                     lines.append("ℹ️ Nenhuma posição alavancada ativa no momento.")
                 else:
@@ -588,6 +590,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 if c_db: db.release_connection(c_db)
 
         elif cmd == '/panic_sell_futures':
+            active_futures_positions = await futures_state.get_all()
             if active_futures_positions:
                 count = len(active_futures_positions)
                 for sym in list(active_futures_positions.keys()):

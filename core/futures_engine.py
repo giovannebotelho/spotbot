@@ -1,5 +1,6 @@
 import asyncio
 from config.settings import TELEGRAM_CONFIG, TIMEZONE
+from core.futures_state import futures_state
 from services.binance_client import (
     setup_futures_margin, place_futures_order, place_futures_conditional_order,
     get_futures_usdt_balance, get_futures_klines
@@ -11,10 +12,9 @@ from services.telegram_notifier import send_telegram_message
 from config.settings import TOP_40_SYMBOLS
 
 bot_futures_running = False
-active_futures_positions = {}
 bot_futures_status_data = {
     "price": 0, "symbol": "", "action": "Aguardando...", "target_asset": "BTCUSDT",
-    "active_symbols": [], "active_positions": active_futures_positions
+    "active_symbols": [], "active_positions": futures_state.get_all_sync()
 }
 
 shared_futures_market_data = {
@@ -22,7 +22,7 @@ shared_futures_market_data = {
 }
 
 async def run_futures_bot(client, bsm, db, log=print, status=print):
-    global bot_futures_running, active_futures_positions, bot_futures_status_data
+    global bot_futures_running, bot_futures_status_data
     bot_futures_running = True
     log("🚀 Iniciando Motor de Futuros (HedgeFund Edition)...")
     
@@ -43,7 +43,7 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
     from core.futures_trailing_lock import run_trailing_lock_monitor
     asyncio.create_task(run_futures_user_stream(client, db, log))
     asyncio.create_task(run_fallback_position_monitor(client, db, log))
-    asyncio.create_task(run_trailing_lock_monitor(client, active_futures_positions, log))
+    asyncio.create_task(run_trailing_lock_monitor(client, log))
     
     symbols_to_scan = TOP_40_SYMBOLS
     
@@ -74,10 +74,10 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                 sl_price = float(sl_order['triggerPrice']) if sl_order else (entry_price * 0.98 if direction == 'LONG' else entry_price * 1.02)
                 
                 if tp_order and sl_order:
-                    active_futures_positions[rec_symbol] = {
+                    await futures_state.add(rec_symbol, {
                         'entry': entry_price, 'tp': tp_price, 'sl': sl_price, 'direction': direction
-                    }
-                    bot_futures_status_data['active_symbols'] = list(active_futures_positions.keys())
+                    })
+                    bot_futures_status_data['active_symbols'] = list((await futures_state.get_all()).keys())
                     bot_futures_status_data['target_asset'] = rec_symbol
                     
                     try:
@@ -110,7 +110,7 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                     asyncio.create_task(monitor_futures_lifecycle(
                         client, bsm, rec_symbol, direction, entry_price, qty,
                         tp_order.get('algoId'), sl_order.get('algoId'), tp_price, sl_price, db,
-                        active_futures_positions, bot_futures_status_data, log, status
+                        bot_futures_status_data, log, status
                     ))
                     if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
                         asyncio.create_task(send_telegram_message(
@@ -127,7 +127,8 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
     
     while bot_futures_running:
         try:
-            if len(active_futures_positions) >= 3:
+            active_positions = await futures_state.get_all()
+            if len(active_positions) >= 3:
                 status("⏳ Limite de 3 posições simultâneas atingido no Futuros.")
                 await asyncio.sleep(10)
                 continue
@@ -139,10 +140,12 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                 continue
                 
             for symbol in symbols_to_scan:
-                if symbol in active_futures_positions:
+                active_positions = await futures_state.get_all()
+                if symbol in active_positions:
                     continue
                     
-                if len(active_futures_positions) >= 3:
+                active_positions = await futures_state.get_all()
+                if len(active_positions) >= 3:
                     break
                     
                 status(f"🔍 [FUTUROS] Analisando {symbol}...")
@@ -284,7 +287,16 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                             if f['filterType'] == 'PRICE_FILTER':
                                 price_precision = get_precision(float(f['tickSize']))
                                 
-                    qty = round(notional / cur_price, qty_precision)
+                    from decimal import Decimal, ROUND_DOWN
+                    step_size_str = "0.001"
+                    if info:
+                        for f in info.get('filters', []):
+                            if f['filterType'] == 'LOT_SIZE':
+                                step_size_str = f['stepSize']
+                    qty_dec = Decimal(str(notional / cur_price))
+                    step_dec = Decimal(step_size_str)
+                    quantized_qty = (qty_dec / step_dec).quantize(Decimal('1'), rounding=ROUND_DOWN) * step_dec
+                    qty = float(quantized_qty)
                     if qty <= 0: continue
                     
                     try:
@@ -302,10 +314,10 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                         if not entry_order:
                             continue
                             
-                        active_futures_positions[symbol] = {
+                        await futures_state.add(symbol, {
                             'entry': entry_price_executed, 'tp': tp_price, 'sl': sl_price, 'direction': direction, 'qty': qty
-                        }
-                        bot_futures_status_data['active_symbols'] = list(active_futures_positions.keys())
+                        })
+                        bot_futures_status_data['active_symbols'] = list((await futures_state.get_all()).keys())
                         
                         from config.settings import TELEGRAM_CONFIG
                         if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
@@ -331,10 +343,11 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
 
 async def panic_sell_futures_position(client, symbol, qty=0, log=print):
     """Fecha imediatamente a posição de futuros (Panic Sell) e limpa ordens condicionais."""
-    if symbol not in active_futures_positions:
+    active_positions = await futures_state.get_all()
+    if symbol not in active_positions:
         return False, "Nenhuma posição aberta neste par."
     
-    pos_data = active_futures_positions[symbol]
+    pos_data = await futures_state.get(symbol)
     direction = pos_data['direction']
     close_side = 'SELL' if direction == 'LONG' else 'BUY'
     
@@ -358,8 +371,8 @@ async def panic_sell_futures_position(client, symbol, qty=0, log=print):
         if qty > 0:
             await client.futures_create_order(symbol=symbol, side=close_side, type='MARKET', quantity=qty, reduceOnly='true')
             
-        active_futures_positions.pop(symbol, None)
-        bot_futures_status_data['active_symbols'] = list(active_futures_positions.keys())
+        await futures_state.remove(symbol)
+        bot_futures_status_data['active_symbols'] = list((await futures_state.get_all()).keys())
         log(f"🔥 PANIC SELL FUTUROS: {symbol} liquidado a mercado!")
         return True, f"Posição de Futuros em {symbol} liquidada a mercado."
     except Exception as e:

@@ -1,4 +1,5 @@
 import asyncio
+from core.futures_state import futures_state
 import datetime as dt_module
 from config.settings import TELEGRAM_CONFIG, TRADING_CONFIG, TIMEZONE
 from services.binance_client import get_futures_order_details, cancel_futures_order, get_bnb_price
@@ -10,7 +11,7 @@ from utils.formatting import format_price
 async def monitor_futures_lifecycle(
     client, bsm, symbol, position_side, entry_price, executed_qty, 
     tp_order_id, sl_order_id, tp_price, sl_price, db, 
-    active_futures_positions, bot_futures_status_data, log=print, status=print
+    bot_futures_status_data, log=print, status=print
 ):
     """
     Monitora uma posição de futuros aberta.
@@ -130,8 +131,8 @@ async def monitor_futures_lifecycle(
     ws_task.cancel()
 
     # Cleanup Global
-    active_futures_positions.pop(symbol, None)
-    bot_futures_status_data['active_symbols'] = list(active_futures_positions.keys())
+    await futures_state.remove(symbol)
+    bot_futures_status_data['active_symbols'] = list((await futures_state.get_all()).keys())
     return
 
 async def close_futures_position(client, symbol, side, qty, tp_order, sl_order, log):
@@ -235,7 +236,7 @@ async def place_futures_trade_with_protection(client, symbol, side, qty, tp_pric
 
 async def handle_user_data_stream_event(client, db, event, log):
     """Processa eventos do WebSocket de usuário (ORDER_TRADE_UPDATE)."""
-    from core.futures_engine import active_futures_positions, bot_futures_status_data
+    from core.futures_engine import bot_futures_status_data
     
     if event.get('e') == 'ORDER_TRADE_UPDATE':
         order = event.get('o', {})
@@ -245,9 +246,10 @@ async def handle_user_data_stream_event(client, db, event, log):
         
         if status == 'FILLED' and order_type in ['TAKE_PROFIT_MARKET', 'STOP_MARKET', 'MARKET']:
             # Verifica se o símbolo está ativo para fechar e limpar
+            active_futures_positions = await futures_state.get_all()
             if symbol in active_futures_positions:
-                pos = active_futures_positions.pop(symbol)
-                bot_futures_status_data['active_symbols'] = list(active_futures_positions.keys())
+                pos = await futures_state.remove(symbol)
+                bot_futures_status_data['active_symbols'] = list((await futures_state.get_all()).keys())
                 
                 log(f"🎯 [UDS] Execução detectada para {symbol} ({status}). Limpando ordens órfãs...")
                 try:
@@ -268,11 +270,13 @@ async def handle_user_data_stream_event(client, db, event, log):
 
 async def run_fallback_position_monitor(client, db, log):
     """Fallback de segurança que roda a cada 5 segundos para limpar posições se o WS falhar."""
-    from core.futures_engine import active_futures_positions, bot_futures_status_data
+    from core.futures_engine import bot_futures_status_data
     import asyncio
+    from core.futures_state import futures_state
     
     while True:
         await asyncio.sleep(5)
+        active_futures_positions = await futures_state.get_all()
         symbols_to_check = list(active_futures_positions.keys())
         if not symbols_to_check:
             continue
@@ -289,8 +293,8 @@ async def run_fallback_position_monitor(client, db, log):
                         await client.futures_cancel_all_open_orders(symbol=symbol)
                     except: pass
                     
-                    pos_data = active_futures_positions.pop(symbol, None)
-                    bot_futures_status_data['active_symbols'] = list(active_futures_positions.keys())
+                    pos_data = await futures_state.remove(symbol)
+                    bot_futures_status_data['active_symbols'] = list((await futures_state.get_all()).keys())
                     
                     if pos_data:
                         # Busca o PnL exato das ordens recentes
