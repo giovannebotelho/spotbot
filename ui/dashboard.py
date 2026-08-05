@@ -60,6 +60,7 @@ risk_profile_select = None
 paper_trading_switch = None
 
 chart_symbol_badge = None
+futures_chart_symbol_badge = None
 chart_asset_select = None
 chart_tabs = None
 selected_chart_symbol = None
@@ -95,6 +96,11 @@ async def change_chart_asset(val):
     selected_chart_symbol = val
     _last_chart_sig = None
     _last_fut_chart_sig = None
+    
+    base_val = val.replace('_spot', '').replace('_fut', '')
+    is_spot = val.endswith('_spot')
+    is_fut = val.endswith('_fut')
+    
     try:
         if not candle_chart:
             return
@@ -104,7 +110,7 @@ async def change_chart_asset(val):
         client_obj = getattr(engine, 'client', None)
         if client_obj:
             try:
-                klines_raw = await client_obj.get_klines(symbol=val, interval=engine.TRADING_CONFIG['interval'], limit=50)
+                klines_raw = await client_obj.get_klines(symbol=base_val, interval=engine.TRADING_CONFIG['interval'], limit=50)
                 if klines_raw:
                     dates = [dt_module.datetime.fromtimestamp(int(k[0])/1000).strftime('%H:%M') for k in klines_raw]
                     candles = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in klines_raw]
@@ -117,10 +123,7 @@ async def change_chart_asset(val):
                     bb_lower = (ma - (2 * std)).where(pd.notnull(ma), None).tolist()
                     ema200 = s_closes.ewm(span=min(200, len(closes)), adjust=False).mean().where(pd.notnull(s_closes), None).tolist()
             except Exception as k_err:
-                print(f"Aviso ao buscar klines via client para {val}: {k_err}")
-
-        is_spot = val in engine.active_positions
-        is_fut = val in futures_engine.active_futures_positions
+                print(f"Aviso ao buscar klines via client para {base_val}: {k_err}")
 
         # Tenta buscar do Spot Engine primeiro
         if not dates and engine.shared_market_data.get('dates') and is_spot:
@@ -144,9 +147,9 @@ async def change_chart_asset(val):
 
         if dates and candles:
             # OCO/Spot
-            pos_info = engine.active_positions.get(val, {})
+            pos_info = engine.active_positions.get(base_val, {})
             # Futures
-            fut_pos_info = futures_engine.active_futures_positions.get(val, {})
+            fut_pos_info = futures_engine.active_futures_positions.get(base_val, {})
             
             e_p = pos_info.get('entry', 0.0) or fut_pos_info.get('entry', engine.bot_status_data.get('entry_price', 0.0))
             tp_p = pos_info.get('tp', 0.0) or fut_pos_info.get('tp', engine.bot_status_data.get('tp_price', 0.0))
@@ -166,7 +169,7 @@ async def change_chart_asset(val):
 
             if is_fut and not is_spot:
                 candle_chart.options['title'] = {
-                    'text': f'🚀 {val} (Posição Ativa FUT)',
+                    'text': f'🚀 {base_val} (Posição Ativa FUT)',
                     'subtext': f'Entrada: {e_str} | TP: {tp_str} | SL: {sl_str}',
                     'left': 15, 'top': 8,
                     'textStyle': {'color': '#F43F5E', 'fontSize': 13, 'fontWeight': 'bold'},
@@ -193,7 +196,7 @@ async def change_chart_asset(val):
                 candle_chart.update()
             else:
                 candle_chart.options['title'] = {
-                    'text': f'📈 {val} (Posição Ativa OCO)',
+                    'text': f'📈 {base_val} (Posição Ativa OCO)',
                     'subtext': f'Entrada: {e_str} | TP: {tp_str} | SL: {sl_str}',
                     'left': 15, 'top': 8,
                     'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
@@ -210,7 +213,7 @@ async def change_chart_asset(val):
                     candle_chart.options['series'][7]['data'] = volumes
                 candle_chart.update()
     except Exception as e:
-        print(f"Aviso ao alterar gráfico para {val}: {e}")
+        print(f"Aviso ao alterar gráfico para {base_val}: {e}")
 
 @ui.refreshable
 def render_chart_tabs():
@@ -220,11 +223,13 @@ def render_chart_tabs():
     with chart_tabs:
         ui.tab('foco', label='⚡ Foco do Bot (Scanner)', icon='center_focus_strong')
         for sym in sorted(_last_rendered_tabs):
-            is_spot = sym in engine.active_positions
-            is_fut = sym in futures_engine.active_futures_positions
-            label_suffix = '(OCO)' if is_spot and not is_fut else ('(FUT)' if is_fut and not is_spot else '(SPOT/FUT)')
-            icon = 'rocket_launch' if is_fut and not is_spot else 'show_chart'
-            ui.tab(sym, label=f'🪙 {sym} {label_suffix}', icon=icon)
+            base_sym = sym.replace('_spot', '').replace('_fut', '')
+            is_spot = sym.endswith('_spot')
+            is_fut = sym.endswith('_fut')
+            label_suffix = '(OCO)' if is_spot else '(FUT)'
+            icon = 'show_chart' if is_spot else 'rocket_launch'
+            
+            ui.tab(sym, label=f'🪙 {base_sym} {label_suffix}' if is_spot else f'🚀 {base_sym} {label_suffix}', icon=icon).classes('text-sky-400' if is_spot else 'text-rose-400')
             
     if selected_chart_symbol and selected_chart_symbol in _last_rendered_tabs:
         chart_tabs.value = selected_chart_symbol
@@ -277,7 +282,7 @@ async def update_data():
 
         # Sincronização Dinâmica de Abas do Gráfico (Multi-Ativo)
         if 'chart_tabs' in globals() and chart_tabs:
-            current_active_keys = set(engine.active_positions.keys()).union(set(futures_engine.active_futures_positions.keys()))
+            current_active_keys = set([s + '_spot' for s in engine.active_positions.keys()]).union(set([s + '_fut' for s in futures_engine.active_futures_positions.keys()]))
             global _last_rendered_tabs
             if current_active_keys != _last_rendered_tabs:
                 _last_rendered_tabs = current_active_keys.copy()
@@ -295,16 +300,26 @@ async def update_data():
             active_symbols = list(engine.active_positions.keys())
             if active_symbols:
                 active_str = " | ".join([f"{s}" for s in active_symbols])
-                chart_symbol_badge.text = f"⚡ VAGAS ATIVAS ({len(active_symbols)}/{engine.MAX_CONCURRENT_POSITIONS}): [{active_str}]"
+                chart_symbol_badge.text = f"⚡ VAGAS SPOT ({len(active_symbols)}/{engine.MAX_CONCURRENT_POSITIONS}): [{active_str}]"
             else:
                 chart_symbol_badge.text = f"🪙 {active_symbol} ({price_str})"
+
+        if futures_chart_symbol_badge:
+            fut_active_symbols = list(futures_engine.active_futures_positions.keys())
+            if fut_active_symbols:
+                fut_active_str = " | ".join([f"{s}" for s in fut_active_symbols])
+                futures_chart_symbol_badge.text = f"🚀 VAGAS FUTUROS ({len(fut_active_symbols)}/{futures_engine.MAX_CONCURRENT_POSITIONS_FUTURES}): [{fut_active_str}]"
+                futures_chart_symbol_badge.set_visibility(True)
+            else:
+                futures_chart_symbol_badge.set_visibility(False)
 
         tp_price = engine.bot_status_data.get('tp_price', 0.0)
         sl_price = engine.bot_status_data.get('sl_price', 0.0)
         entry_price = engine.bot_status_data.get('entry_price', 0.0)
 
         market_data = engine.shared_market_data
-        if market_data['dates'] and candle_chart and (not selected_chart_symbol or selected_chart_symbol in engine.active_positions):
+        base_selected = selected_chart_symbol.replace('_spot', '').replace('_fut', '') if selected_chart_symbol else None
+        if market_data['dates'] and candle_chart and (not selected_chart_symbol or (selected_chart_symbol.endswith('_spot') and base_selected in engine.active_positions)):
             current_sig = (active_symbol, price_str, len(market_data['dates']), market_data['dates'][-1] if market_data['dates'] else '', tp_price, sl_price, entry_price)
             if current_sig != _last_chart_sig:
                 _last_chart_sig = current_sig
@@ -351,7 +366,7 @@ async def update_data():
         fut_entry_price = futures_engine.bot_futures_status_data.get('entry_price', 0.0)
 
         fut_market_data = getattr(futures_engine, 'shared_futures_market_data', None)
-        if fut_market_data and fut_market_data['dates'] and candle_chart and (not selected_chart_symbol or selected_chart_symbol in futures_engine.active_futures_positions):
+        if fut_market_data and fut_market_data['dates'] and candle_chart and (not selected_chart_symbol or (selected_chart_symbol.endswith('_fut') and base_selected in futures_engine.active_futures_positions)):
             fut_sig = (fut_active_symbol, fut_price_str, len(fut_market_data['dates']), fut_market_data['dates'][-1] if fut_market_data['dates'] else '', fut_tp_price, fut_sl_price, fut_entry_price)
             # using same _last_chart_sig check logic but for futures (create a new one)
             global _last_fut_chart_sig
@@ -776,6 +791,7 @@ async def index():
             with ui.column().classes('w-full flex-shrink-0 h-[470px] lg:h-[64vh] min-h-[420px] p-0 border-b border-slate-800 relative'):
                 with ui.row().classes('absolute top-3 right-4 z-20 items-center gap-2'):
                     ui.button(icon='refresh', on_click=lambda: asyncio.create_task(change_chart_asset(selected_chart_symbol if selected_chart_symbol else 'foco'))).props('dense flat color=sky-400 size=sm').classes('bg-[#121722] border border-sky-500/30 rounded-lg shadow-md px-2 py-1').tooltip('Recarregar Gráfico')
+                    futures_chart_symbol_badge = ui.label('').classes('obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-rose-400 border border-rose-900/50 backdrop-blur-md shadow-lg')
                     chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-sky-400 border border-sky-500/30 backdrop-blur-md shadow-lg')
                 candle_chart = ui.echart(get_main_chart_options()).classes('w-full h-full')
 
