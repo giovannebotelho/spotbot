@@ -1,7 +1,7 @@
 import asyncio
 import datetime as dt_module
 from config.settings import TELEGRAM_CONFIG, TRADING_CONFIG, TIMEZONE
-from services.binance_client import get_futures_order_details, get_bnb_price
+from services.binance_client import get_futures_order_details, cancel_futures_order, get_bnb_price
 from core.post_trade import create_data_row, save_to_csv
 from services.telegram_notifier import send_telegram_message
 from services.gemini_ai import generate_post_trade_synthesis
@@ -82,14 +82,14 @@ async def monitor_futures_lifecycle(
                     # Cancel the other orphan order
                     if tp_details['status'] == 'FILLED':
                         try:
-                            await client.futures_cancel_order(symbol=symbol, orderId=sl_order_id)
+                            await cancel_futures_order(client, symbol, sl_order_id)
                         except: pass
-                        exit_price = float(tp_details['avgPrice']) if float(tp_details.get('avgPrice', 0)) > 0 else float(tp_details['stopPrice'])
+                        exit_price = float(tp_details.get('avgPrice', tp_details.get('actualPrice', 0))) if float(tp_details.get('avgPrice', tp_details.get('actualPrice', 0))) > 0 else float(tp_details.get('stopPrice', tp_details.get('triggerPrice', 0)))
                     else:
                         try:
-                            await client.futures_cancel_order(symbol=symbol, orderId=tp_order_id)
+                            await cancel_futures_order(client, symbol, tp_order_id)
                         except: pass
-                        exit_price = float(sl_details['avgPrice']) if float(sl_details.get('avgPrice', 0)) > 0 else float(sl_details['stopPrice'])
+                        exit_price = float(sl_details.get('avgPrice', sl_details.get('actualPrice', 0))) if float(sl_details.get('avgPrice', sl_details.get('actualPrice', 0))) > 0 else float(sl_details.get('stopPrice', sl_details.get('triggerPrice', 0)))
 
                     await register_futures_trade(client, db, symbol, position_side, entry_price, exit_price, executed_qty, log)
                     break
@@ -105,10 +105,10 @@ async def monitor_futures_lifecycle(
 async def close_futures_position(client, symbol, side, qty, tp_order, sl_order, log):
     """Fecha a posição a mercado e cancela ordens orfãs."""
     try:
-        await client.futures_cancel_order(symbol=symbol, orderId=tp_order)
+        await cancel_futures_order(client, symbol, tp_order)
     except: pass
     try:
-        await client.futures_cancel_order(symbol=symbol, orderId=sl_order)
+        await cancel_futures_order(client, symbol, sl_order)
     except: pass
     
     try:

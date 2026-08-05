@@ -199,8 +199,38 @@ async def place_futures_conditional_order(client, symbol, side, order_type, quan
     return await client.futures_create_order(**params)
 
 async def get_futures_order_details(client, symbol, order_id):
-    """Obtém detalhes de uma ordem específica de Futuros pelo ID."""
-    return await client.futures_get_order(symbol=symbol, orderId=order_id)
+    """Obtém detalhes de uma ordem específica de Futuros pelo ID (tenta order regular e depois algo order)."""
+    try:
+        return await client.futures_get_order(symbol=symbol, orderId=order_id)
+    except Exception as e:
+        if "does not exist" in str(e) or "-2013" in str(e):
+            algo_res = await client.futures_get_algo_order(algoId=order_id)
+            if isinstance(algo_res, list) and len(algo_res) > 0:
+                res = algo_res[0]
+            elif isinstance(algo_res, dict):
+                res = algo_res
+            
+            if res:
+                if 'algoStatus' in res:
+                    if res['algoStatus'] in ['WORKING', 'NEW']:
+                        res['status'] = 'NEW'
+                    elif res['algoStatus'] == 'CANCELLED':
+                        res['status'] = 'CANCELED'
+                    elif res['algoStatus'] == 'EXECUTED':
+                        res['status'] = 'FILLED'
+                    else:
+                        res['status'] = res['algoStatus']
+                return res
+        raise e
+
+async def cancel_futures_order(client, symbol, order_id):
+    """Cancela uma ordem de futuros, tentando regular e depois algo."""
+    try:
+        return await client.futures_cancel_order(symbol=symbol, orderId=order_id)
+    except Exception as e:
+        if "Unknown order" in str(e) or "-2011" in str(e):
+            return await client.futures_cancel_algo_order(symbol=symbol, algoId=order_id)
+        raise e
 
 async def get_futures_klines(client, symbol, interval, limit):
     """Obtém as velas (klines) para um símbolo de Futuros específicos."""

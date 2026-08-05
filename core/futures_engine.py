@@ -29,6 +29,49 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
     except Exception as e:
         log(f"⚠️ Erro ao buscar futures_exchange_info: {e}")
         symbols_info = {}
+        
+    try:
+        positions = await client.futures_position_information()
+        active = [p for p in positions if float(p['positionAmt']) != 0]
+        if active:
+            log(f"🔄 \033[1;36mState Recovery Engine\033[0m: {len(active)} posição(ões) de Futuros ativa(s) encontrada(s)!")
+            for p in active:
+                rec_symbol = p['symbol']
+                qty = float(p['positionAmt'])
+                entry_price = float(p['entryPrice'])
+                direction = 'LONG' if qty > 0 else 'SHORT'
+                qty = abs(qty)
+                
+                algo_open = await client.futures_get_open_algo_orders(symbol=rec_symbol)
+                tp_order = next((o for o in algo_open if o['orderType'] == 'TAKE_PROFIT_MARKET'), None)
+                sl_order = next((o for o in algo_open if o['orderType'] == 'STOP_MARKET'), None)
+                
+                tp_price = float(tp_order['triggerPrice']) if tp_order else (entry_price * 1.03 if direction == 'LONG' else entry_price * 0.97)
+                sl_price = float(sl_order['triggerPrice']) if sl_order else (entry_price * 0.98 if direction == 'LONG' else entry_price * 1.02)
+                
+                if tp_order and sl_order:
+                    active_futures_positions[rec_symbol] = {
+                        'entry': entry_price, 'tp': tp_price, 'sl': sl_price, 'direction': direction
+                    }
+                    bot_futures_status_data['active_symbols'] = list(active_futures_positions.keys())
+                    log(f"🛡️ Retomando monitoramento de \033[1;33m{rec_symbol}\033[0m sem cancelar a operação...")
+                    asyncio.create_task(monitor_futures_lifecycle(
+                        client, bsm, rec_symbol, direction, entry_price, qty,
+                        tp_order.get('algoId'), sl_order.get('algoId'), tp_price, sl_price, db,
+                        active_futures_positions, bot_futures_status_data, log, status
+                    ))
+                    if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                        asyncio.create_task(send_telegram_message(
+                            TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                            f"🔄 <b>FUTURES State Recovery Ativado!</b>\n\n"
+                            f"🪙 Par: <b>{rec_symbol}</b> ({direction})\n"
+                            f"🛡️ Posição adotada da nuvem para monitoramento ativo!"
+                        ))
+                else:
+                    log(f"⚠️ Posição órfã em {rec_symbol} sem Stop Loss! Recomenda-se fechar manualmente.")
+    except Exception as e:
+        log(f"⚠️ Erro no State Recovery do Futuros: {e}")
+
     
     while bot_futures_running:
         try:
@@ -124,7 +167,9 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                         # Inicia Monitoramento Lifecycle
                         asyncio.create_task(monitor_futures_lifecycle(
                             client, bsm, symbol, direction, entry_price, qty,
-                            tp_order['orderId'], sl_order['orderId'], tp_price, sl_price, db,
+                            tp_order.get('orderId') or tp_order.get('algoId'),
+                            sl_order.get('orderId') or sl_order.get('algoId'),
+                            tp_price, sl_price, db,
                             active_futures_positions, bot_futures_status_data, log, status
                         ))
                         
