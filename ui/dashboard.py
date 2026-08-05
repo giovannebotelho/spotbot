@@ -667,8 +667,6 @@ async def index():
                     ui.label('🛑 SL').classes('text-rose-400 font-bold')
                     ui.label('🩵 Entrada').classes('text-sky-400 font-bold')
 
-            # Seção Central do Gráfico (+30% de Altura Explicita)
-            with ui.element('div').classes('w-full h-[470px] lg:h-[64vh] min-h-[420px] relative border-b border-slate-800 flex-shrink-0 bg-[#0B0E14]'):
             # Área do Gráfico (com sistema de Tabs)
             with ui.column().classes('w-full flex-shrink-0 h-[400px] lg:h-[450px] p-0 border-b border-slate-800 relative'):
                 with ui.tabs().classes('w-full h-10 border-b border-slate-800 text-xs font-semibold').props('dense active-color=sky-400 align=left') as main_tabs:
