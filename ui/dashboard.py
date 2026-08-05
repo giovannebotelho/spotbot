@@ -14,6 +14,7 @@ from services.database import DatabaseManager
 from utils.formatting import remove_ansi_codes, format_price
 import core.engine as engine
 import core.futures_engine as futures_engine
+from core.futures_state import futures_state
 
 db = DatabaseManager()
 
