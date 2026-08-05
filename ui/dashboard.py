@@ -110,7 +110,10 @@ async def change_chart_asset(val):
         client_obj = getattr(engine, 'client', None)
         if client_obj:
             try:
-                klines_raw = await client_obj.get_klines(symbol=base_val, interval=engine.TRADING_CONFIG['interval'], limit=50)
+                if is_fut:
+                    klines_raw = await client_obj.futures_klines(symbol=base_val, interval=engine.TRADING_CONFIG['interval'], limit=50)
+                else:
+                    klines_raw = await client_obj.get_klines(symbol=base_val, interval=engine.TRADING_CONFIG['interval'], limit=50)
                 if klines_raw:
                     dates = [dt_module.datetime.fromtimestamp(int(k[0])/1000).strftime('%H:%M') for k in klines_raw]
                     candles = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in klines_raw]
@@ -151,9 +154,14 @@ async def change_chart_asset(val):
             # Futures
             fut_pos_info = futures_engine.active_futures_positions.get(base_val, {})
             
-            e_p = pos_info.get('entry', 0.0) or fut_pos_info.get('entry', engine.bot_status_data.get('entry_price', 0.0))
-            tp_p = pos_info.get('tp', 0.0) or fut_pos_info.get('tp', engine.bot_status_data.get('tp_price', 0.0))
-            sl_p = pos_info.get('sl', 0.0) or fut_pos_info.get('sl', engine.bot_status_data.get('sl_price', 0.0))
+            if is_fut:
+                e_p = fut_pos_info.get('entry', futures_engine.bot_futures_status_data.get('entry_price', 0.0))
+                tp_p = fut_pos_info.get('tp', futures_engine.bot_futures_status_data.get('tp_price', 0.0))
+                sl_p = fut_pos_info.get('sl', futures_engine.bot_futures_status_data.get('sl_price', 0.0))
+            else:
+                e_p = pos_info.get('entry', engine.bot_status_data.get('entry_price', 0.0))
+                tp_p = pos_info.get('tp', engine.bot_status_data.get('tp_price', 0.0))
+                sl_p = pos_info.get('sl', engine.bot_status_data.get('sl_price', 0.0))
             
             e_str = format_price(e_p)
             tp_str = format_price(tp_p)
