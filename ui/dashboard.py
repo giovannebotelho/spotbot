@@ -25,6 +25,7 @@ if os.path.exists(assets_dir):
 # Buffer de Logs Global (guarda os últimos 50 logs para novos visitantes/dispositivos)
 logs_buffer = collections.deque(maxlen=50)
 _last_chart_sig = None
+_last_fut_chart_sig = None
 _last_trades_sig = None
 
 log_ui = None
@@ -84,14 +85,16 @@ def status_handler(message):
             pass
 
 async def change_chart_asset(val):
-    global selected_chart_symbol, _last_chart_sig
+    global selected_chart_symbol, _last_chart_sig, _last_fut_chart_sig
     if not val or val == 'foco' or 'Foco do Bot' in val:
         selected_chart_symbol = None
         _last_chart_sig = None
+        _last_fut_chart_sig = None
         return
         
     selected_chart_symbol = val
     _last_chart_sig = None
+    _last_fut_chart_sig = None
     try:
         if not candle_chart:
             return
