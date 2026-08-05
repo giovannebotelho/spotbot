@@ -40,8 +40,10 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
         log(f"⚠️ Erro ao buscar saldo inicial de Futuros: {e}")
         
     from core.futures_order_manager import run_futures_user_stream, run_fallback_position_monitor
+    from core.futures_trailing_lock import run_trailing_lock_monitor
     asyncio.create_task(run_futures_user_stream(client, db, log))
     asyncio.create_task(run_fallback_position_monitor(client, db, log))
+    asyncio.create_task(run_trailing_lock_monitor(client, active_futures_positions, log))
     
     symbols_to_scan = TOP_40_SYMBOLS
     
@@ -237,16 +239,38 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                 if direction:
                     # Re-avalia o saldo antes de entrar, pois operações anteriores no mesmo ciclo podem ter consumido a margem
                     current_balance = await get_futures_usdt_balance(client)
-                    if current_balance < 20.0:
-                        log(f"⚠️ Saldo insuficiente para novas entradas (${current_balance:.2f}). Pausando scanner...")
+                    # 1. Dimensionamento do Kelly Sizer
+                    from core.futures_kelly_sizer import calculate_optimal_margin
+                    margin_usdt = await calculate_optimal_margin(db, current_balance, log)
+                    
+                    if current_balance < margin_usdt:
+                        log(f"⚠️ Saldo atual ({current_balance:.2f}) menor que margem exigida ({margin_usdt:.2f}). Pausando scanner...")
                         break
                         
                     log(f"🚨 [FUTUROS] Oportunidade {direction} detectada em {symbol} (RSI: {rsi:.1f})")
                     log(f"💡 Gatilho: {trigger_reason}")
                         
-                    # Usa $20 dólares de margem por trade (com 20x = $400 de posição)
-                    margin_usdt = 20.0 
-                    leverage = 20
+                    initial_leverage = 20
+                    
+                    # 2. Definição do TP/SL (Dinâmico para notícia)
+                    if '[GEMINI-AI]' in trigger_reason:
+                        roi_tp = 1.0025 if direction == 'LONG' else 0.9975
+                        roi_sl = 0.9975 if direction == 'LONG' else 1.0025 # SL super curto para notícia
+                    else:
+                        roi_tp = 1.0025 if direction == 'LONG' else 0.9975
+                        roi_sl = 0.9950 if direction == 'LONG' else 1.0050
+                        
+                    tp_price = cur_price * roi_tp
+                    sl_price = cur_price * roi_sl
+                    
+                    # 3. Gerenciamento de Risco (Liquidation Buffer)
+                    from core.futures_risk_manager import validate_trade_safety
+                    safe_leverage = await validate_trade_safety(symbol, cur_price, sl_price, initial_leverage, direction, log)
+                    
+                    if safe_leverage == 0:
+                        continue # Rejeitado
+                        
+                    leverage = safe_leverage
                     notional = margin_usdt * leverage
                     
                     # Dinamicamente buscar a precisão do ativo
@@ -267,18 +291,6 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                         from core.futures_order_manager import place_futures_trade_with_protection
                         side_entry = 'BUY' if direction == 'LONG' else 'SELL'
                         
-                        # Conditional Orders (5% ROI = 0.25% variação, 10% SL = 0.5% variação com 20x)
-                        # Se veio de Notícia Extrema, usamos SL mais curto
-                        if '[GEMINI-AI]' in trigger_reason:
-                            roi_tp = 1.0025 if direction == 'LONG' else 0.9975
-                            roi_sl = 0.9975 if direction == 'LONG' else 1.0025 # SL super curto para notícia
-                        else:
-                            roi_tp = 1.0025 if direction == 'LONG' else 0.9975
-                            roi_sl = 0.9950 if direction == 'LONG' else 1.0050
-                            
-                        tp_price = cur_price * roi_tp
-                        sl_price = cur_price * roi_sl
-                            
                         # Usando a precisão real da exchange
                         tp_price = round(tp_price, price_precision)
                         sl_price = round(sl_price, price_precision)
