@@ -160,6 +160,8 @@ async def register_futures_trade(client, db, symbol, direction, entry, exit, qty
             "Data/Hora da Compra": dt_module.datetime.now(TIMEZONE).strftime("%d/%m/%Y at %H:%M:%S"),
             "Data/Hora OCO": dt_module.datetime.now(TIMEZONE).strftime("%d/%m/%Y %H:%M:%S"),
             "Resultado da Ordem OCO": "profit" if gross_pnl > 0 else "loss",
+            "Resultado Parcial da Transação": gross_pnl,
+            "Resultado Parcial da Transação Líquido": gross_pnl * 0.96,
             "Resultado Total Bruto": gross_pnl,
             "Resultado Total Liquido": gross_pnl * 0.96, # desconto de taxa ficticio
             "market_type": "FUTURES",
