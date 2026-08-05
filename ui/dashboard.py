@@ -61,11 +61,9 @@ paper_trading_switch = None
 
 chart_symbol_badge = None
 chart_asset_select = None
-spot_chart_tabs = None
-futures_chart_tabs = None
+chart_tabs = None
 selected_chart_symbol = None
-_last_rendered_spot_tabs = set()
-_last_rendered_fut_tabs = set()
+_last_rendered_tabs = set()
 
 bot_task = None
 
@@ -167,16 +165,16 @@ async def change_chart_asset(val):
                 mark_lines.append({'yAxis': sl_p, 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🛑 SL: {sl_str}', 'position': 'insideEndBottom', 'color': '#F43F5E'}})
 
             if is_fut and not is_spot:
-                futures_candle_chart.options['title'] = {
+                candle_chart.options['title'] = {
                     'text': f'🚀 {val} (Posição Ativa FUT)',
                     'subtext': f'Entrada: {e_str} | TP: {tp_str} | SL: {sl_str}',
                     'left': 15, 'top': 8,
                     'textStyle': {'color': '#F43F5E', 'fontSize': 13, 'fontWeight': 'bold'},
                     'subtextStyle': {'color': '#64748b', 'fontSize': 9}
                 }
-                futures_candle_chart.options['xAxis'][0]['data'] = dates
-                futures_candle_chart.options['xAxis'][1]['data'] = dates
-                futures_candle_chart.options['series'][0]['data'] = candles
+                candle_chart.options['xAxis'][0]['data'] = dates
+                candle_chart.options['xAxis'][1]['data'] = dates
+                candle_chart.options['series'][0]['data'] = candles
                 
                 fmark_lines = []
                 if e_p > 0:
@@ -186,13 +184,13 @@ async def change_chart_asset(val):
                 if sl_p > 0:
                     fmark_lines.append({'yAxis': sl_p, 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🛑 SL: {sl_str}', 'position': 'insideEndBottom', 'color': '#F43F5E'}})
                 
-                futures_candle_chart.options['series'][0]['markLine'] = {'symbol': ['none', 'none'], 'data': fmark_lines}
-                futures_candle_chart.options['series'][1]['data'] = bb_upper
-                futures_candle_chart.options['series'][2]['data'] = bb_lower
-                futures_candle_chart.options['series'][3]['data'] = ema200
+                candle_chart.options['series'][0]['markLine'] = {'symbol': ['none', 'none'], 'data': fmark_lines}
+                candle_chart.options['series'][1]['data'] = bb_upper
+                candle_chart.options['series'][2]['data'] = bb_lower
+                candle_chart.options['series'][3]['data'] = ema200
                 if 'volumes' in locals():
-                    futures_candle_chart.options['series'][7]['data'] = volumes
-                futures_candle_chart.update()
+                    candle_chart.options['series'][7]['data'] = volumes
+                candle_chart.update()
             else:
                 candle_chart.options['title'] = {
                     'text': f'📈 {val} (Posição Ativa OCO)',
@@ -215,34 +213,23 @@ async def change_chart_asset(val):
         print(f"Aviso ao alterar gráfico para {val}: {e}")
 
 @ui.refreshable
-def render_spot_chart_tabs():
-    global spot_chart_tabs, selected_chart_symbol, _last_rendered_spot_tabs
+def render_chart_tabs():
+    global chart_tabs, selected_chart_symbol, _last_rendered_tabs
     
-    spot_chart_tabs = ui.tabs(on_change=lambda e: asyncio.create_task(change_chart_asset(e.value))).props('dense active-color=sky-400 indicator-color=sky-400 text-color=slate-400 no-caps').classes('bg-transparent min-h-[40px] text-xs')
-    with spot_chart_tabs:
-        ui.tab('foco', label='⚡ Foco (Scanner Spot)', icon='center_focus_strong')
-        for sym in sorted(_last_rendered_spot_tabs):
-            ui.tab(sym, label=f'🪙 {sym} (OCO)', icon='show_chart')
+    chart_tabs = ui.tabs(on_change=lambda e: asyncio.create_task(change_chart_asset(e.value))).props('dense active-color=sky-400 indicator-color=sky-400 text-color=slate-400 no-caps').classes('bg-transparent min-h-[40px] text-xs')
+    with chart_tabs:
+        ui.tab('foco', label='⚡ Foco do Bot (Scanner)', icon='center_focus_strong')
+        for sym in sorted(_last_rendered_tabs):
+            is_spot = sym in engine.active_positions
+            is_fut = sym in futures_engine.active_futures_positions
+            label_suffix = '(OCO)' if is_spot and not is_fut else ('(FUT)' if is_fut and not is_spot else '(SPOT/FUT)')
+            icon = 'rocket_launch' if is_fut and not is_spot else 'show_chart'
+            ui.tab(sym, label=f'🪙 {sym} {label_suffix}', icon=icon)
             
-    if selected_chart_symbol and selected_chart_symbol in _last_rendered_spot_tabs:
-        spot_chart_tabs.value = selected_chart_symbol
+    if selected_chart_symbol and selected_chart_symbol in _last_rendered_tabs:
+        chart_tabs.value = selected_chart_symbol
     else:
-        spot_chart_tabs.value = 'foco'
-
-@ui.refreshable
-def render_futures_chart_tabs():
-    global futures_chart_tabs, selected_chart_symbol, _last_rendered_fut_tabs
-    
-    futures_chart_tabs = ui.tabs(on_change=lambda e: asyncio.create_task(change_chart_asset(e.value))).props('dense active-color=rose-400 indicator-color=rose-400 text-color=slate-400 no-caps').classes('bg-transparent min-h-[40px] text-xs')
-    with futures_chart_tabs:
-        ui.tab('foco', label='⚡ Foco (Scanner Futuros)', icon='center_focus_strong')
-        for sym in sorted(_last_rendered_fut_tabs):
-            ui.tab(sym, label=f'🚀 {sym} (FUT)', icon='rocket_launch')
-            
-    if selected_chart_symbol and selected_chart_symbol in _last_rendered_fut_tabs:
-        futures_chart_tabs.value = selected_chart_symbol
-    else:
-        futures_chart_tabs.value = 'foco'
+        chart_tabs.value = 'foco'
 
 async def update_data():
     global start_btn, stop_btn, status_indicator, _last_chart_sig
@@ -289,26 +276,15 @@ async def update_data():
                 risk_profile_select.value = settings.ACTIVE_RISK_PROFILE
 
         # Sincronização Dinâmica de Abas do Gráfico (Multi-Ativo)
-        if 'spot_chart_tabs' in globals() and spot_chart_tabs:
-            current_active_spot = set(engine.active_positions.keys())
-            global _last_rendered_spot_tabs
-            if current_active_spot != _last_rendered_spot_tabs:
-                _last_rendered_spot_tabs = current_active_spot.copy()
-                render_spot_chart_tabs.refresh()
+        if 'chart_tabs' in globals() and chart_tabs:
+            current_active_keys = set(engine.active_positions.keys()).union(set(futures_engine.active_futures_positions.keys()))
+            global _last_rendered_tabs
+            if current_active_keys != _last_rendered_tabs:
+                _last_rendered_tabs = current_active_keys.copy()
+                render_chart_tabs.refresh()
                 
-                if current_active_spot and (not selected_chart_symbol or selected_chart_symbol == 'foco'):
-                    first_sym = sorted(current_active_spot)[0]
-                    await change_chart_asset(first_sym)
-
-        if 'futures_chart_tabs' in globals() and futures_chart_tabs:
-            current_active_fut = set(futures_engine.active_futures_positions.keys())
-            global _last_rendered_fut_tabs
-            if current_active_fut != _last_rendered_fut_tabs:
-                _last_rendered_fut_tabs = current_active_fut.copy()
-                render_futures_chart_tabs.refresh()
-                
-                if current_active_fut and (not selected_chart_symbol or selected_chart_symbol == 'foco'):
-                    first_sym = sorted(current_active_fut)[0]
+                if current_active_keys and (not selected_chart_symbol or selected_chart_symbol == 'foco'):
+                    first_sym = sorted(current_active_keys)[0]
                     await change_chart_asset(first_sym)
 
         active_symbol = engine.bot_status_data.get('target_asset', 'BTCUSDT')
@@ -375,13 +351,13 @@ async def update_data():
         fut_entry_price = futures_engine.bot_futures_status_data.get('entry_price', 0.0)
 
         fut_market_data = getattr(futures_engine, 'shared_futures_market_data', None)
-        if fut_market_data and fut_market_data['dates'] and futures_candle_chart and (not selected_chart_symbol or selected_chart_symbol in futures_engine.active_futures_positions):
+        if fut_market_data and fut_market_data['dates'] and candle_chart and (not selected_chart_symbol or selected_chart_symbol in futures_engine.active_futures_positions):
             fut_sig = (fut_active_symbol, fut_price_str, len(fut_market_data['dates']), fut_market_data['dates'][-1] if fut_market_data['dates'] else '', fut_tp_price, fut_sl_price, fut_entry_price)
             # using same _last_chart_sig check logic but for futures (create a new one)
             global _last_fut_chart_sig
             if 'fut_sig' not in globals() or fut_sig != globals().get('_last_fut_chart_sig'):
                 globals()['_last_fut_chart_sig'] = fut_sig
-                futures_candle_chart.options['title'] = {
+                candle_chart.options['title'] = {
                     'text': f'🚀 {fut_active_symbol} (HedgeFund)',
                     'subtext': 'Binance Futures WebSockets',
                     'left': 15,
@@ -389,9 +365,9 @@ async def update_data():
                     'textStyle': {'color': '#F43F5E', 'fontSize': 13, 'fontWeight': 'bold'},
                     'subtextStyle': {'color': '#64748b', 'fontSize': 9}
                 }
-                futures_candle_chart.options['xAxis'][0]['data'] = fut_market_data['dates']
-                futures_candle_chart.options['xAxis'][1]['data'] = fut_market_data['dates']
-                futures_candle_chart.options['series'][0]['data'] = fut_market_data['klines']
+                candle_chart.options['xAxis'][0]['data'] = fut_market_data['dates']
+                candle_chart.options['xAxis'][1]['data'] = fut_market_data['dates']
+                candle_chart.options['series'][0]['data'] = fut_market_data['klines']
 
                 # MarkLines Futuros
                 fe_str = format_price(fut_entry_price)
@@ -406,13 +382,13 @@ async def update_data():
                 if fut_sl_price > 0:
                     fmark_lines.append({'yAxis': fut_sl_price, 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🛑 SL: {fsl_str}', 'position': 'insideEndBottom', 'color': '#F43F5E'}})
                 
-                futures_candle_chart.options['series'][0]['markLine'] = {'symbol': ['none', 'none'], 'data': fmark_lines}
+                candle_chart.options['series'][0]['markLine'] = {'symbol': ['none', 'none'], 'data': fmark_lines}
 
-                futures_candle_chart.options['series'][1]['data'] = fut_market_data.get('bb_upper', [])
-                futures_candle_chart.options['series'][2]['data'] = fut_market_data.get('bb_lower', [])
-                futures_candle_chart.options['series'][3]['data'] = fut_market_data.get('ema200', [])
-                futures_candle_chart.options['series'][7]['data'] = fut_market_data.get('volumes', [])
-                futures_candle_chart.update()
+                candle_chart.options['series'][1]['data'] = fut_market_data.get('bb_upper', [])
+                candle_chart.options['series'][2]['data'] = fut_market_data.get('bb_lower', [])
+                candle_chart.options['series'][3]['data'] = fut_market_data.get('ema200', [])
+                candle_chart.options['series'][7]['data'] = fut_market_data.get('volumes', [])
+                candle_chart.update()
 
         await update_recent_trades_table()
 
@@ -781,19 +757,10 @@ async def index():
             with ai_reason_container:
                 ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-xs text-slate-300 leading-relaxed')
 
-            # Abas Principais (SPOT / FUTUROS)
-            with ui.tabs().classes('w-full h-16 bg-[#080B10] border-b border-slate-800 text-sm font-bold').props('active-color=sky-400 align=left indicator-color=sky-400') as main_tabs:
-                spot_tab = ui.tab('SPOT', icon='show_chart').classes('py-2')
-                futures_tab = ui.tab('FUTUROS', icon='rocket_launch').classes('text-rose-400 py-2')
-
             # Barra de Abas do Gráfico (Multi-Ativo) & Legenda Estilo Binance (Sub-abas)
             with ui.row().classes('w-full min-h-[48px] bg-[#0B0E14] border-b border-slate-800/80 px-2 sm:px-3 items-center justify-between gap-2 flex-shrink-0 z-20 overflow-x-auto flex-nowrap'):
                 with ui.row().classes('items-center gap-1 flex-shrink-0 min-h-[40px]'):
-                    render_spot_chart_tabs()
-                    render_futures_chart_tabs()
-                    
-                    spot_chart_tabs.bind_visibility_from(main_tabs, 'value', backward=lambda v: getattr(v, 'name', v) == 'SPOT')
-                    futures_chart_tabs.bind_visibility_from(main_tabs, 'value', backward=lambda v: getattr(v, 'name', v) == 'FUTUROS')
+                    render_chart_tabs()
 
                 with ui.row().classes('items-center gap-2.5 text-[0.6rem] font-mono text-slate-400 flex-shrink-0 hidden xl:flex ml-auto'):
                     ui.label('LEGENDA:').classes('font-bold text-slate-500')
@@ -807,19 +774,10 @@ async def index():
 
             # Área do Gráfico
             with ui.column().classes('w-full flex-shrink-0 h-[470px] lg:h-[64vh] min-h-[420px] p-0 border-b border-slate-800 relative'):
-                
-                with ui.tab_panels(main_tabs, value=spot_tab).classes('w-full h-full bg-[#0B0E14] p-0'):
-                    with ui.tab_panel(spot_tab).classes('w-full h-full p-0 relative'):
-                        with ui.row().classes('absolute top-3 right-4 z-20 items-center gap-2'):
-                            ui.button(icon='refresh', on_click=lambda: asyncio.create_task(change_chart_asset(selected_chart_symbol if selected_chart_symbol else 'foco'))).props('dense flat color=sky-400 size=sm').classes('bg-[#121722] border border-sky-500/30 rounded-lg shadow-md px-2 py-1').tooltip('Recarregar Gráfico (Spot)')
-                            chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-sky-400 border border-sky-500/30 backdrop-blur-md shadow-lg')
-                        candle_chart = ui.echart(get_main_chart_options()).classes('w-full h-full')
-                    
-                    with ui.tab_panel(futures_tab).classes('w-full h-full p-0 relative'):
-                        with ui.row().classes('absolute top-3 right-4 z-20 items-center gap-2'):
-                            ui.button(icon='refresh', on_click=lambda: asyncio.create_task(change_chart_asset(selected_chart_symbol if selected_chart_symbol else 'foco'))).props('dense flat color=rose-400 size=sm').classes('bg-[#2a1215] border border-rose-900/50 rounded-lg shadow-md px-2 py-1').tooltip('Recarregar Gráfico (Futuros)')
-                            futures_chart_symbol_badge = ui.label('🚀 BTCUSDT').classes('obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-rose-400 border border-rose-900/50 backdrop-blur-md shadow-lg')
-                        futures_candle_chart = ui.echart(get_main_chart_options()).classes('w-full h-full')
+                with ui.row().classes('absolute top-3 right-4 z-20 items-center gap-2'):
+                    ui.button(icon='refresh', on_click=lambda: asyncio.create_task(change_chart_asset(selected_chart_symbol if selected_chart_symbol else 'foco'))).props('dense flat color=sky-400 size=sm').classes('bg-[#121722] border border-sky-500/30 rounded-lg shadow-md px-2 py-1').tooltip('Recarregar Gráfico')
+                    chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-sky-400 border border-sky-500/30 backdrop-blur-md shadow-lg')
+                candle_chart = ui.echart(get_main_chart_options()).classes('w-full h-full')
 
             # Painel Inferior (Execuções + Terminal Output Sincronizado)
             with ui.row().classes('w-full flex-shrink-0 flex-col lg:flex-row gap-0 bg-[#0B0E14] min-h-[280px]'):

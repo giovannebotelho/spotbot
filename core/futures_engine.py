@@ -30,7 +30,6 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
         log(f"💰 Saldo USDT Futuros: \033[1;32m${usdt_balance:.2f}\033[0m")
         from config.settings import TELEGRAM_CONFIG
         if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
-            from services.telegram_bot import send_telegram_message
             asyncio.create_task(send_telegram_message(
                 TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
                 f"<b>🚀 Motor de Futuros Iniciado! 🚀</b>\n\n"
