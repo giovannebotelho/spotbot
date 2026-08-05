@@ -288,6 +288,17 @@ class DatabaseManager:
                         restored_rows.append(data)
                     except Exception:
                         pass
+                else:
+                    # Fallback para trades antigos (sem raw_data)
+                    data = {
+                        'id': row.get('id'),
+                        'Data/Hora da Compra': row.get('oco_timestamp') or row.get('buy_timestamp', 'N/A'),
+                        'Símbolo': row.get('symbol', 'N/A'),
+                        'market_type': row.get('market_type', 'SPOT'),
+                        'direction': row.get('direction', 'LONG'),
+                        'Resultado Total Liquido': row.get('trade_result_net', 0.0),
+                    }
+                    restored_rows.append(data)
             
             return pd.DataFrame(restored_rows)
         except Exception:
