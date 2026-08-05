@@ -127,6 +127,12 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                 await asyncio.sleep(10)
                 continue
                 
+            usdt_balance = await get_futures_usdt_balance(client)
+            if usdt_balance < 10.0:
+                log(f"⚠️ Saldo insuficiente no Futuros: ${usdt_balance:.2f}. Mínimo $10. Standby por 5 minutos...")
+                await asyncio.sleep(300)
+                continue
+                
             for symbol in symbols_to_scan:
                 if symbol in active_futures_positions:
                     continue
@@ -177,12 +183,6 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                     
                 if direction:
                     log(f"🚨 [FUTUROS] Oportunidade {direction} detectada em {symbol} (RSI: {rsi:.1f})")
-                    
-                    usdt_balance = await get_futures_usdt_balance(client)
-                    if usdt_balance < 10:
-                        log(f"⚠️ Saldo insuficiente no Futuros: ${usdt_balance:.2f}. Necessário mínimo de $10.")
-                        await asyncio.sleep(30)
-                        break
                         
                     # Usa $10 dólares de margem por trade (com 20x = $200 de posição)
                     margin_usdt = 10.0 
