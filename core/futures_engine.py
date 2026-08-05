@@ -136,6 +136,9 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                 if symbol in active_futures_positions:
                     continue
                     
+                if len(active_futures_positions) >= 3:
+                    break
+                    
                 status(f"🔍 [FUTUROS] Analisando {symbol}...")
                 
                 try:

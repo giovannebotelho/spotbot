@@ -52,68 +52,68 @@ async def monitor_futures_lifecycle(
         return False
     
     
-    try:
-        # WebSocket connection para klines/trades (Futuros)
-        async with bsm.aggtrade_futures_socket(symbol=symbol.lower()) as ts:
-            while True:
-                try:
-                    # Um timeout de 10 segundos garante que se a conexão travar sem fechar (zombie connection), 
-                    # forçamos a queda para o REST Polling
-                    msg = await asyncio.wait_for(ts.recv(), timeout=10.0)
-                    
-                    import time
-                    now = time.time()
-                    if now - locals().get('_last_pos_check', 0) > 15:
-                        locals()['_last_pos_check'] = now
-                        if await check_and_handle_closure():
-                            break
-                    
-                    if 'p' in msg:
-                        cur_price = float(msg['p'])
-                        
-                        if position_side == 'LONG':
-                            if cur_price > highest_price:
-                                highest_price = cur_price
-                        else:
-                            if cur_price < lowest_price:
-                                lowest_price = cur_price
-                                
-                        bot_futures_status_data['price'] = cur_price
-                        
-                        # Lógica de Trailing Stop Lock para Futuros
-                        if position_side == 'LONG':
-                            tp_distance = tp_price - entry_price
-                            trigger_price = entry_price + (tp_distance * 0.75)
-                            if highest_price >= trigger_price and cur_price < highest_price * 0.998:
-                                log(f"🔒 Trailing Lock Acionado (LONG)! Vendendo a mercado...")
-                                await close_futures_position(client, symbol, 'SELL', executed_qty, tp_order_id, sl_order_id, log)
-                                await register_futures_trade(client, db, symbol, 'LONG', entry_price, cur_price, executed_qty, log)
-                                break
-                        else:
-                            # SHORT
-                            tp_distance = entry_price - tp_price
-                            trigger_price = entry_price - (tp_distance * 0.75)
-                            if lowest_price <= trigger_price and cur_price > lowest_price * 1.002:
-                                log(f"🔒 Trailing Lock Acionado (SHORT)! Comprando a mercado...")
-                                await close_futures_position(client, symbol, 'BUY', executed_qty, tp_order_id, sl_order_id, log)
-                                await register_futures_trade(client, db, symbol, 'SHORT', entry_price, cur_price, executed_qty, log)
-                                break
-                except asyncio.TimeoutError:
-                    log(f"⚠️ WS Timeout para {symbol} em Futuros. Checando ordens via REST fallback.")
-                    break # Cai no fallback de REST polling abaixo
-
-    except Exception as ws_err:
-        use_ws_monitoring = False
-        log(f"⚠️ WS Instável em Futuros para {symbol} ({ws_err}). Alternando para REST Polling.")
-
-    if not use_ws_monitoring:
+    async def closure_checker():
         while True:
-            await asyncio.sleep(3)
-            try:
-                if await check_and_handle_closure():
-                    break
-            except Exception as poll_err:
-                log(f"⚠️ Polling Futuros Erro: {poll_err}")
+            await asyncio.sleep(5)
+            if await check_and_handle_closure():
+                break
+
+    checker_task = asyncio.create_task(closure_checker())
+    
+    async def ws_loop():
+        try:
+            # WebSocket connection para klines/trades (Futuros)
+            async with bsm.aggtrade_futures_socket(symbol=symbol.lower()) as ts:
+                while True:
+                    try:
+                        msg = await asyncio.wait_for(ts.recv(), timeout=10.0)
+                        
+                        if 'p' in msg:
+                            cur_price = float(msg['p'])
+                            
+                            if position_side == 'LONG':
+                                if cur_price > highest_price:
+                                    highest_price = cur_price
+                            else:
+                                if cur_price < lowest_price:
+                                    lowest_price = cur_price
+                                    
+                            bot_futures_status_data['price'] = cur_price
+                            
+                            # Lógica de Trailing Stop Lock para Futuros
+                            if position_side == 'LONG':
+                                tp_distance = tp_price - entry_price
+                                trigger_price = entry_price + (tp_distance * 0.75)
+                                if highest_price >= trigger_price and cur_price < highest_price * 0.998:
+                                    log(f"🔒 Trailing Lock Acionado (LONG)! Vendendo a mercado...")
+                                    await close_futures_position(client, symbol, 'SELL', executed_qty, tp_order_id, sl_order_id, log)
+                                    await register_futures_trade(client, db, symbol, 'LONG', entry_price, cur_price, executed_qty, log)
+                                    checker_task.cancel()
+                                    break
+                            else:
+                                # SHORT
+                                tp_distance = entry_price - tp_price
+                                trigger_price = entry_price - (tp_distance * 0.75)
+                                if lowest_price <= trigger_price and cur_price > lowest_price * 1.002:
+                                    log(f"🔒 Trailing Lock Acionado (SHORT)! Comprando a mercado...")
+                                    await close_futures_position(client, symbol, 'BUY', executed_qty, tp_order_id, sl_order_id, log)
+                                    await register_futures_trade(client, db, symbol, 'SHORT', entry_price, cur_price, executed_qty, log)
+                                    checker_task.cancel()
+                                    break
+                    except asyncio.TimeoutError:
+                        continue # Apenas continua esperando, sem falhar
+        except Exception as ws_err:
+            log(f"⚠️ WS Instável em Futuros para {symbol} ({ws_err}). Somente REST Polling ativo.")
+
+    ws_task = asyncio.create_task(ws_loop())
+    
+    # Aguarda o checker finalizar (indica que a posição foi fechada por TP, SL ou manual)
+    try:
+        await checker_task
+    except asyncio.CancelledError:
+        pass
+        
+    ws_task.cancel()
 
     # Cleanup Global
     active_futures_positions.pop(symbol, None)
