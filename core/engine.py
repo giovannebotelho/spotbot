@@ -524,13 +524,17 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             return "ℹ️ Nenhuma posição ativa no momento para encerrar."
 
         elif cmd == '/status_futures':
+            c_db = None
             try:
-                c = await db.get_connection()
-                total_trades_raw = await c.execute("SELECT COUNT(*) FROM historico_trades WHERE market_type = 'FUTURES'")
-                total_trades = (await total_trades_raw.fetchone())[0]
+                c_db = db.get_connection()
+                cursor = c_db.cursor()
+                cursor.execute("SELECT COUNT(*) as total FROM trades WHERE market_type = 'FUTURES'")
+                row_total = cursor.fetchone()
+                total_trades = row_total["total"] if db.is_postgres else row_total[0]
                 
-                wins_raw = await c.execute("SELECT COUNT(*) FROM historico_trades WHERE market_type = 'FUTURES' AND `Resultado Total Liquido` > 0")
-                wins = (await wins_raw.fetchone())[0]
+                cursor.execute("SELECT COUNT(*) as wins FROM trades WHERE market_type = 'FUTURES' AND trade_result_net > 0")
+                row_wins = cursor.fetchone()
+                wins = row_wins["wins"] if db.is_postgres else row_wins[0]
                 
                 win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
                 
@@ -557,16 +561,20 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             except Exception as e:
                 return f"Erro ao buscar status do futuros: {e}"
             finally:
-                if c: await c.close_connection()
+                if c_db: db.release_connection(c_db)
 
         elif cmd == '/saldo_futures':
+            c_db = None
             try:
                 from services.binance_client import get_futures_usdt_balance
                 usdt_balance = await get_futures_usdt_balance(client)
                 
-                c = await db.get_connection()
-                pnl_raw = await c.execute("SELECT SUM(`Resultado Total Liquido`) FROM historico_trades WHERE market_type = 'FUTURES'")
-                pnl = (await pnl_raw.fetchone())[0] or 0.0
+                c_db = db.get_connection()
+                cursor = c_db.cursor()
+                cursor.execute("SELECT SUM(trade_result_net) as pnl FROM trades WHERE market_type = 'FUTURES'")
+                row_pnl = cursor.fetchone()
+                pnl = row_pnl["pnl"] if db.is_postgres else row_pnl[0]
+                pnl = float(pnl) if pnl is not None else 0.0
                 
                 return (
                     f"💰 <b>SALDOS E PNL (FUTUROS USDS-M)</b>\n"
@@ -577,7 +585,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             except Exception as e:
                 return f"Erro ao buscar saldos de futuros: {e}"
             finally:
-                if 'c' in locals() and c: await c.close_connection()
+                if c_db: db.release_connection(c_db)
 
         elif cmd == '/panic_sell_futures':
             if active_futures_positions:
