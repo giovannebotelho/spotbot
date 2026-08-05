@@ -189,19 +189,51 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                 rsi = calculate_rsi(closes)
                 
                 direction = None
-                # Filtro conservador: Aguarda confirmação do candle atual (reversão confirmada visualmente)
-                is_green_candle = cur_price > cur_open
-                is_red_candle = cur_price < cur_open
+                trigger_reason = ""
                 
-                if rsi < 30 and is_green_candle:
-                    if bb_lower and len(bb_lower) > 0 and bb_lower[-1]:
-                        if cur_price <= bb_lower[-1]:
-                            direction = 'LONG'
-                elif rsi > 70 and is_red_candle:
-                    if bb_upper and len(bb_upper) > 0 and bb_upper[-1]:
-                        if cur_price >= bb_upper[-1]:
-                            direction = 'SHORT'
+                # 1. Gemini AI Panic Scanner (Independente)
+                from services.futures_gemini_news import evaluate_news_sentiment
+                score, gemini_dir, reason = await evaluate_news_sentiment(symbol, log)
+                if gemini_dir in ['LONG', 'SHORT'] and (score <= 25 or score >= 80):
+                    direction = gemini_dir
+                    trigger_reason = f"[GEMINI-AI] Notícia Extrema ({score}): {reason}"
                     
+                if not direction:
+                    # 2. Lead-Lag Alpha + CVD (Independente)
+                    from core.futures_lead_lag import evaluate_lead_lag
+                    from core.futures_cvd_reader import evaluate_cvd
+                    is_lagging, ll_direction = await evaluate_lead_lag(client, symbol)
+                    if is_lagging and ll_direction:
+                        cvd_delta, buy_ratio, cvd_direction = await evaluate_cvd(client, symbol)
+                        if cvd_direction == ll_direction:
+                            direction = ll_direction
+                            trigger_reason = f"[LEAD-LAG] Alpha Impulse. Apoiado por [CVD] (Delta: {cvd_delta:.0f})"
+                            
+                if not direction:
+                    # 3. Análise Técnica Padrão (BB + RSI) com filtro CVD
+                    tech_dir = None
+                    is_green_candle = cur_price > cur_open
+                    is_red_candle = cur_price < cur_open
+                    
+                    if rsi < 30 and is_green_candle:
+                        if bb_lower and len(bb_lower) > 0 and bb_lower[-1] and cur_price <= bb_lower[-1]:
+                            tech_dir = 'LONG'
+                    elif rsi > 70 and is_red_candle:
+                        if bb_upper and len(bb_upper) > 0 and bb_upper[-1] and cur_price >= bb_upper[-1]:
+                            tech_dir = 'SHORT'
+                            
+                    if tech_dir:
+                        from core.futures_cvd_reader import evaluate_cvd
+                        cvd_delta, buy_ratio, cvd_direction = await evaluate_cvd(client, symbol)
+                        # Aborta se CVD apontar forte para a direção oposta
+                        if tech_dir == 'LONG' and cvd_direction == 'SHORT':
+                            log(f"⚠️ [CVD] Abortando LONG em {symbol} devido a agressão vendedora massiva (Delta: {cvd_delta:.0f}).")
+                        elif tech_dir == 'SHORT' and cvd_direction == 'LONG':
+                            log(f"⚠️ [CVD] Abortando SHORT em {symbol} devido a agressão compradora massiva (Delta: {cvd_delta:.0f}).")
+                        else:
+                            direction = tech_dir
+                            trigger_reason = f"[TÉCNICO] RSI/BB Sniper. Filtro [CVD] Validou (Delta: {cvd_delta:.0f})"
+                            
                 if direction:
                     # Re-avalia o saldo antes de entrar, pois operações anteriores no mesmo ciclo podem ter consumido a margem
                     current_balance = await get_futures_usdt_balance(client)
@@ -209,7 +241,8 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                         log(f"⚠️ Saldo insuficiente para novas entradas (${current_balance:.2f}). Pausando scanner...")
                         break
                         
-                    log(f"🚨 [FUTUROS] Oportunidade {direction} detectada em {symbol} (RSI: {rsi:.1f}, Reversão Confirmada)")
+                    log(f"🚨 [FUTUROS] Oportunidade {direction} detectada em {symbol} (RSI: {rsi:.1f})")
+                    log(f"💡 Gatilho: {trigger_reason}")
                         
                     # Usa $20 dólares de margem por trade (com 20x = $400 de posição)
                     margin_usdt = 20.0 
@@ -235,12 +268,16 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                         side_entry = 'BUY' if direction == 'LONG' else 'SELL'
                         
                         # Conditional Orders (5% ROI = 0.25% variação, 10% SL = 0.5% variação com 20x)
-                        if direction == 'LONG':
-                            tp_price = cur_price * 1.0025
-                            sl_price = cur_price * 0.995
+                        # Se veio de Notícia Extrema, usamos SL mais curto
+                        if '[GEMINI-AI]' in trigger_reason:
+                            roi_tp = 1.0025 if direction == 'LONG' else 0.9975
+                            roi_sl = 0.9975 if direction == 'LONG' else 1.0025 # SL super curto para notícia
                         else:
-                            tp_price = cur_price * 0.9975
-                            sl_price = cur_price * 1.005
+                            roi_tp = 1.0025 if direction == 'LONG' else 0.9975
+                            roi_sl = 0.9950 if direction == 'LONG' else 1.0050
+                            
+                        tp_price = cur_price * roi_tp
+                        sl_price = cur_price * roi_sl
                             
                         # Usando a precisão real da exchange
                         tp_price = round(tp_price, price_precision)
@@ -264,9 +301,10 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                                 TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
                                 f"<b>✅ [FUTUROS] Posição {direction} Aberta!</b>\n\n"
                                 f"🪙 <b>Ativo:</b> {symbol}\n"
+                                f"💡 <b>Motivo:</b> {trigger_reason}\n"
                                 f"💰 <b>Entrada:</b> ${entry_price_executed:.4f}\n"
-                                f"🎯 <b>Take Profit:</b> ${tp_price} (5% ROI)\n"
-                                f"🛑 <b>Stop Loss:</b> ${sl_price} (-10% ROI)\n"
+                                f"🎯 <b>Take Profit:</b> ${tp_price}\n"
+                                f"🛑 <b>Stop Loss:</b> ${sl_price}\n"
                                 f"⚡ <b>Alavancagem:</b> {leverage}x"
                             ))
                         
