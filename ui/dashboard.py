@@ -322,12 +322,19 @@ async def update_data():
             else:
                 futures_chart_symbol_badge.set_visibility(False)
 
-        tp_price = engine.bot_status_data.get('tp_price', 0.0)
-        sl_price = engine.bot_status_data.get('sl_price', 0.0)
-        entry_price = engine.bot_status_data.get('entry_price', 0.0)
+        base_selected = selected_chart_symbol.replace('_spot', '').replace('_fut', '') if selected_chart_symbol else None
+
+        if selected_chart_symbol and selected_chart_symbol.endswith('_spot') and base_selected in engine.active_positions:
+            pos_data = engine.active_positions[base_selected]
+            entry_price = pos_data.get('entry', 0.0)
+            tp_price = pos_data.get('tp', 0.0)
+            sl_price = pos_data.get('sl', 0.0)
+        else:
+            entry_price = engine.bot_status_data.get('entry_price', 0.0)
+            tp_price = engine.bot_status_data.get('tp_price', 0.0)
+            sl_price = engine.bot_status_data.get('sl_price', 0.0)
 
         market_data = engine.shared_market_data
-        base_selected = selected_chart_symbol.replace('_spot', '').replace('_fut', '') if selected_chart_symbol else None
         if market_data['dates'] and candle_chart and (not selected_chart_symbol or (selected_chart_symbol.endswith('_spot') and base_selected in engine.active_positions)):
             current_sig = (active_symbol, price_str, len(market_data['dates']), market_data['dates'][-1] if market_data['dates'] else '', tp_price, sl_price, entry_price)
             if current_sig != _last_chart_sig:
@@ -370,12 +377,19 @@ async def update_data():
         fut_current_price = futures_engine.bot_futures_status_data.get('price', 0.0)
         fut_price_str = format_price(fut_current_price)
         
-        fut_tp_price = futures_engine.bot_futures_status_data.get('tp_price', 0.0)
-        fut_sl_price = futures_engine.bot_futures_status_data.get('sl_price', 0.0)
-        fut_entry_price = futures_engine.bot_futures_status_data.get('entry_price', 0.0)
+        fut_state = futures_state.get_all_sync()
+        if selected_chart_symbol and selected_chart_symbol.endswith('_fut') and base_selected in fut_state:
+            pos_data = fut_state[base_selected]
+            fut_entry_price = pos_data.get('entry', 0.0)
+            fut_tp_price = pos_data.get('tp', 0.0)
+            fut_sl_price = pos_data.get('sl', 0.0)
+        else:
+            fut_entry_price = futures_engine.bot_futures_status_data.get('entry_price', 0.0)
+            fut_tp_price = futures_engine.bot_futures_status_data.get('tp_price', 0.0)
+            fut_sl_price = futures_engine.bot_futures_status_data.get('sl_price', 0.0)
 
         fut_market_data = getattr(futures_engine, 'shared_futures_market_data', None)
-        if fut_market_data and fut_market_data['dates'] and candle_chart and (not selected_chart_symbol or (selected_chart_symbol.endswith('_fut') and base_selected in futures_state.get_all_sync())):
+        if fut_market_data and fut_market_data['dates'] and candle_chart and (not selected_chart_symbol or (selected_chart_symbol.endswith('_fut') and base_selected in fut_state)):
             fut_sig = (fut_active_symbol, fut_price_str, len(fut_market_data['dates']), fut_market_data['dates'][-1] if fut_market_data['dates'] else '', fut_tp_price, fut_sl_price, fut_entry_price)
             # using same _last_chart_sig check logic but for futures (create a new one)
             global _last_fut_chart_sig
