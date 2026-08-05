@@ -23,8 +23,8 @@ async def monitor_futures_lifecycle(
     lowest_price = entry_price
     
     try:
-        # WebSocket connection para klines/trades ou user data
-        async with bsm.trade_socket(symbol=symbol.lower()) as ts:
+        # WebSocket connection para klines/trades (Futuros)
+        async with bsm.aggtrade_futures_socket(symbol=symbol.lower()) as ts:
             while True:
                 try:
                     # Um timeout de 10 segundos garante que se a conexão travar sem fechar (zombie connection), 

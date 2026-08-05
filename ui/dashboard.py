@@ -121,8 +121,22 @@ async def change_chart_asset(val):
             except Exception as k_err:
                 print(f"Aviso ao buscar klines via client para {val}: {k_err}")
 
-        if not dates and engine.shared_market_data.get('dates'):
+        is_spot = val in engine.active_positions
+        is_fut = val in futures_engine.active_futures_positions
+
+        # Tenta buscar do Spot Engine primeiro
+        if not dates and engine.shared_market_data.get('dates') and is_spot:
             market_data = engine.shared_market_data
+            dates = market_data['dates']
+            candles = market_data['klines']
+            bb_upper = market_data.get('bb_upper', [])
+            bb_lower = market_data.get('bb_lower', [])
+            ema200 = market_data.get('ema200', [])
+            volumes = market_data.get('volumes', [])
+            
+        # Tenta buscar do Futures Engine
+        if not dates and futures_engine.shared_futures_market_data.get('dates') and is_fut:
+            market_data = futures_engine.shared_futures_market_data
             dates = market_data['dates']
             candles = market_data['klines']
             bb_upper = market_data.get('bb_upper', [])
@@ -131,10 +145,14 @@ async def change_chart_asset(val):
             volumes = market_data.get('volumes', [])
 
         if dates and candles:
+            # OCO/Spot
             pos_info = engine.active_positions.get(val, {})
-            e_p = pos_info.get('entry', engine.bot_status_data.get('entry_price', 0.0))
-            tp_p = pos_info.get('tp', engine.bot_status_data.get('tp_price', 0.0))
-            sl_p = pos_info.get('sl', engine.bot_status_data.get('sl_price', 0.0))
+            # Futures
+            fut_pos_info = futures_engine.active_futures_positions.get(val, {})
+            
+            e_p = pos_info.get('entry', 0.0) or fut_pos_info.get('entry', engine.bot_status_data.get('entry_price', 0.0))
+            tp_p = pos_info.get('tp', 0.0) or fut_pos_info.get('tp', engine.bot_status_data.get('tp_price', 0.0))
+            sl_p = pos_info.get('sl', 0.0) or fut_pos_info.get('sl', engine.bot_status_data.get('sl_price', 0.0))
             
             e_str = format_price(e_p)
             tp_str = format_price(tp_p)
@@ -148,23 +166,51 @@ async def change_chart_asset(val):
             if sl_p > 0:
                 mark_lines.append({'yAxis': sl_p, 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🛑 SL: {sl_str}', 'position': 'insideEndBottom', 'color': '#F43F5E'}})
 
-            candle_chart.options['title'] = {
-                'text': f'📈 {val} (Posição Ativa OCO)',
-                'subtext': f'Entrada: {e_str} | TP: {tp_str} | SL: {sl_str}',
-                'left': 15, 'top': 8,
-                'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
-                'subtextStyle': {'color': '#64748b', 'fontSize': 9}
-            }
-            candle_chart.options['xAxis'][0]['data'] = dates
-            candle_chart.options['xAxis'][1]['data'] = dates
-            candle_chart.options['series'][0]['data'] = candles
-            candle_chart.options['series'][0]['markLine'] = {'symbol': ['none', 'none'], 'data': mark_lines}
-            candle_chart.options['series'][1]['data'] = bb_upper
-            candle_chart.options['series'][2]['data'] = bb_lower
-            candle_chart.options['series'][3]['data'] = ema200
-            if 'volumes' in locals():
-                candle_chart.options['series'][7]['data'] = volumes
-            candle_chart.update()
+            if is_fut and not is_spot:
+                futures_candle_chart.options['title'] = {
+                    'text': f'🚀 {val} (Posição Ativa FUT)',
+                    'subtext': f'Entrada: {e_str} | TP: {tp_str} | SL: {sl_str}',
+                    'left': 15, 'top': 8,
+                    'textStyle': {'color': '#F43F5E', 'fontSize': 13, 'fontWeight': 'bold'},
+                    'subtextStyle': {'color': '#64748b', 'fontSize': 9}
+                }
+                futures_candle_chart.options['xAxis'][0]['data'] = dates
+                futures_candle_chart.options['xAxis'][1]['data'] = dates
+                futures_candle_chart.options['series'][0]['data'] = candles
+                
+                fmark_lines = []
+                if e_p > 0:
+                    fmark_lines.append({'yAxis': e_p, 'lineStyle': {'color': '#F87171', 'type': 'dashed', 'width': 1.5}, 'label': {'formatter': f' Entrada: {e_str}', 'position': 'insideStartTop', 'color': '#F87171'}})
+                if tp_p > 0:
+                    fmark_lines.append({'yAxis': tp_p, 'lineStyle': {'color': '#10B981', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🎯 TP: {tp_str}', 'position': 'insideEndTop', 'color': '#10B981'}})
+                if sl_p > 0:
+                    fmark_lines.append({'yAxis': sl_p, 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🛑 SL: {sl_str}', 'position': 'insideEndBottom', 'color': '#F43F5E'}})
+                
+                futures_candle_chart.options['series'][0]['markLine'] = {'symbol': ['none', 'none'], 'data': fmark_lines}
+                futures_candle_chart.options['series'][1]['data'] = bb_upper
+                futures_candle_chart.options['series'][2]['data'] = bb_lower
+                futures_candle_chart.options['series'][3]['data'] = ema200
+                if 'volumes' in locals():
+                    futures_candle_chart.options['series'][7]['data'] = volumes
+                futures_candle_chart.update()
+            else:
+                candle_chart.options['title'] = {
+                    'text': f'📈 {val} (Posição Ativa OCO)',
+                    'subtext': f'Entrada: {e_str} | TP: {tp_str} | SL: {sl_str}',
+                    'left': 15, 'top': 8,
+                    'textStyle': {'color': '#38BDF8', 'fontSize': 13, 'fontWeight': 'bold'},
+                    'subtextStyle': {'color': '#64748b', 'fontSize': 9}
+                }
+                candle_chart.options['xAxis'][0]['data'] = dates
+                candle_chart.options['xAxis'][1]['data'] = dates
+                candle_chart.options['series'][0]['data'] = candles
+                candle_chart.options['series'][0]['markLine'] = {'symbol': ['none', 'none'], 'data': mark_lines}
+                candle_chart.options['series'][1]['data'] = bb_upper
+                candle_chart.options['series'][2]['data'] = bb_lower
+                candle_chart.options['series'][3]['data'] = ema200
+                if 'volumes' in locals():
+                    candle_chart.options['series'][7]['data'] = volumes
+                candle_chart.update()
     except Exception as e:
         print(f"Aviso ao alterar gráfico para {val}: {e}")
 
@@ -282,7 +328,7 @@ async def update_data():
         entry_price = engine.bot_status_data.get('entry_price', 0.0)
 
         market_data = engine.shared_market_data
-        if market_data['dates'] and candle_chart and not selected_chart_symbol:
+        if market_data['dates'] and candle_chart and (not selected_chart_symbol or selected_chart_symbol in engine.active_positions):
             current_sig = (active_symbol, price_str, len(market_data['dates']), market_data['dates'][-1] if market_data['dates'] else '', tp_price, sl_price, entry_price)
             if current_sig != _last_chart_sig:
                 _last_chart_sig = current_sig
@@ -329,7 +375,7 @@ async def update_data():
         fut_entry_price = futures_engine.bot_futures_status_data.get('entry_price', 0.0)
 
         fut_market_data = getattr(futures_engine, 'shared_futures_market_data', None)
-        if fut_market_data and fut_market_data['dates'] and futures_candle_chart and not selected_chart_symbol:
+        if fut_market_data and fut_market_data['dates'] and futures_candle_chart and (not selected_chart_symbol or selected_chart_symbol in futures_engine.active_futures_positions):
             fut_sig = (fut_active_symbol, fut_price_str, len(fut_market_data['dates']), fut_market_data['dates'][-1] if fut_market_data['dates'] else '', fut_tp_price, fut_sl_price, fut_entry_price)
             # using same _last_chart_sig check logic but for futures (create a new one)
             global _last_fut_chart_sig
@@ -746,8 +792,8 @@ async def index():
                     render_spot_chart_tabs()
                     render_futures_chart_tabs()
                     
-                    spot_chart_tabs.bind_visibility_from(main_tabs, 'value', backward=lambda v: v == 'SPOT')
-                    futures_chart_tabs.bind_visibility_from(main_tabs, 'value', backward=lambda v: v == 'FUTUROS')
+                    spot_chart_tabs.bind_visibility_from(main_tabs, 'value', backward=lambda v: getattr(v, 'name', v) == 'SPOT')
+                    futures_chart_tabs.bind_visibility_from(main_tabs, 'value', backward=lambda v: getattr(v, 'name', v) == 'FUTUROS')
 
                 with ui.row().classes('items-center gap-2.5 text-[0.6rem] font-mono text-slate-400 flex-shrink-0 hidden xl:flex ml-auto'):
                     ui.label('LEGENDA:').classes('font-bold text-slate-500')
