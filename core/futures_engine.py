@@ -78,7 +78,6 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                         import pandas as pd
                         import datetime as dt_module
                         from config.settings import TIMEZONE, TRADING_CONFIG
-                        from services.binance_client import get_futures_klines
                         klines_raw = await get_futures_klines(client, symbol=rec_symbol, interval=TRADING_CONFIG['interval'], limit=100)
                         if klines_raw:
                             klines_rec = [float(k[4]) for k in klines_raw]
