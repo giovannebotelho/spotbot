@@ -31,6 +31,17 @@ async def monitor_futures_lifecycle(
                     # forçamos a queda para o REST Polling
                     msg = await asyncio.wait_for(ts.recv(), timeout=10.0)
                     
+                    import time
+                    now = time.time()
+                    if now - locals().get('_last_pos_check', 0) > 15:
+                        locals()['_last_pos_check'] = now
+                        pos_info = await client.futures_position_information(symbol=symbol)
+                        if pos_info and float(pos_info[0]['positionAmt']) == 0.0:
+                            log(f"⚠️ Posição de {symbol} foi fechada manualmente ou externamente!")
+                            await close_futures_position(client, symbol, 'SELL' if position_side == 'LONG' else 'BUY', executed_qty, tp_order_id, sl_order_id, log)
+                            await register_futures_trade(client, db, symbol, position_side, entry_price, cur_price, executed_qty, log)
+                            break
+                    
                     if 'p' in msg:
                         cur_price = float(msg['p'])
                         
@@ -76,11 +87,19 @@ async def monitor_futures_lifecycle(
                 tp_details = await get_futures_order_details(client, symbol, tp_order_id)
                 sl_details = await get_futures_order_details(client, symbol, sl_order_id)
                 
-                if tp_details['status'] in ['FILLED', 'CANCELED'] or sl_details['status'] in ['FILLED', 'CANCELED']:
-                    log(f"🎯 Posição de Futuros fechada! TP: {tp_details['status']}, SL: {sl_details['status']}")
-                    
-                    # Cancel the other orphan order
-                    if tp_details['status'] == 'FILLED':
+                pos_info = await client.futures_position_information(symbol=symbol)
+                is_manually_closed = pos_info and float(pos_info[0]['positionAmt']) == 0.0
+                
+                if tp_details['status'] in ['FILLED'] or sl_details['status'] in ['FILLED'] or is_manually_closed:
+                    if is_manually_closed and tp_details['status'] != 'FILLED' and sl_details['status'] != 'FILLED':
+                        log(f"⚠️ Posição de {symbol} foi fechada manualmente ou externamente!")
+                        await close_futures_position(client, symbol, 'SELL' if position_side == 'LONG' else 'BUY', executed_qty, tp_order_id, sl_order_id, log)
+                        exit_price = float(bot_futures_status_data.get('price', entry_price))
+                    else:
+                        log(f"🎯 Posição de Futuros fechada! TP: {tp_details['status']}, SL: {sl_details['status']}")
+                        
+                        # Cancel the other orphan order
+                        if tp_details['status'] == 'FILLED':
                         try:
                             await cancel_futures_order(client, symbol, sl_order_id)
                         except: pass
@@ -139,6 +158,8 @@ async def register_futures_trade(client, db, symbol, direction, entry, exit, qty
             "Quantidade de Moeda": qty,
             "Meta de Lucro OCO": exit,
             "Data/Hora da Compra": dt_module.datetime.now(TIMEZONE).strftime("%d/%m/%Y at %H:%M:%S"),
+            "Data/Hora OCO": dt_module.datetime.now(TIMEZONE).strftime("%d/%m/%Y %H:%M:%S"),
+            "Resultado da Ordem OCO": "profit" if gross_pnl > 0 else "loss",
             "Resultado Total Bruto": gross_pnl,
             "Resultado Total Liquido": gross_pnl * 0.96, # desconto de taxa ficticio
             "market_type": "FUTURES",
