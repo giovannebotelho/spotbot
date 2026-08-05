@@ -143,7 +143,8 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                 
                 try:
                     # Setup alavancagem 20x Isolada
-                    await setup_futures_margin(client, symbol, leverage=20, margin_type='ISOLATED')
+                    if not await setup_futures_margin(client, symbol, leverage=20, margin_type='ISOLATED'):
+                        continue
                     
                     # Fetch Klines 15m
                     from config.settings import TRADING_CONFIG
