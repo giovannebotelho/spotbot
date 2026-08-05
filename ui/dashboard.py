@@ -669,7 +669,7 @@ async def index():
 
             # Área do Gráfico (com sistema de Tabs)
             with ui.column().classes('w-full flex-shrink-0 h-[470px] lg:h-[64vh] min-h-[420px] p-0 border-b border-slate-800 relative'):
-                with ui.tabs().classes('w-full h-14 bg-[#080B10] border-b border-slate-800 text-sm font-bold').props('active-color=sky-400 align=left indicator-color=sky-400') as main_tabs:
+                with ui.tabs().classes('w-full h-16 bg-[#080B10] border-b border-slate-800 text-sm font-bold').props('active-color=sky-400 align=left indicator-color=sky-400') as main_tabs:
                     spot_tab = ui.tab('SPOT', icon='show_chart').classes('py-2')
                     futures_tab = ui.tab('FUTUROS', icon='rocket_launch').classes('text-rose-400 py-2')
                 
