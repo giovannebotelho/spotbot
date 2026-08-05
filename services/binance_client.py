@@ -200,3 +200,8 @@ async def place_futures_conditional_order(client, symbol, side, order_type, quan
 async def get_futures_order_details(client, symbol, order_id):
     """Obtém detalhes de uma ordem específica de Futuros pelo ID."""
     return await client.futures_get_order(symbol=symbol, orderId=order_id)
+
+async def get_futures_klines(client, symbol, interval, limit):
+    """Obtém as velas (klines) para um símbolo de Futuros específicos."""
+    return await client.futures_klines(symbol=symbol, interval=interval, limit=limit)
+
