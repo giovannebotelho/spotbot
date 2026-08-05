@@ -135,7 +135,8 @@ async def get_futures_usdt_balance(client):
         balances = await client.futures_account_balance()
         for asset in balances:
             if asset['asset'] == 'USDT':
-                return float(asset['withdrawAvailable'])
+                # No /fapi/v2/balance a chave correta para o saldo sacável/disponível é 'availableBalance' ou 'maxWithdrawAmount'
+                return float(asset.get('availableBalance', asset.get('withdrawAvailable', asset.get('balance', 0.0))))
         return 0.0
     except Exception as e:
         print(f"Error fetching futures balance: {e}")
