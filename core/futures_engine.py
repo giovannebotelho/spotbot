@@ -8,6 +8,7 @@ from core.decision import get_precision
 from core.indicators import calculate_rsi
 from core.futures_order_manager import monitor_futures_lifecycle
 from services.telegram_notifier import send_telegram_message
+from config.settings import TOP_40_SYMBOLS
 
 bot_futures_running = False
 active_futures_positions = {}
@@ -38,7 +39,7 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
     except Exception as e:
         log(f"⚠️ Erro ao buscar saldo inicial de Futuros: {e}")
     
-    symbols_to_scan = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'ADAUSDT', 'AVAXUSDT']
+    symbols_to_scan = TOP_40_SYMBOLS
     
     try:
         exchange_info = await client.futures_exchange_info()
@@ -233,6 +234,18 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                         bot_futures_status_data['active_symbols'] = list(active_futures_positions.keys())
                         
                         log(f"✅ [FUTUROS] Posição {direction} aberta em {symbol} a ${entry_price:.4f} (TP: ${tp_price}, SL: ${sl_price})")
+                        
+                        from config.settings import TELEGRAM_CONFIG
+                        if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
+                            asyncio.create_task(send_telegram_message(
+                                TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
+                                f"<b>✅ [FUTUROS] Posição {direction} Aberta!</b>\n\n"
+                                f"🪙 <b>Ativo:</b> {symbol}\n"
+                                f"💰 <b>Entrada:</b> ${entry_price:.4f}\n"
+                                f"🎯 <b>Take Profit:</b> ${tp_price} (10% ROI)\n"
+                                f"🛑 <b>Stop Loss:</b> ${sl_price} (-10% ROI)\n"
+                                f"⚡ <b>Alavancagem:</b> 20x"
+                            ))
                         
                         # Inicia Monitoramento Lifecycle
                         asyncio.create_task(monitor_futures_lifecycle(

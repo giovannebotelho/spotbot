@@ -44,16 +44,20 @@ DB_CONFIG = {
 }
 DATABASE_URL = DB_CONFIG['url']
 
-TOP_20_SYMBOLS = [
+TOP_40_SYMBOLS = [
     'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
     'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'LINKUSDT', 'NEARUSDT',
     'DOTUSDT', 'MATICUSDT', 'SHIBUSDT', 'LTCUSDT', 'UNIUSDT',
-    'APTUSDT', 'SUIUSDT', 'PEPEUSDT', 'FETUSDT', 'RENDERUSDT'
+    'APTUSDT', 'SUIUSDT', 'PEPEUSDT', 'FETUSDT', 'RENDERUSDT',
+    'FILUSDT', 'ARBUSDT', 'OPUSDT', 'INJUSDT', 'STXUSDT',
+    'TIAUSDT', 'GRTUSDT', 'RNDRUSDT', 'SNXUSDT', 'THETAUSDT',
+    'AAVEUSDT', 'FTMUSDT', 'SANDUSDT', 'MANAUSDT', 'AXSUSDT',
+    'GALAUSDT', 'CHZUSDT', 'ENJUSDT', 'ALGOUSDT', 'ICPUSDT'
 ]
 
 SCANNER_CONFIG = {
     'enabled': True,
-    'top_symbols': TOP_20_SYMBOLS,
+    'top_symbols': TOP_40_SYMBOLS,
     'min_order_usdt': 10.0,
     'macro_interval': '4h',
     'default_micro_interval': '1h',

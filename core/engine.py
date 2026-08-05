@@ -10,7 +10,7 @@ from binance import BinanceSocketManager
 from binance import AsyncClient as BinanceAsyncClient
 from binance.exceptions import BinanceAPIException
 
-from config.settings import API_KEYS, TELEGRAM_CONFIG, TRADING_CONFIG, RSI_CONFIG, TRAILING_STOP_CONFIG, SCANNER_CONFIG, TOP_20_SYMBOLS, MAX_CONCURRENT_POSITIONS, RESERVE_FRACTION_FOR_DCA, TIMEZONE
+from config.settings import API_KEYS, TELEGRAM_CONFIG, TRADING_CONFIG, RSI_CONFIG, TRAILING_STOP_CONFIG, SCANNER_CONFIG, TOP_40_SYMBOLS, MAX_CONCURRENT_POSITIONS, RESERVE_FRACTION_FOR_DCA, TIMEZONE
 from services.binance_client import extract_closes, extract_volumes, get_usdt_balance, get_order_details, get_klines, get_bnb_price, get_multi_klines
 from core.indicators import (
     calculate_rsi, calculate_macd, calculate_bollinger_bands, check_trend, check_candle_patterns,
@@ -383,7 +383,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             try:
                 c = await BinanceAsyncClient.create(api_key, api_secret)
                 await sync_binance_time(c, log=lambda m: None)
-                multi_klines = await get_multi_klines(c, TOP_20_SYMBOLS, TRADING_CONFIG['interval'], 50)
+                multi_klines = await get_multi_klines(c, TOP_40_SYMBOLS, TRADING_CONFIG['interval'], 50)
                 ranked_assets = calculate_relative_strength_rank(multi_klines)
                 
                 lines = [f"🔥 <b>TOP 5 FORÇA RELATIVA & MOMENTUM (SCANNER 2.0)</b>\n━━━━━━━━━━━━━━━━━━━"]
@@ -780,7 +780,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 active_target_symbol = symbol
                 if is_scanner_mode:
                     status(f"⚡ Scanner 2.0 avaliando Top 20... (Vagas Livres: {MAX_CONCURRENT_POSITIONS - len(active_positions)}/{MAX_CONCURRENT_POSITIONS})")
-                    multi_klines = await get_multi_klines(client, TOP_20_SYMBOLS, TRADING_CONFIG['interval'], TRADING_CONFIG['limit'])
+                    multi_klines = await get_multi_klines(client, TOP_40_SYMBOLS, TRADING_CONFIG['interval'], TRADING_CONFIG['limit'])
                     ranked_assets = calculate_relative_strength_rank(multi_klines)
                     if ranked_assets:
                         available_assets = [a for a in ranked_assets if a['symbol'] not in active_positions]

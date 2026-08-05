@@ -652,8 +652,8 @@ async def index():
             with ui.column().classes('w-full gap-1'):
                 ui.label('MODO DE MONITORAMENTO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
                 symbol_select = ui.select(
-                    options=['⚡ SCANNER TOP 20', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'LINKUSDT', 'NEARUSDT'],
-                    value='⚡ SCANNER TOP 20'
+                    options=['⚡ SCANNER TOP 40', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'LINKUSDT', 'NEARUSDT'],
+                    value='⚡ SCANNER TOP 40'
                 ).classes('w-full input-zinc bg-[#121722] rounded-lg').props('dark outlined dense')
 
             with ui.column().classes('w-full gap-1'):
