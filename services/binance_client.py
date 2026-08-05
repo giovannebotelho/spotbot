@@ -151,8 +151,11 @@ async def setup_futures_margin(client, symbol, leverage=20, margin_type='ISOLATE
         # Tenta mudar a margem
         await client.futures_change_margin_type(symbol=symbol, marginType=margin_type)
     except Exception as e:
-        # Se já estiver configurado, a Binance lança um erro (-4046 No need to change margin type).
-        if "-4046" not in str(e):
+        # -4046: No need to change margin type
+        # -4067: Position side cannot be changed if there exists open orders
+        # -4131: The margin type cannot be changed if there exists open orders
+        err_str = str(e)
+        if "-4046" not in err_str and "-4067" not in err_str and "-4131" not in err_str:
             print(f"Warning setting margin type for {symbol}: {e}")
             
     try:
