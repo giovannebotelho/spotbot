@@ -61,9 +61,11 @@ paper_trading_switch = None
 
 chart_symbol_badge = None
 chart_asset_select = None
-chart_tabs = None
+spot_chart_tabs = None
+futures_chart_tabs = None
 selected_chart_symbol = None
-_last_rendered_tabs = set()
+_last_rendered_spot_tabs = set()
+_last_rendered_fut_tabs = set()
 
 bot_task = None
 
@@ -167,22 +169,34 @@ async def change_chart_asset(val):
         print(f"Aviso ao alterar gráfico para {val}: {e}")
 
 @ui.refreshable
-def render_chart_tabs():
-    global chart_tabs, selected_chart_symbol, _last_rendered_tabs
+def render_spot_chart_tabs():
+    global spot_chart_tabs, selected_chart_symbol, _last_rendered_spot_tabs
     
-    chart_tabs = ui.tabs(on_change=lambda e: asyncio.create_task(change_chart_asset(e.value))).props('dense active-color=sky-400 indicator-color=sky-400 text-color=slate-400 no-caps').classes('bg-transparent min-h-[40px] text-xs')
-    with chart_tabs:
-        ui.tab('foco', label='⚡ Foco do Bot (Scanner)', icon='center_focus_strong')
-        for sym in sorted(_last_rendered_tabs):
-            is_spot = sym in engine.active_positions
-            is_fut = sym in futures_engine.active_futures_positions
-            label_suffix = '(OCO)' if is_spot and not is_fut else ('(FUT)' if is_fut and not is_spot else '(SPOT/FUT)')
-            ui.tab(sym, label=f'🪙 {sym} {label_suffix}', icon='show_chart')
+    spot_chart_tabs = ui.tabs(on_change=lambda e: asyncio.create_task(change_chart_asset(e.value))).props('dense active-color=sky-400 indicator-color=sky-400 text-color=slate-400 no-caps').classes('bg-transparent min-h-[40px] text-xs')
+    with spot_chart_tabs:
+        ui.tab('foco', label='⚡ Foco (Scanner Spot)', icon='center_focus_strong')
+        for sym in sorted(_last_rendered_spot_tabs):
+            ui.tab(sym, label=f'🪙 {sym} (OCO)', icon='show_chart')
             
-    if selected_chart_symbol and selected_chart_symbol in _last_rendered_tabs:
-        chart_tabs.value = selected_chart_symbol
+    if selected_chart_symbol and selected_chart_symbol in _last_rendered_spot_tabs:
+        spot_chart_tabs.value = selected_chart_symbol
     else:
-        chart_tabs.value = 'foco'
+        spot_chart_tabs.value = 'foco'
+
+@ui.refreshable
+def render_futures_chart_tabs():
+    global futures_chart_tabs, selected_chart_symbol, _last_rendered_fut_tabs
+    
+    futures_chart_tabs = ui.tabs(on_change=lambda e: asyncio.create_task(change_chart_asset(e.value))).props('dense active-color=rose-400 indicator-color=rose-400 text-color=slate-400 no-caps').classes('bg-transparent min-h-[40px] text-xs')
+    with futures_chart_tabs:
+        ui.tab('foco', label='⚡ Foco (Scanner Futuros)', icon='center_focus_strong')
+        for sym in sorted(_last_rendered_fut_tabs):
+            ui.tab(sym, label=f'🚀 {sym} (FUT)', icon='rocket_launch')
+            
+    if selected_chart_symbol and selected_chart_symbol in _last_rendered_fut_tabs:
+        futures_chart_tabs.value = selected_chart_symbol
+    else:
+        futures_chart_tabs.value = 'foco'
 
 async def update_data():
     global start_btn, stop_btn, status_indicator, _last_chart_sig
@@ -229,15 +243,26 @@ async def update_data():
                 risk_profile_select.value = settings.ACTIVE_RISK_PROFILE
 
         # Sincronização Dinâmica de Abas do Gráfico (Multi-Ativo)
-        if chart_tabs:
-            current_active_keys = set(engine.active_positions.keys()).union(set(futures_engine.active_futures_positions.keys()))
-            global _last_rendered_tabs
-            if current_active_keys != _last_rendered_tabs:
-                _last_rendered_tabs = current_active_keys.copy()
-                render_chart_tabs.refresh()
+        if 'spot_chart_tabs' in globals() and spot_chart_tabs:
+            current_active_spot = set(engine.active_positions.keys())
+            global _last_rendered_spot_tabs
+            if current_active_spot != _last_rendered_spot_tabs:
+                _last_rendered_spot_tabs = current_active_spot.copy()
+                render_spot_chart_tabs.refresh()
                 
-                if current_active_keys and (not selected_chart_symbol or selected_chart_symbol == 'foco'):
-                    first_sym = sorted(current_active_keys)[0]
+                if current_active_spot and (not selected_chart_symbol or selected_chart_symbol == 'foco'):
+                    first_sym = sorted(current_active_spot)[0]
+                    await change_chart_asset(first_sym)
+
+        if 'futures_chart_tabs' in globals() and futures_chart_tabs:
+            current_active_fut = set(futures_engine.active_futures_positions.keys())
+            global _last_rendered_fut_tabs
+            if current_active_fut != _last_rendered_fut_tabs:
+                _last_rendered_fut_tabs = current_active_fut.copy()
+                render_futures_chart_tabs.refresh()
+                
+                if current_active_fut and (not selected_chart_symbol or selected_chart_symbol == 'foco'):
+                    first_sym = sorted(current_active_fut)[0]
                     await change_chart_asset(first_sym)
 
         active_symbol = engine.bot_status_data.get('target_asset', 'BTCUSDT')
@@ -718,7 +743,11 @@ async def index():
             # Barra de Abas do Gráfico (Multi-Ativo) & Legenda Estilo Binance (Sub-abas)
             with ui.row().classes('w-full min-h-[48px] bg-[#0B0E14] border-b border-slate-800/80 px-2 sm:px-3 items-center justify-between gap-2 flex-shrink-0 z-20 overflow-x-auto flex-nowrap'):
                 with ui.row().classes('items-center gap-1 flex-shrink-0 min-h-[40px]'):
-                    render_chart_tabs()
+                    render_spot_chart_tabs()
+                    render_futures_chart_tabs()
+                    
+                    spot_chart_tabs.bind_visibility_from(main_tabs, 'value', backward=lambda v: v == 'SPOT')
+                    futures_chart_tabs.bind_visibility_from(main_tabs, 'value', backward=lambda v: v == 'FUTUROS')
 
                 with ui.row().classes('items-center gap-2.5 text-[0.6rem] font-mono text-slate-400 flex-shrink-0 hidden xl:flex ml-auto'):
                     ui.label('LEGENDA:').classes('font-bold text-slate-500')

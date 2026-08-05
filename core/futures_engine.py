@@ -197,14 +197,14 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                         entry_price = float(entry_order.get('avgPrice', cur_price))
                         if entry_price == 0.0: entry_price = cur_price
                         
-                        # Conditional Orders (TP 3%, SL 2%)
+                        # Conditional Orders (10% ROI = 0.5% variação com 20x de alavancagem)
                         if direction == 'LONG':
-                            tp_price = entry_price * 1.03
-                            sl_price = entry_price * 0.98
+                            tp_price = entry_price * 1.005
+                            sl_price = entry_price * 0.995
                             side_exit = 'SELL'
                         else:
-                            tp_price = entry_price * 0.97
-                            sl_price = entry_price * 1.02
+                            tp_price = entry_price * 0.995
+                            sl_price = entry_price * 1.005
                             side_exit = 'BUY'
                             
                         # Usando a precisão real da exchange
