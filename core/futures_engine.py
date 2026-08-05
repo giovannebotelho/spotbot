@@ -38,6 +38,10 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
             ))
     except Exception as e:
         log(f"⚠️ Erro ao buscar saldo inicial de Futuros: {e}")
+        
+    from core.futures_order_manager import run_futures_user_stream, run_fallback_position_monitor
+    asyncio.create_task(run_futures_user_stream(client, db, log))
+    asyncio.create_task(run_fallback_position_monitor(client, db, log))
     
     symbols_to_scan = TOP_40_SYMBOLS
     
@@ -227,36 +231,32 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                     if qty <= 0: continue
                     
                     try:
-                        # Market Entry
+                        from core.futures_order_manager import place_futures_trade_with_protection
                         side_entry = 'BUY' if direction == 'LONG' else 'SELL'
-                        entry_order = await place_futures_order(client, symbol, side_entry, 'MARKET', qty)
-                        
-                        entry_price = float(entry_order.get('avgPrice', cur_price))
-                        if entry_price == 0.0: entry_price = cur_price
                         
                         # Conditional Orders (5% ROI = 0.25% variação, 10% SL = 0.5% variação com 20x)
                         if direction == 'LONG':
-                            tp_price = entry_price * 1.0025
-                            sl_price = entry_price * 0.995
-                            side_exit = 'SELL'
+                            tp_price = cur_price * 1.0025
+                            sl_price = cur_price * 0.995
                         else:
-                            tp_price = entry_price * 0.9975
-                            sl_price = entry_price * 1.005
-                            side_exit = 'BUY'
+                            tp_price = cur_price * 0.9975
+                            sl_price = cur_price * 1.005
                             
                         # Usando a precisão real da exchange
                         tp_price = round(tp_price, price_precision)
                         sl_price = round(sl_price, price_precision)
                         
-                        tp_order = await place_futures_conditional_order(client, symbol, side_exit, 'TAKE_PROFIT_MARKET', qty, tp_price)
-                        sl_order = await place_futures_conditional_order(client, symbol, side_exit, 'STOP_MARKET', qty, sl_price)
+                        entry_order, tp_order, sl_order, entry_price_executed = await place_futures_trade_with_protection(
+                            client, symbol, side_entry, qty, tp_price, sl_price, leverage, log
+                        )
                         
+                        if not entry_order:
+                            continue
+                            
                         active_futures_positions[symbol] = {
-                            'entry': entry_price, 'tp': tp_price, 'sl': sl_price, 'direction': direction
+                            'entry': entry_price_executed, 'tp': tp_price, 'sl': sl_price, 'direction': direction, 'qty': qty
                         }
                         bot_futures_status_data['active_symbols'] = list(active_futures_positions.keys())
-                        
-                        log(f"✅ [FUTUROS] Posição {direction} aberta em {symbol} a ${entry_price:.4f} (TP: ${tp_price}, SL: ${sl_price})")
                         
                         from config.settings import TELEGRAM_CONFIG
                         if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
@@ -264,20 +264,11 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                                 TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
                                 f"<b>✅ [FUTUROS] Posição {direction} Aberta!</b>\n\n"
                                 f"🪙 <b>Ativo:</b> {symbol}\n"
-                                f"💰 <b>Entrada:</b> ${entry_price:.4f}\n"
+                                f"💰 <b>Entrada:</b> ${entry_price_executed:.4f}\n"
                                 f"🎯 <b>Take Profit:</b> ${tp_price} (5% ROI)\n"
                                 f"🛑 <b>Stop Loss:</b> ${sl_price} (-10% ROI)\n"
-                                f"⚡ <b>Alavancagem:</b> 20x"
+                                f"⚡ <b>Alavancagem:</b> {leverage}x"
                             ))
-                        
-                        # Inicia Monitoramento Lifecycle
-                        asyncio.create_task(monitor_futures_lifecycle(
-                            client, bsm, symbol, direction, entry_price, qty,
-                            tp_order.get('orderId') or tp_order.get('algoId'),
-                            sl_order.get('orderId') or sl_order.get('algoId'),
-                            tp_price, sl_price, db,
-                            active_futures_positions, bot_futures_status_data, log, status
-                        ))
                         
                     except Exception as e:
                         log(f"❌ Erro ao abrir posição {direction} em {symbol}: {e}")

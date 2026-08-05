@@ -191,3 +191,119 @@ async def register_futures_trade(client, db, symbol, direction, entry, exit, qty
             "leverage": 20
         }
         db.add_trade(data)
+
+async def place_futures_trade_with_protection(client, symbol, side, qty, tp_price, sl_price, leverage, log):
+    """Coloca ordem primária e as ordens condicionais de proteção (TP/SL)."""
+    try:
+        # 1. Ordem de Entrada
+        entry_order = await client.futures_create_order(
+            symbol=symbol, side=side, type='MARKET', quantity=qty
+        )
+        # Calcula entry_price
+        entry_price = 0.0
+        if entry_order.get('avgPrice') and float(entry_order['avgPrice']) > 0:
+            entry_price = float(entry_order['avgPrice'])
+        else:
+            entry_price = float((await client.futures_symbol_ticker(symbol=symbol))['price'])
+
+        # Determina lado de saída
+        exit_side = 'SELL' if side == 'BUY' else 'BUY'
+
+        # 2. Ordem TP
+        tp_order = await client.futures_create_order(
+            symbol=symbol, side=exit_side, type='TAKE_PROFIT_MARKET',
+            stopPrice=str(tp_price), closePosition='true', timeInForce='GTC'
+        )
+        
+        # 3. Ordem SL
+        sl_order = await client.futures_create_order(
+            symbol=symbol, side=exit_side, type='STOP_MARKET',
+            stopPrice=str(sl_price), closePosition='true', timeInForce='GTC'
+        )
+        
+        log(f"✅ [FUTUROS] Posição {side} aberta em {symbol} a ${entry_price:.4f} (TP: ${tp_price:.4f}, SL: ${sl_price:.4f})")
+        return entry_order, tp_order, sl_order, entry_price
+    except Exception as e:
+        log(f"⚠️ Erro ao posicionar trade em {symbol}: {e}")
+        # Tentativa de cleanup caso falhe no meio
+        try:
+            await client.futures_cancel_all_open_orders(symbol=symbol)
+            await client.futures_create_order(symbol=symbol, side='SELL' if side == 'BUY' else 'BUY', type='MARKET', quantity=qty, reduceOnly='true')
+        except:
+            pass
+        return None, None, None, 0.0
+
+async def handle_user_data_stream_event(client, db, event, log):
+    """Processa eventos do WebSocket de usuário (ORDER_TRADE_UPDATE)."""
+    from core.futures_engine import active_futures_positions, bot_futures_status_data
+    
+    if event.get('e') == 'ORDER_TRADE_UPDATE':
+        order = event.get('o', {})
+        symbol = order.get('s')
+        status = order.get('X')
+        order_type = order.get('o')
+        
+        if status == 'FILLED' and order_type in ['TAKE_PROFIT_MARKET', 'STOP_MARKET', 'MARKET']:
+            # Verifica se o símbolo está ativo para fechar e limpar
+            if symbol in active_futures_positions:
+                pos = active_futures_positions.pop(symbol)
+                bot_futures_status_data['active_symbols'] = list(active_futures_positions.keys())
+                
+                log(f"🎯 [UDS] Execução detectada para {symbol} ({status}). Limpando ordens órfãs...")
+                try:
+                    await client.futures_cancel_all_open_orders(symbol=symbol)
+                except Exception as e:
+                    log(f"⚠️ Aviso ao cancelar ordens de {symbol}: {e}")
+                
+                realized_pnl = float(order.get('rp', 0))
+                exit_price = float(order.get('ap', 0))
+                if exit_price == 0:
+                    exit_price = float(order.get('sp', 0))
+                    
+                entry_price = pos.get('entry', 0.0)
+                qty = pos.get('qty', 0.0)
+                direction = pos.get('direction', 'LONG')
+                
+                await register_futures_trade(client, db, symbol, direction, entry_price, exit_price, qty, log, realized_pnl)
+
+async def run_fallback_position_monitor(client, db, log):
+    """Fallback de segurança que roda a cada 5 segundos para limpar posições se o WS falhar."""
+    from core.futures_engine import active_futures_positions, bot_futures_status_data
+    import asyncio
+    
+    while True:
+        await asyncio.sleep(5)
+        symbols_to_check = list(active_futures_positions.keys())
+        if not symbols_to_check:
+            continue
+            
+        try:
+            positions = await client.futures_position_information()
+            for pos in positions:
+                symbol = pos['symbol']
+                if symbol in symbols_to_check and float(pos['positionAmt']) == 0.0:
+                    # Posição fechou mas o WS não pegou!
+                    log(f"⚠️ [FALLBACK] Orphan order detected by fallback loop and cancelled para {symbol}.")
+                    
+                    try:
+                        await client.futures_cancel_all_open_orders(symbol=symbol)
+                    except: pass
+                    
+                    pos_data = active_futures_positions.pop(symbol, None)
+                    bot_futures_status_data['active_symbols'] = list(active_futures_positions.keys())
+                    
+                    if pos_data:
+                        # Busca o PnL exato das ordens recentes
+                        realized_pnl = 0.0
+                        exit_price = pos_data.get('entry', 0.0)
+                        try:
+                            recent_trades = await client.futures_account_trades(symbol=symbol, limit=5)
+                            closing_trades = [t for t in recent_trades if float(t.get('realizedPnl', 0)) != 0]
+                            if closing_trades:
+                                realized_pnl = sum(float(t['realizedPnl']) for t in closing_trades)
+                                exit_price = float(closing_trades[-1]['price'])
+                        except: pass
+                        
+                        await register_futures_trade(client, db, symbol, pos_data['direction'], pos_data['entry'], exit_price, pos_data['qty'], log, realized_pnl)
+        except Exception as e:
+            log(f"⚠️ Erro no Fallback Monitor: {e}")
