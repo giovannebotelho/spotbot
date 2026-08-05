@@ -308,46 +308,39 @@ async def update_data():
         pass
 
 async def update_recent_trades_table():
-    global _last_trades_sig
-    if not recent_trades_table:
-        return
-
     trades_df = await asyncio.to_thread(db.get_recent_trades, 10)
     if trades_df.empty:
-        if _last_trades_sig != 0:
-            _last_trades_sig = 0
-            recent_trades_table.rows = []
+        recent_trades_table.rows = []
+        recent_trades_table.update()
         return
 
-    if 'id' in trades_df.columns:
-        trades_df = trades_df.sort_values('id', ascending=False)
-        current_sig = trades_df['id'].max()
-    else:
-        current_sig = len(trades_df)
-
-    if current_sig != _last_trades_sig:
-        _last_trades_sig = current_sig
-        rows = []
-        for _, row in trades_df.iterrows():
-            pnl_val = row.get('Resultado da Ordem OCO')
-            if not isinstance(pnl_val, (int, float)):
-                 pnl_val = row.get('Resultado Parcial da Transação Líquido', 0)
-            
-            try:
-                pnl_float = float(pnl_val)
-                pnl_str = f"${pnl_float:.2f}"
-            except Exception:
-                pnl_str = str(pnl_val)
-            
-            rows.append({
-                'date': str(row.get('Data/Hora da Compra', 'N/A')),
-                'pair': str(row.get('Símbolo', 'N/A')),
-                'type': 'OCO',
-                'result': str(row.get('Resultado da Ordem OCO', '-')),
-                'pnl': pnl_str,
-            })
-            
-        recent_trades_table.rows = rows
+    rows = []
+    for _, row in trades_df.iterrows():
+        pnl_val = row.get('Resultado da Ordem OCO')
+        if not isinstance(pnl_val, (int, float)):
+             pnl_val = row.get('Resultado Total Liquido') or row.get('Resultado Parcial da Transação Líquido', 0)
+        
+        try:
+            pnl_float = float(pnl_val)
+            pnl_str = f"{pnl_float:.2f}"
+        except Exception:
+            pnl_str = "0.00"
+            pnl_float = 0.0
+        
+        m_type = str(row.get('market_type', 'SPOT')).upper()
+        d_type = str(row.get('direction', 'LONG')).upper()
+        
+        rows.append({
+            'date': str(row.get('Data/Hora da Compra', 'N/A')),
+            'pair': str(row.get('Símbolo', 'N/A')),
+            'market': m_type,
+            'type': d_type,
+            'pnl': pnl_str,
+            'pnl_raw': pnl_float
+        })
+        
+    recent_trades_table.rows = rows
+    recent_trades_table.update()
 
 async def start_bot():
     global bot_task
@@ -573,7 +566,17 @@ async def index():
 
                 ui.button('📄 Exportar Extrato CSV', on_click=download_csv_export).props('unelevated dense size=xs color=sky-700 text-color=white').classes('w-full mt-1 text-[0.65rem] font-bold')
 
-            with ui.column().classes('w-full gap-1 mt-1'):
+            with ui.column().classes('w-full gap-2 mt-2'):
+                ui.label('MERCADO FUTUROS (HedgeFund)').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
+                with ui.row().classes('w-full justify-between items-center p-2 rounded-xl bg-[#2a1215] border border-rose-900/50'):
+                    ui.label('Saldo Futuros').classes('text-xs text-slate-400')
+                    futures_usdt_val = ui.label('$0.00').classes('font-mono text-sm font-bold text-rose-400')
+                
+                with ui.row().classes('w-full justify-between items-center p-2 rounded-xl bg-[#2a1215] border border-rose-900/50'):
+                    ui.label('Lucro (Futuros)').classes('text-xs text-slate-400')
+                    futures_profit_val = ui.label('$0.00').classes('font-mono text-sm font-bold text-rose-400')
+
+            with ui.column().classes('w-full gap-1 mt-2'):
                 ui.label('STATUS ATUAL').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
                 status_ui = ui.markdown('**Aguardando...**').classes('text-xs text-slate-300 leading-relaxed w-full break-words')
 
@@ -666,14 +669,20 @@ async def index():
 
             # Seção Central do Gráfico (+30% de Altura Explicita)
             with ui.element('div').classes('w-full h-[470px] lg:h-[64vh] min-h-[420px] relative border-b border-slate-800 flex-shrink-0 bg-[#0B0E14]'):
-                # Badge Flutuante no Canto Superior Direito
-                with ui.row().classes('absolute top-3 right-4 z-20 items-center gap-2'):
-                    ui.button(icon='refresh', on_click=lambda: asyncio.create_task(change_chart_asset(selected_chart_symbol if selected_chart_symbol else 'foco'))).props('dense flat color=sky-400 size=sm').classes('bg-[#121722] border border-sky-500/30 rounded-lg shadow-md px-2 py-1').tooltip('Recarregar Gráfico')
-                    chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-sky-400 border border-sky-500/30 backdrop-blur-md shadow-lg')
-
-                # ECharts 100% Visível e Nítido com Titulo Alinhado a Esquerda (Sem colidir com a Badge da Direita!)
-                with ui.element('div').classes('w-full h-full'):
-                    candle_chart = ui.echart(get_main_chart_options()).classes('w-full h-full')
+            # Área do Gráfico (com sistema de Tabs)
+            with ui.column().classes('w-full flex-shrink-0 h-[400px] lg:h-[450px] p-0 border-b border-slate-800 relative'):
+                with ui.tabs().classes('w-full h-10 border-b border-slate-800 text-xs font-semibold').props('dense active-color=sky-400 align=left') as main_tabs:
+                    spot_tab = ui.tab('SPOT', icon='show_chart')
+                    futures_tab = ui.tab('FUTUROS', icon='rocket_launch').classes('text-rose-400')
+                
+                with ui.tab_panels(main_tabs, value=spot_tab).classes('w-full h-full bg-[#0B0E14] p-0'):
+                    with ui.tab_panel(spot_tab).classes('w-full h-full p-0 relative'):
+                        chart_symbol_badge = ui.label('BTCUSDT').classes('absolute top-4 left-4 z-10 bg-[#121722]/80 backdrop-blur-sm text-sky-400 px-3 py-1 rounded border border-sky-500/20 text-xs font-mono font-bold tracking-widest shadow-lg')
+                        candle_chart = ui.echart(get_main_chart_options()).classes('w-full h-full')
+                    
+                    with ui.tab_panel(futures_tab).classes('w-full h-full p-0 relative flex items-center justify-center'):
+                        ui.label('Terminal de Futuros').classes('text-rose-400 font-bold text-xl')
+                        ui.label('Em breve: Multi-gráficos independentes.').classes('text-slate-400 mt-2')
 
             # Painel Inferior (Execuções + Terminal Output Sincronizado)
             with ui.row().classes('w-full flex-shrink-0 flex-col lg:flex-row gap-0 bg-[#0B0E14] min-h-[280px]'):
@@ -687,12 +696,34 @@ async def index():
                         rows=[],
                         pagination={'rowsPerPage': 5}
                     ).classes('w-full h-full no-shadow bg-transparent text-slate-300').props('flat dense square')
+                    
                     recent_trades_table.add_slot('header', r'''
                        <q-tr :props="props" class="bg-[#121722] text-slate-400 text-xs font-semibold">
                            <q-th v-for="col in props.cols" :key="col.name" :props="props">
                                {{ col.label }}
                            </q-th>
                        </q-tr>
+                    ''')
+
+                    recent_trades_table.add_slot('body', r'''
+                        <q-tr :props="props">
+                            <q-td key="date" :props="props" class="text-xs text-slate-400 font-mono">{{ props.row.date }}</q-td>
+                            <q-td key="pair" :props="props" class="text-xs font-bold font-mono">{{ props.row.pair }}</q-td>
+                            <q-td key="market" :props="props">
+                                <q-badge :color="props.row.market === 'FUTURES' ? 'red-10' : 'sky-9'" class="text-[0.6rem] font-bold">
+                                    {{ props.row.market }}
+                                </q-badge>
+                            </q-td>
+                            <q-td key="type" :props="props">
+                                <q-badge :color="props.row.type === 'SHORT' ? 'red-5' : (props.row.type === 'LONG' ? 'green-5' : 'slate-7')" text-color="white" class="text-[0.6rem] font-bold shadow-md">
+                                    {{ props.row.type }}
+                                </q-badge>
+                            </q-td>
+                            <q-td key="pnl" :props="props" :class="props.row.pnl_raw > 0 ? 'text-emerald-400 font-bold font-mono' : 'text-rose-400 font-bold font-mono'">
+                                <span v-if="props.row.pnl_raw > 0">+</span>
+                                ${{ props.row.pnl }}
+                            </q-td>
+                        </q-tr>
                     ''')
 
                 with ui.column().classes('w-full lg:w-2/5 h-64 lg:h-72 bg-[#0B0E14] p-0 flex-col'):
