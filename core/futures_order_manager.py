@@ -45,7 +45,21 @@ async def monitor_futures_lifecycle(
                         await close_futures_position(client, symbol, 'SELL' if position_side == 'LONG' else 'BUY', 0, tp_order_id, None, log)
                         exit_price = float(sl_details.get('avgPrice', sl_details.get('actualPrice', 0))) if float(sl_details.get('avgPrice', sl_details.get('actualPrice', 0))) > 0 else float(sl_details.get('stopPrice', sl_details.get('triggerPrice', 0)))
 
-                await register_futures_trade(client, db, symbol, position_side, entry_price, exit_price, executed_qty, log)
+                realized_pnl = None
+                try:
+                    # Tenta puxar o PnL exato e preço de saída direto da Binance
+                    recent_trades = await client.futures_account_trades(symbol=symbol, limit=10)
+                    if recent_trades:
+                        # Pega as últimas execuções que não têm realizedPnl zero
+                        closing_trades = [t for t in recent_trades if float(t.get('realizedPnl', 0)) != 0]
+                        if closing_trades:
+                            realized_pnl = sum(float(t['realizedPnl']) for t in closing_trades[-3:])
+                            # Opcional: ajustar o exit_price com base na última trade
+                            exit_price = float(closing_trades[-1]['price'])
+                except Exception as api_err:
+                    log(f"Aviso ao buscar PnL real de {symbol}: {api_err}")
+
+                await register_futures_trade(client, db, symbol, position_side, entry_price, exit_price, executed_qty, log, realized_pnl)
                 return True
         except Exception as e:
             log(f"⚠️ Erro na verificação de posição: {e}")
@@ -138,9 +152,13 @@ async def close_futures_position(client, symbol, side, qty, tp_order, sl_order, 
             if "ReduceOnly" not in str(e) and "-2022" not in str(e):
                 log(f"⚠️ Erro ao fechar posição a mercado: {e}")
 
-async def register_futures_trade(client, db, symbol, direction, entry, exit, qty, log):
+async def register_futures_trade(client, db, symbol, direction, entry, exit, qty, log, realized_pnl=None):
     """Registra o trade no DB e avisa no Telegram."""
-    gross_pnl = (exit - entry) * qty if direction == 'LONG' else (entry - exit) * qty
+    if realized_pnl is not None:
+        gross_pnl = realized_pnl
+    else:
+        gross_pnl = (exit - entry) * qty if direction == 'LONG' else (entry - exit) * qty
+        
     log(f"📈 Trade Futuros Concluído ({direction}): PnL Bruto = ${gross_pnl:.2f}")
     
     if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):

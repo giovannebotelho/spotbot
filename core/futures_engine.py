@@ -189,9 +189,13 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                 is_red_candle = cur_price < cur_open
                 
                 if rsi < 30 and is_green_candle:
-                    direction = 'LONG'
+                    if bb_lower and len(bb_lower) > 0 and bb_lower[-1]:
+                        if cur_price <= bb_lower[-1]:
+                            direction = 'LONG'
                 elif rsi > 70 and is_red_candle:
-                    direction = 'SHORT'
+                    if bb_upper and len(bb_upper) > 0 and bb_upper[-1]:
+                        if cur_price >= bb_upper[-1]:
+                            direction = 'SHORT'
                     
                 if direction:
                     # Re-avalia o saldo antes de entrar, pois operações anteriores no mesmo ciclo podem ter consumido a margem
