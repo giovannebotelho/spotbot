@@ -141,12 +141,32 @@ class TelegramBot:
                     ]
                 ]
             }
+        elif menu_type == "futures":
+            return {
+                "inline_keyboard": [
+                    [
+                        {"text": "📊 Status & Ordens Abertas", "callback_data": "/status_futures"},
+                    ],
+                    [
+                        {"text": "💰 PnL & Saldo USDS-M", "callback_data": "/saldo_futures"},
+                    ],
+                    [
+                        {"text": "🔥 PANIC SELL (FUTUROS)", "callback_data": "/panic_sell_futures"},
+                    ],
+                    [
+                        {"text": "🔙 Voltar ao Menu Principal", "callback_data": "sub_main"},
+                    ]
+                ]
+            }
         else: # "main"
             return {
                 "inline_keyboard": [
                     [
-                        {"text": "📊 Status & Saldos", "callback_data": "sub_status"},
-                        {"text": "📈 Posições OCO", "callback_data": "sub_posicoes"},
+                        {"text": "📊 Status & Saldos (Spot)", "callback_data": "sub_status"},
+                        {"text": "📈 Posições OCO (Spot)", "callback_data": "sub_posicoes"},
+                    ],
+                    [
+                        {"text": "🚀 MERCADO FUTUROS", "callback_data": "sub_futures"},
                     ],
                     [
                         {"text": "⚡ Top 20 Scanner", "callback_data": "sub_scanner"},
@@ -206,8 +226,9 @@ class TelegramBot:
                     menu_type = cmd_data.replace('sub_', '')
                     titles = {
                         "main": "🤖 <b>MENU PRINCIPAL — SPOTBOT PRO v6.0</b>\nSelecione um painel abaixo para navegar:",
-                        "status": "📊 <b>PAINEL DE STATUS & SALDOS</b>\nConsulte o estado do robô, saldos e performance acumulada:",
-                        "posicoes": "📈 <b>PAINEL DE POSIÇÕES OCO ATIVAS</b>\nMonitore ordens ativas ou execute encerramentos:",
+                        "status": "📊 <b>PAINEL SPOT (Status & Saldos)</b>\nConsulte o estado do robô, saldos e performance acumulada:",
+                        "posicoes": "📈 <b>PAINEL SPOT (Posições OCO)</b>\nMonitore ordens ativas ou execute encerramentos:",
+                        "futures": "🚀 <b>PAINEL DE MERCADO FUTUROS (HedgeFund)</b>\nControle posições alavancadas Long/Short de forma independente:",
                         "risco": "⚙️ <b>CONFIGURAÇÃO DE PERFIL DE RISCO</b>\nSelecione a estratégia de gestão de banca desejada:",
                         "scanner": "⚡ <b>SCANNER DE FORÇA RELATIVA TOP 20</b>\nAcompanhe o ranking dos 20 maiores ativos do mercado:",
                         "ia": "🤖 <b>PAINEL INTELIGÊNCIA IA GEMINI</b>\nAnálise de sentimento e relatórios preditivos:",

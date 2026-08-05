@@ -348,7 +348,7 @@ class DatabaseManager:
         try:
             cursor = conn.cursor()
             placeholder = "%s" if self.is_postgres else "?"
-            sql = f"SELECT trade_result_net, oco_result FROM trades WHERE oco_timestamp LIKE {placeholder}"
+            sql = f"SELECT trade_result_net, oco_result, market_type FROM trades WHERE oco_timestamp LIKE {placeholder}"
             cursor.execute(sql, (f"%{date_str}%",))
             rows = cursor.fetchall()
         finally:
@@ -356,13 +356,22 @@ class DatabaseManager:
         
         trades_count = len(rows)
         daily_pnl = 0.0
+        spot_pnl = 0.0
+        futures_pnl = 0.0
         wins = 0
         losses = 0
         
         for r in rows:
-            pnl = float(r["trade_result_net"] if hasattr(r, "__getitem__") else r[0] or 0.0)
+            pnl = float(r["trade_result_net"] if hasattr(r, "__getitem__") and "trade_result_net" in r else (r[0] if isinstance(r, (list, tuple)) else 0.0))
+            market = str(r["market_type"] if hasattr(r, "__getitem__") and "market_type" in r else (r[2] if isinstance(r, (list, tuple)) and len(r) > 2 else "SPOT")).upper()
+            
             daily_pnl += pnl
-            res = str(r["oco_result"] if hasattr(r, "__getitem__") else r[1] or "")
+            if market == "FUTURES":
+                futures_pnl += pnl
+            else:
+                spot_pnl += pnl
+                
+            res = str(r["oco_result"] if hasattr(r, "__getitem__") and "oco_result" in r else (r[1] if isinstance(r, (list, tuple)) else ""))
             if pnl > 0 or "LUCRO" in res.upper() or "TAKE" in res.upper():
                 wins += 1
             else:
@@ -375,7 +384,9 @@ class DatabaseManager:
             "wins": wins,
             "losses": losses,
             "win_rate": win_rate,
-            "daily_pnl": daily_pnl
+            "daily_pnl": daily_pnl,
+            "spot_pnl": spot_pnl,
+            "futures_pnl": futures_pnl
         }
 
     def migrate_from_csv(self, csv_path="results.csv"):

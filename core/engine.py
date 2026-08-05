@@ -29,7 +29,9 @@ from services.gemini_ai import analyze_news_sentiment_with_gemini, generate_post
 from services.database import DatabaseManager
 from services.pdf_generator import generate_weekly_telemetry_pdf
 from utils.formatting import remove_ansi_codes, format_price
-from core.futures_engine import run_futures_bot
+from core.futures_engine import (
+    run_futures_bot, active_futures_positions, bot_futures_status_data, panic_sell_futures_position
+)
 
 client = None
 
@@ -629,7 +631,9 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                                 f"🎯 Operações Executadas: <b>{d_stats['trades']}</b>\n"
                                 f"🏆 Vitórias / Derrotas: <b>{d_stats['wins']} Wins / {d_stats['losses']} Losses</b>\n"
                                 f"📈 Win Rate do Dia: <b>{d_stats['win_rate']:.1f}%</b>\n"
-                                f"💰 PnL Líquido Diário: <b>${d_stats['daily_pnl']:+.2f} USDT</b>\n"
+                                f"💰 PnL (Spot): <b>${d_stats['spot_pnl']:+.2f} USDT</b>\n"
+                                f"💰 PnL (Futuros): <b>${d_stats['futures_pnl']:+.2f} USDT</b>\n"
+                                f"⚖️ PnL Líquido Total: <b>${d_stats['daily_pnl']:+.2f} USDT</b>\n"
                                 f"💵 Saldo Livre Atual: <b>${await get_usdt_balance(client):.2f} USDT</b>"
                             ))
                             log("📄 Relatório Diário enviado automaticamente para o Telegram!")

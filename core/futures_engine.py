@@ -120,3 +120,40 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
         except Exception as e:
             log(f"⚠️ Erro no Motor de Futuros: {e}")
             await asyncio.sleep(10)
+
+async def panic_sell_futures_position(client, symbol, qty=0, log=print):
+    """Fecha imediatamente a posição de futuros (Panic Sell) e limpa ordens condicionais."""
+    if symbol not in active_futures_positions:
+        return False, "Nenhuma posição aberta neste par."
+    
+    pos_data = active_futures_positions[symbol]
+    direction = pos_data['direction']
+    close_side = 'SELL' if direction == 'LONG' else 'BUY'
+    
+    try:
+        # Tenta pegar ordens em aberto para cancelar
+        open_orders = await client.futures_get_open_orders(symbol=symbol)
+        for order in open_orders:
+            try:
+                await client.futures_cancel_order(symbol=symbol, orderId=order['orderId'])
+            except: pass
+            
+        # O qty não é armazenado localmente para simplificar no dicionário
+        # precisaremos buscar a quantidade exata da posição aberta se qty=0
+        if qty == 0:
+            positions = await client.futures_position_information(symbol=symbol)
+            for p in positions:
+                if float(p['positionAmt']) != 0:
+                    qty = abs(float(p['positionAmt']))
+                    break
+        
+        if qty > 0:
+            await client.futures_create_order(symbol=symbol, side=close_side, type='MARKET', quantity=qty, reduceOnly='true')
+            
+        active_futures_positions.pop(symbol, None)
+        bot_futures_status_data['active_symbols'] = list(active_futures_positions.keys())
+        log(f"🔥 PANIC SELL FUTUROS: {symbol} liquidado a mercado!")
+        return True, f"Posição de Futuros em {symbol} liquidada a mercado."
+    except Exception as e:
+        log(f"Erro no Panic Sell Futuros: {e}")
+        return False, str(e)

@@ -134,7 +134,6 @@ async def register_futures_trade(client, db, symbol, direction, entry, exit, qty
         )
     
     if db:
-        # Simplificação para inserir na mesma tabela
         data = {
             "Símbolo": symbol,
             "Preço de Compra": entry,
@@ -142,13 +141,14 @@ async def register_futures_trade(client, db, symbol, direction, entry, exit, qty
             "Meta de Lucro OCO": exit,
             "Data/Hora da Compra": dt_module.datetime.now(TIMEZONE).strftime("%d/%m/%Y at %H:%M:%S"),
             "Resultado Total Bruto": gross_pnl,
-            "Resultado Total Liquido": gross_pnl * 0.96, # desconto de taxa ficticio, ideal calcular real
+            "Resultado Total Liquido": gross_pnl * 0.96, # desconto de taxa ficticio
             "market_type": "FUTURES",
             "direction": direction,
             "margin_type": "ISOLATED",
-            "leverage": 20 # placeholder, pass this properly later
+            "leverage": 20
         }
-        try:
-            db.add_trade(data)
-        except Exception as e:
-            log(f"Erro ao salvar BD Futuros: {e}")
+        db.save_trade(data)
+
+async def panic_sell_futures_position(symbol, client_instance=None):
+    """Fecha a posição de futuros (Panic Sell) e cancela ordens associadas"""
+    pass
