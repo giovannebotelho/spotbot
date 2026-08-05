@@ -16,6 +16,10 @@ bot_futures_status_data = {
     "active_symbols": [], "active_positions": active_futures_positions
 }
 
+shared_futures_market_data = {
+    'dates': [], 'klines': [], 'bb_upper': [], 'bb_lower': [], 'ema200': [], 'volumes': []
+}
+
 async def run_futures_bot(client, bsm, db, log=print, status=print):
     global bot_futures_running, active_futures_positions, bot_futures_status_data
     bot_futures_running = True
@@ -54,6 +58,35 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                         'entry': entry_price, 'tp': tp_price, 'sl': sl_price, 'direction': direction
                     }
                     bot_futures_status_data['active_symbols'] = list(active_futures_positions.keys())
+                    bot_futures_status_data['target_asset'] = rec_symbol
+                    
+                    try:
+                        import pandas as pd
+                        import datetime as dt_module
+                        from config.settings import TIMEZONE, TRADING_CONFIG
+                        from services.binance_client import get_futures_klines
+                        klines_raw = await get_futures_klines(client, symbol=rec_symbol, interval=TRADING_CONFIG['interval'], limit=100)
+                        if klines_raw:
+                            klines_rec = [float(k[4]) for k in klines_raw]
+                            dates_rec = [dt_module.datetime.fromtimestamp(float(k[0])/1000).strftime('%H:%M') for k in klines_raw]
+                            volumes_rec = [float(k[5]) for k in klines_raw]
+                            
+                            df_rec = pd.DataFrame({'close': klines_rec})
+                            sma20 = df_rec['close'].rolling(window=20).mean()
+                            std20 = df_rec['close'].rolling(window=20).std()
+                            bb_upper = (sma20 + 2 * std20).where(pd.notnull(sma20), None).tolist()
+                            bb_lower = (sma20 - 2 * std20).where(pd.notnull(sma20), None).tolist()
+                            ema200 = df_rec['close'].ewm(span=min(200, len(klines_rec)), adjust=False).mean().where(pd.notnull(df_rec['close']), None).tolist()
+
+                            shared_futures_market_data['dates'] = dates_rec
+                            shared_futures_market_data['klines'] = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in klines_raw]
+                            shared_futures_market_data['bb_upper'] = bb_upper[-100:]
+                            shared_futures_market_data['bb_lower'] = bb_lower[-100:]
+                            shared_futures_market_data['ema200'] = ema200[-100:]
+                            shared_futures_market_data['volumes'] = volumes_rec
+                    except Exception as k_err:
+                        log(f"⚠️ Aviso ao carregar klines no State Recovery Futuros: {k_err}")
+
                     log(f"🛡️ Retomando monitoramento de \033[1;33m{rec_symbol}\033[0m sem cancelar a operação...")
                     asyncio.create_task(monitor_futures_lifecycle(
                         client, bsm, rec_symbol, direction, entry_price, qty,
@@ -90,11 +123,35 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                 await setup_futures_margin(client, symbol, leverage=20, margin_type='ISOLATED')
                 
                 # Fetch Klines 15m
-                klines = await get_futures_klines(client, symbol, interval='15m', limit=100)
+                from config.settings import TRADING_CONFIG
+                interval = TRADING_CONFIG['interval']
+                klines = await get_futures_klines(client, symbol, interval=interval, limit=100)
                 if not klines or len(klines) < 20:
                     continue
                     
+                import pandas as pd
+                import datetime as dt_module
+                
                 closes = [float(k[4]) for k in klines]
+                dates_rec = [dt_module.datetime.fromtimestamp(float(k[0])/1000).strftime('%H:%M') for k in klines]
+                volumes_rec = [float(k[5]) for k in klines]
+                
+                df_rec = pd.DataFrame({'close': closes})
+                sma20 = df_rec['close'].rolling(window=20).mean()
+                std20 = df_rec['close'].rolling(window=20).std()
+                bb_upper = (sma20 + 2 * std20).where(pd.notnull(sma20), None).tolist()
+                bb_lower = (sma20 - 2 * std20).where(pd.notnull(sma20), None).tolist()
+                ema200 = df_rec['close'].ewm(span=min(200, len(closes)), adjust=False).mean().where(pd.notnull(df_rec['close']), None).tolist()
+
+                shared_futures_market_data['dates'] = dates_rec
+                shared_futures_market_data['klines'] = [[float(k[1]), float(k[4]), float(k[3]), float(k[2])] for k in klines]
+                shared_futures_market_data['bb_upper'] = bb_upper[-100:]
+                shared_futures_market_data['bb_lower'] = bb_lower[-100:]
+                shared_futures_market_data['ema200'] = ema200[-100:]
+                shared_futures_market_data['volumes'] = volumes_rec
+                
+                bot_futures_status_data['target_asset'] = symbol
+
                 cur_price = closes[-1]
                 rsi = calculate_rsi(closes)
                 

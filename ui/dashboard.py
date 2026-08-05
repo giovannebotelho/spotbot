@@ -170,7 +170,10 @@ def render_chart_tabs():
     with chart_tabs:
         ui.tab('foco', label='⚡ Foco do Bot (Scanner)', icon='center_focus_strong')
         for sym in sorted(_last_rendered_tabs):
-            ui.tab(sym, label=f'🪙 {sym} (OCO)', icon='show_chart')
+            is_spot = sym in engine.active_positions
+            is_fut = sym in futures_engine.active_futures_positions
+            label_suffix = '(OCO)' if is_spot and not is_fut else ('(FUT)' if is_fut and not is_spot else '(SPOT/FUT)')
+            ui.tab(sym, label=f'🪙 {sym} {label_suffix}', icon='show_chart')
             
     if selected_chart_symbol and selected_chart_symbol in _last_rendered_tabs:
         chart_tabs.value = selected_chart_symbol
@@ -223,7 +226,7 @@ async def update_data():
 
         # Sincronização Dinâmica de Abas do Gráfico (Multi-Ativo)
         if chart_tabs:
-            current_active_keys = set(engine.active_positions.keys())
+            current_active_keys = set(engine.active_positions.keys()).union(set(futures_engine.active_futures_positions.keys()))
             global _last_rendered_tabs
             if current_active_keys != _last_rendered_tabs:
                 _last_rendered_tabs = current_active_keys.copy()
@@ -286,6 +289,55 @@ async def update_data():
                 candle_chart.options['series'][3]['data'] = market_data.get('ema200', [])
                 candle_chart.options['series'][7]['data'] = market_data.get('volumes', [])
                 candle_chart.update()
+
+        # ---------- FUTURES CHART UPDATE ----------
+        fut_active_symbol = futures_engine.bot_futures_status_data.get('target_asset', 'BTCUSDT')
+        fut_current_price = futures_engine.bot_futures_status_data.get('price', 0.0)
+        fut_price_str = format_price(fut_current_price)
+        
+        fut_tp_price = futures_engine.bot_futures_status_data.get('tp_price', 0.0)
+        fut_sl_price = futures_engine.bot_futures_status_data.get('sl_price', 0.0)
+        fut_entry_price = futures_engine.bot_futures_status_data.get('entry_price', 0.0)
+
+        fut_market_data = getattr(futures_engine, 'shared_futures_market_data', None)
+        if fut_market_data and fut_market_data['dates'] and futures_candle_chart and not selected_chart_symbol:
+            fut_sig = (fut_active_symbol, fut_price_str, len(fut_market_data['dates']), fut_market_data['dates'][-1] if fut_market_data['dates'] else '', fut_tp_price, fut_sl_price, fut_entry_price)
+            # using same _last_chart_sig check logic but for futures (create a new one)
+            global _last_fut_chart_sig
+            if 'fut_sig' not in globals() or fut_sig != globals().get('_last_fut_chart_sig'):
+                globals()['_last_fut_chart_sig'] = fut_sig
+                futures_candle_chart.options['title'] = {
+                    'text': f'🚀 {fut_active_symbol} (HedgeFund)',
+                    'subtext': 'Binance Futures WebSockets',
+                    'left': 15,
+                    'top': 8,
+                    'textStyle': {'color': '#F43F5E', 'fontSize': 13, 'fontWeight': 'bold'},
+                    'subtextStyle': {'color': '#64748b', 'fontSize': 9}
+                }
+                futures_candle_chart.options['xAxis'][0]['data'] = fut_market_data['dates']
+                futures_candle_chart.options['xAxis'][1]['data'] = fut_market_data['dates']
+                futures_candle_chart.options['series'][0]['data'] = fut_market_data['klines']
+
+                # MarkLines Futuros
+                fe_str = format_price(fut_entry_price)
+                ftp_str = format_price(fut_tp_price)
+                fsl_str = format_price(fut_sl_price)
+                
+                fmark_lines = []
+                if fut_entry_price > 0:
+                    fmark_lines.append({'yAxis': fut_entry_price, 'lineStyle': {'color': '#F87171', 'type': 'dashed', 'width': 1.5}, 'label': {'formatter': f' Entrada: {fe_str}', 'position': 'insideStartTop', 'color': '#F87171'}})
+                if fut_tp_price > 0:
+                    fmark_lines.append({'yAxis': fut_tp_price, 'lineStyle': {'color': '#10B981', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🎯 TP: {ftp_str}', 'position': 'insideEndTop', 'color': '#10B981'}})
+                if fut_sl_price > 0:
+                    fmark_lines.append({'yAxis': fut_sl_price, 'lineStyle': {'color': '#F43F5E', 'type': 'dashed', 'width': 2}, 'label': {'formatter': f'🛑 SL: {fsl_str}', 'position': 'insideEndBottom', 'color': '#F43F5E'}})
+                
+                futures_candle_chart.options['series'][0]['markLine'] = {'symbol': ['none', 'none'], 'data': fmark_lines}
+
+                futures_candle_chart.options['series'][1]['data'] = fut_market_data.get('bb_upper', [])
+                futures_candle_chart.options['series'][2]['data'] = fut_market_data.get('bb_lower', [])
+                futures_candle_chart.options['series'][3]['data'] = fut_market_data.get('ema200', [])
+                futures_candle_chart.options['series'][7]['data'] = fut_market_data.get('volumes', [])
+                futures_candle_chart.update()
 
         await update_recent_trades_table()
 
