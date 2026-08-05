@@ -124,3 +124,79 @@ async def get_recent_trades_cvd(client, symbol, limit=500):
         return await client.get_recent_trades(symbol=symbol, limit=limit)
     except Exception:
         return []
+
+# ---------------------------------------------------------
+# FUTURES MARKET WRAPPERS (HedgeFund Edition)
+# ---------------------------------------------------------
+
+async def get_futures_usdt_balance(client):
+    """Obtém o saldo disponível de USDT na conta de Futuros (USDS-M)."""
+    try:
+        balances = await client.futures_account_balance()
+        for asset in balances:
+            if asset['asset'] == 'USDT':
+                return float(asset['withdrawAvailable'])
+        return 0.0
+    except Exception as e:
+        print(f"Error fetching futures balance: {e}")
+        return 0.0
+
+async def setup_futures_margin(client, symbol, leverage=20, margin_type='ISOLATED'):
+    """
+    Configura a alavancagem e o tipo de margem para o ativo.
+    margin_type: 'ISOLATED' ou 'CROSSED'
+    """
+    try:
+        # Tenta mudar a margem
+        await client.futures_change_margin_type(symbol=symbol, marginType=margin_type)
+    except Exception as e:
+        # Se já estiver configurado, a Binance lança um erro (-4046 No need to change margin type).
+        if "-4046" not in str(e):
+            print(f"Warning setting margin type for {symbol}: {e}")
+            
+    try:
+        # Configura alavancagem
+        await client.futures_change_leverage(symbol=symbol, leverage=leverage)
+    except Exception as e:
+        print(f"Warning setting leverage for {symbol}: {e}")
+
+async def place_futures_order(client, symbol, side, order_type, quantity, price=None, reduce_only=False):
+    """
+    Envia uma ordem para o mercado de futuros.
+    side: 'BUY' ou 'SELL'
+    order_type: 'MARKET', 'LIMIT', 'STOP_MARKET', 'TAKE_PROFIT_MARKET', etc.
+    """
+    params = {
+        'symbol': symbol,
+        'side': side,
+        'type': order_type,
+        'quantity': quantity
+    }
+    if price and order_type != 'MARKET':
+        params['price'] = str(price)
+        params['timeInForce'] = 'GTC'
+        
+    if reduce_only:
+        params['reduceOnly'] = 'true'
+        
+    return await client.futures_create_order(**params)
+
+async def place_futures_conditional_order(client, symbol, side, order_type, quantity, stop_price):
+    """
+    Envia uma ordem condicional para Futuros (STOP_MARKET ou TAKE_PROFIT_MARKET).
+    Essas ordens são usadas como Stop Loss e Take Profit no Futures.
+    """
+    params = {
+        'symbol': symbol,
+        'side': side,
+        'type': order_type,
+        'quantity': quantity,
+        'stopPrice': str(stop_price),
+        'timeInForce': 'GTC',
+        'reduceOnly': 'true'
+    }
+    return await client.futures_create_order(**params)
+
+async def get_futures_order_details(client, symbol, order_id):
+    """Obtém detalhes de uma ordem específica de Futuros pelo ID."""
+    return await client.futures_get_order(symbol=symbol, orderId=order_id)

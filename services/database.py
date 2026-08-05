@@ -105,7 +105,11 @@ class DatabaseManager:
                 initial_stop_loss REAL,
                 dca_levels INTEGER,
                 bot_version TEXT,
-                raw_data TEXT
+                raw_data TEXT,
+                market_type TEXT,
+                leverage INTEGER,
+                margin_type TEXT,
+                direction TEXT
             )
             """
             cursor.execute(create_table_sql)
@@ -128,7 +132,11 @@ class DatabaseManager:
                 'initial_stop_loss': 'REAL',
                 'dca_levels': 'INTEGER',
                 'bot_version': 'TEXT',
-                'raw_data': 'TEXT'
+                'raw_data': 'TEXT',
+                'market_type': 'TEXT',
+                'leverage': 'INTEGER',
+                'margin_type': 'TEXT',
+                'direction': 'TEXT'
             }
             
             for col_name, col_type in new_columns.items():
@@ -160,7 +168,7 @@ class DatabaseManager:
                 return data_row.get(key, default)
 
             placeholder = "%s" if self.is_postgres else "?"
-            placeholders = ", ".join([placeholder] * 51)
+            placeholders = ", ".join([placeholder] * 55)
 
             sql = f"""
             INSERT INTO trades (
@@ -172,7 +180,8 @@ class DatabaseManager:
                 candle_open, candle_high, candle_low, candle_close, candle_variation, candle_amplitude,
                 variation_24h, candle_volume, candle_patterns, macd, signal_line,
                 bb_lower, bb_middle, bb_upper, trend_up, gemini_response, 
-                confluence_score, slippage, initial_stop_loss, dca_levels, bot_version, raw_data
+                confluence_score, slippage, initial_stop_loss, dca_levels, bot_version, raw_data,
+                market_type, leverage, margin_type, direction
             ) VALUES ({placeholders})
             """
             
@@ -227,7 +236,11 @@ class DatabaseManager:
                 get_val("initial_stop_loss", 0.0),
                 get_val("dca_levels", 0),
                 get_val("bot_version", "v6.0"),
-                json.dumps(data_row, default=str)
+                json.dumps(data_row, default=str),
+                get_val("market_type", "SPOT"),
+                get_val("leverage", 1),
+                get_val("margin_type", "ISOLATED"),
+                get_val("direction", "LONG")
             )
             
             cursor.execute(sql, values)
