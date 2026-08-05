@@ -23,6 +23,13 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
     
     symbols_to_scan = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'ADAUSDT', 'AVAXUSDT']
     
+    try:
+        exchange_info = await client.futures_exchange_info()
+        symbols_info = {s['symbol']: s for s in exchange_info['symbols']}
+    except Exception as e:
+        log(f"⚠️ Erro ao buscar futures_exchange_info: {e}")
+        symbols_info = {}
+    
     while bot_futures_running:
         try:
             if len(active_futures_positions) >= 3:
@@ -68,9 +75,18 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                     leverage = 20
                     notional = margin_usdt * leverage
                     
-                    qty = notional / cur_price
-                    # Precisão fake (simplificação), na real precisa buscar do exchange_info
-                    qty = round(qty, 3) 
+                    # Dinamicamente buscar a precisão do ativo
+                    info = symbols_info.get(symbol, {})
+                    qty_precision = 3
+                    price_precision = 4
+                    if info:
+                        for f in info.get('filters', []):
+                            if f['filterType'] == 'LOT_SIZE':
+                                qty_precision = get_precision(float(f['stepSize']))
+                            if f['filterType'] == 'PRICE_FILTER':
+                                price_precision = get_precision(float(f['tickSize']))
+                                
+                    qty = round(notional / cur_price, qty_precision)
                     if qty <= 0: continue
                     
                     try:
@@ -91,9 +107,9 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                             sl_price = entry_price * 1.02
                             side_exit = 'BUY'
                             
-                        # Precisão de preço fake (simplificação)
-                        tp_price = round(tp_price, 4)
-                        sl_price = round(sl_price, 4)
+                        # Usando a precisão real da exchange
+                        tp_price = round(tp_price, price_precision)
+                        sl_price = round(sl_price, price_precision)
                         
                         tp_order = await place_futures_conditional_order(client, symbol, side_exit, 'TAKE_PROFIT_MARKET', qty, tp_price)
                         sl_order = await place_futures_conditional_order(client, symbol, side_exit, 'STOP_MARKET', qty, sl_price)

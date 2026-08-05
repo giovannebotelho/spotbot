@@ -251,7 +251,10 @@ class TelegramBot:
                 elif cmd_data.startswith('/'):
                     response_text = await self.command_handler(cmd_data)
                     if response_text:
-                        target_menu = "futures" if 'futures' in cmd_data else "spot"
+                        if cmd_data in ['/menu', '/ajuda', '/help']:
+                            target_menu = "main"
+                        else:
+                            target_menu = "futures" if 'futures' in cmd_data else "spot"
                         await send_telegram_message(self.token, chat_id, response_text, reply_markup=self.get_menu_keyboard(target_menu))
             return
 
@@ -265,5 +268,8 @@ class TelegramBot:
         if text.startswith('/'):
             response_text = await self.command_handler(text)
             if response_text:
-                target_menu = "futures" if 'futures' in text else "spot"
+                if text in ['/menu', '/ajuda', '/help']:
+                    target_menu = "main"
+                else:
+                    target_menu = "futures" if 'futures' in text else "spot"
                 await send_telegram_message(self.token, chat_id, response_text, reply_markup=self.get_menu_keyboard(target_menu))
