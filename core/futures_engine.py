@@ -211,13 +211,13 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                         entry_price = float(entry_order.get('avgPrice', cur_price))
                         if entry_price == 0.0: entry_price = cur_price
                         
-                        # Conditional Orders (10% ROI = 0.5% variação com 20x de alavancagem)
+                        # Conditional Orders (5% ROI = 0.25% variação, 10% SL = 0.5% variação com 20x)
                         if direction == 'LONG':
-                            tp_price = entry_price * 1.005
+                            tp_price = entry_price * 1.0025
                             sl_price = entry_price * 0.995
                             side_exit = 'SELL'
                         else:
-                            tp_price = entry_price * 0.995
+                            tp_price = entry_price * 0.9975
                             sl_price = entry_price * 1.005
                             side_exit = 'BUY'
                             
@@ -242,7 +242,7 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                                 f"<b>✅ [FUTUROS] Posição {direction} Aberta!</b>\n\n"
                                 f"🪙 <b>Ativo:</b> {symbol}\n"
                                 f"💰 <b>Entrada:</b> ${entry_price:.4f}\n"
-                                f"🎯 <b>Take Profit:</b> ${tp_price} (10% ROI)\n"
+                                f"🎯 <b>Take Profit:</b> ${tp_price} (5% ROI)\n"
                                 f"🛑 <b>Stop Loss:</b> ${sl_price} (-10% ROI)\n"
                                 f"⚡ <b>Alavancagem:</b> 20x"
                             ))

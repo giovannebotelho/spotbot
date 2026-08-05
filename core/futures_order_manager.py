@@ -100,15 +100,15 @@ async def monitor_futures_lifecycle(
                         
                         # Cancel the other orphan order
                         if tp_details['status'] == 'FILLED':
-                        try:
-                            await cancel_futures_order(client, symbol, sl_order_id)
-                        except: pass
-                        exit_price = float(tp_details.get('avgPrice', tp_details.get('actualPrice', 0))) if float(tp_details.get('avgPrice', tp_details.get('actualPrice', 0))) > 0 else float(tp_details.get('stopPrice', tp_details.get('triggerPrice', 0)))
-                    else:
-                        try:
-                            await cancel_futures_order(client, symbol, tp_order_id)
-                        except: pass
-                        exit_price = float(sl_details.get('avgPrice', sl_details.get('actualPrice', 0))) if float(sl_details.get('avgPrice', sl_details.get('actualPrice', 0))) > 0 else float(sl_details.get('stopPrice', sl_details.get('triggerPrice', 0)))
+                            try:
+                                await cancel_futures_order(client, symbol, sl_order_id)
+                            except: pass
+                            exit_price = float(tp_details.get('avgPrice', tp_details.get('actualPrice', 0))) if float(tp_details.get('avgPrice', tp_details.get('actualPrice', 0))) > 0 else float(tp_details.get('stopPrice', tp_details.get('triggerPrice', 0)))
+                        else:
+                            try:
+                                await cancel_futures_order(client, symbol, tp_order_id)
+                            except: pass
+                            exit_price = float(sl_details.get('avgPrice', sl_details.get('actualPrice', 0))) if float(sl_details.get('avgPrice', sl_details.get('actualPrice', 0))) > 0 else float(sl_details.get('stopPrice', sl_details.get('triggerPrice', 0)))
 
                     await register_futures_trade(client, db, symbol, position_side, entry_price, exit_price, executed_qty, log)
                     break
