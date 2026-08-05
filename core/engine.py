@@ -29,6 +29,7 @@ from services.gemini_ai import analyze_news_sentiment_with_gemini, generate_post
 from services.database import DatabaseManager
 from services.pdf_generator import generate_weekly_telemetry_pdf
 from utils.formatting import remove_ansi_codes, format_price
+from core.futures_engine import run_futures_bot
 
 client = None
 
@@ -582,6 +583,12 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
         symbol_info = await client.get_symbol_info(symbol)
         tick_size = float(next(filter for filter in symbol_info['filters'] if filter['filterType'] == 'PRICE_FILTER')['tickSize'])
         quote_precision = int(symbol_info['quoteAssetPrecision'])
+
+        # FASE 4 (HedgeFund Edition): Iniciando Motor Paralelo de Futuros
+        log("🔄 Sincronizando e Inicializando a Célula de Mercado Futuros...")
+        active_monitoring_tasks.append(
+            asyncio.create_task(run_futures_bot(client, bsm, db, log, status))
+        )
 
         last_sync_hour = dt_module.datetime.now(TIMEZONE).hour
         last_pdf_sent_day = None
