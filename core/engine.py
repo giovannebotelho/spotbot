@@ -744,14 +744,18 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                         rec_profile, rec_just = auto_tune_risk_profile("ALTA", db_stats['win_rate'], acc_pnl)
                         from config.settings import RISK_PROFILES
                         import config.settings as setts
-                        if rec_profile in RISK_PROFILES and setts.ACTIVE_RISK_PROFILE != rec_profile:
-                            setts.ACTIVE_RISK_PROFILE = rec_profile
-                            log(f"🧠 \033[1;36mGemini Auto-Tuning\033[0m: Perfil de Risco ajustado para \033[1;32m{rec_profile}\033[0m! ({rec_just})")
+                        if rec_profile in RISK_PROFILES:
+                            if setts.ACTIVE_RISK_PROFILE != rec_profile:
+                                setts.ACTIVE_RISK_PROFILE = rec_profile
+                                log(f"🧠 \033[1;36mGemini Auto-Tuning\033[0m: Perfil de Risco ajustado para \033[1;32m{rec_profile}\033[0m! ({rec_just})")
+                            else:
+                                log(f"🧠 \033[1;36mGemini Auto-Tuning\033[0m: Perfil de Risco MANTIDO em \033[1;32m{rec_profile}\033[0m. ({rec_just})")
+                                
                             if TELEGRAM_CONFIG.get('bot_token') and TELEGRAM_CONFIG.get('chat_id'):
                                 asyncio.create_task(send_telegram_message(
                                     TELEGRAM_CONFIG['bot_token'], TELEGRAM_CONFIG['chat_id'],
                                     f"🧠 <b>GEMINI AUTO-TUNING DE RISCO</b>\n\n"
-                                    f"🎯 Novo Perfil Recomendado: <b>{rec_profile}</b>\n"
+                                    f"🎯 Perfil Recomendado: <b>{rec_profile}</b>\n"
                                     f"📝 Justificativa IA: <i>{rec_just}</i>"
                                 ))
                     except Exception as at_err:
@@ -837,6 +841,34 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                     shared_market_data['ema200'] = s_closes.ewm(span=200, adjust=False).mean().tail(chart_limit).where(pd.notnull(s_closes.tail(chart_limit)), None).tolist()
             except Exception:
                 pass
+                
+            # FASE 4: Atualização Periódica do Gemini no Dashboard (1 hora)
+            current_timestamp = time.time()
+            if current_timestamp - globals().get('_last_gemini_dashboard_update', 0) >= 3600:
+                globals()['_last_gemini_dashboard_update'] = current_timestamp
+                
+                async def update_dashboard_gemini():
+                    try:
+                        from services.gemini_ai import analyze_with_gemini, interpret_gemini_response
+                        import math
+                        trend_up = check_trend(klines)
+                        
+                        gem_resp = await asyncio.to_thread(
+                            analyze_with_gemini,
+                            "Resumo Gráfico...", "Sem padrões definidos", rsi, f"{macd_current:.2f}/{signal_line_current:.2f}",
+                            f"{lower_band:.2f}/{middle_band:.2f}/{upper_band:.2f}", 0, {},
+                            closes[-1], closes[-1], closes[-1], closes[-1], volumes[-1], 0, 0,
+                            0, 0, 0, 0, 0, 0, vwap, trend_up, 0.65,
+                            20, 2, 12, 26, 300, 20, 20, 50, []
+                        )
+                        if gem_resp:
+                            parsed = interpret_gemini_response(gem_resp)
+                            if parsed:
+                                shared_market_data['gemini_insight'] = parsed
+                    except Exception as e:
+                        pass
+                
+                asyncio.create_task(update_dashboard_gemini())
 
             bot_status_data['symbol'] = display_symbol
             bot_status_data['price'] = closes[-1]
