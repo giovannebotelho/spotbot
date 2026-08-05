@@ -127,8 +127,8 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                 continue
                 
             usdt_balance = await get_futures_usdt_balance(client)
-            if usdt_balance < 10.0:
-                log(f"⚠️ Saldo insuficiente no Futuros: ${usdt_balance:.2f}. Mínimo $10. Standby por 5 minutos...")
+            if usdt_balance < 20.0:
+                log(f"⚠️ Saldo insuficiente no Futuros: ${usdt_balance:.2f}. Mínimo $20. Standby por 5 minutos...")
                 await asyncio.sleep(300)
                 continue
                 
@@ -180,25 +180,30 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                 bot_futures_status_data['target_asset'] = symbol
 
                 cur_price = closes[-1]
+                cur_open = float(klines[-1][1])
                 rsi = calculate_rsi(closes)
                 
                 direction = None
-                if rsi < 30:
+                # Filtro conservador: Aguarda confirmação do candle atual (reversão confirmada visualmente)
+                is_green_candle = cur_price > cur_open
+                is_red_candle = cur_price < cur_open
+                
+                if rsi < 30 and is_green_candle:
                     direction = 'LONG'
-                elif rsi > 70:
+                elif rsi > 70 and is_red_candle:
                     direction = 'SHORT'
                     
                 if direction:
                     # Re-avalia o saldo antes de entrar, pois operações anteriores no mesmo ciclo podem ter consumido a margem
                     current_balance = await get_futures_usdt_balance(client)
-                    if current_balance < 10.0:
+                    if current_balance < 20.0:
                         log(f"⚠️ Saldo insuficiente para novas entradas (${current_balance:.2f}). Pausando scanner...")
                         break
                         
-                    log(f"🚨 [FUTUROS] Oportunidade {direction} detectada em {symbol} (RSI: {rsi:.1f})")
+                    log(f"🚨 [FUTUROS] Oportunidade {direction} detectada em {symbol} (RSI: {rsi:.1f}, Reversão Confirmada)")
                         
-                    # Usa $10 dólares de margem por trade (com 20x = $200 de posição)
-                    margin_usdt = 10.0 
+                    # Usa $20 dólares de margem por trade (com 20x = $400 de posição)
+                    margin_usdt = 20.0 
                     leverage = 20
                     notional = margin_usdt * leverage
                     
