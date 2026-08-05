@@ -13,6 +13,7 @@ import config.settings as settings
 from services.database import DatabaseManager
 from utils.formatting import remove_ansi_codes, format_price
 import core.engine as engine
+import core.futures_engine as futures_engine
 
 db = DatabaseManager()
 
