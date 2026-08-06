@@ -203,8 +203,18 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                     direction = gemini_dir
                     trigger_reason = f"[GEMINI-AI] Notícia Extrema ({score}): {reason}"
                     
+                # 2. 15m Bollinger Band Sniper (Reversão à Média Extrema)
                 if not direction:
-                    # 2. Lead-Lag Alpha + CVD (Independente)
+                    from core.futures_band_sniper import evaluate_band_sniper
+                    sniper_dir, sniper_tp, sniper_sl = await evaluate_band_sniper(client, symbol, log)
+                    if sniper_dir:
+                        direction = sniper_dir
+                        trigger_reason = f"🎯 [BAND-SNIPER 15M] Reversão à Média Detectada."
+                        bot_futures_status_data['sniper_tp'] = sniper_tp
+                        bot_futures_status_data['sniper_sl'] = sniper_sl
+                    
+                if not direction:
+                    # 3. Lead-Lag Alpha + CVD (Independente)
                     from core.futures_lead_lag import evaluate_lead_lag
                     from core.futures_cvd_reader import evaluate_cvd
                     is_lagging, ll_direction = await evaluate_lead_lag(client, symbol)
@@ -215,7 +225,7 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                             trigger_reason = f"[LEAD-LAG] Alpha Impulse. Apoiado por [CVD] (Delta: {cvd_delta:.0f})"
                             
                 if not direction:
-                    # 3. Análise Técnica Padrão (BB + RSI) com filtro CVD
+                    # 4. Análise Técnica Padrão (BB + RSI) com filtro CVD
                     tech_dir = None
                     is_green_candle = cur_price > cur_open
                     is_red_candle = cur_price < cur_open
@@ -265,16 +275,20 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                         
                     initial_leverage = 20
                     
-                    # 2. Definição do TP/SL (Dinâmico para notícia)
-                    if '[GEMINI-AI]' in trigger_reason:
-                        roi_tp = 1.0025 if direction == 'LONG' else 0.9975
-                        roi_sl = 0.9975 if direction == 'LONG' else 1.0025 # SL super curto para notícia
+                    # 2. Definição do TP/SL (Dinâmico)
+                    if '[BAND-SNIPER 15M]' in trigger_reason:
+                        tp_price = bot_futures_status_data.pop('sniper_tp')
+                        sl_price = bot_futures_status_data.pop('sniper_sl')
                     else:
-                        roi_tp = 1.0025 if direction == 'LONG' else 0.9975
-                        roi_sl = 0.9950 if direction == 'LONG' else 1.0050
-                        
-                    tp_price = cur_price * roi_tp
-                    sl_price = cur_price * roi_sl
+                        if '[GEMINI-AI]' in trigger_reason:
+                            roi_tp = 1.0025 if direction == 'LONG' else 0.9975
+                            roi_sl = 0.9975 if direction == 'LONG' else 1.0025 # SL super curto para notícia
+                        else:
+                            roi_tp = 1.0025 if direction == 'LONG' else 0.9975
+                            roi_sl = 0.9950 if direction == 'LONG' else 1.0050
+                            
+                        tp_price = cur_price * roi_tp
+                        sl_price = cur_price * roi_sl
                     
                     # 3. Gerenciamento de Risco (Liquidation Buffer)
                     from core.futures_risk_manager import validate_trade_safety
