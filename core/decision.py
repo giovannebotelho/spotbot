@@ -270,6 +270,11 @@ async def should_buy(rsi, trend_is_up, macd_current, signal_line_current, last_c
     except Exception:
         score_mtf, is_confluent, details_mtf = 75, True, {'reasons': []}
 
+    # Smart Relaxation: Se score >= 60 e temos CVD ou Sweep, podemos considerar confluente
+    if not is_confluent and score_mtf >= 60:
+        if is_sweep or (futures_data and futures_data.get('oi_trend') == 'UP'):
+            is_confluent = True
+            
     if not is_confluent:
         return {
             "buy": False,

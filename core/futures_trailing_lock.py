@@ -6,8 +6,8 @@ from core.futures_state import futures_state
 async def run_trailing_lock_monitor(client, log=print):
     """
     Monitora posições ativas de futuros a cada 1 segundo.
-    Se o preço atingir 75% da meta (TP), engatilha a Trava Trailing.
-    Se, após engatilhar, o preço recuar 0.25% a partir do pico, fecha a mercado.
+    Se o preço atingir 80% da meta (TP), engatilha a Trava Trailing.
+    Se, após engatilhar, o preço recuar 0.50% a partir do pico, fecha a mercado.
     """
     log("🛡️ Trailing Lock Monitor iniciado...")
     while True:
@@ -60,26 +60,26 @@ async def run_trailing_lock_monitor(client, log=print):
                 
                 cur_dist = abs(cur_price - entry_price)
                 
-                # Regra: Passou de 75% da meta
+                # Regra: Passou de 80% da meta
                 is_in_profit = (cur_price > entry_price) if direction == 'LONG' else (cur_price < entry_price)
                 
-                if is_in_profit and cur_dist >= (total_target_dist * 0.75):
+                if is_in_profit and cur_dist >= (total_target_dist * 0.80):
                     if not pos['trailing_active']:
                         pos['trailing_active'] = True
                         log(f"🎯 [TRAILING-LOCK] Ativado para {symbol}! Garantindo lucro no pico.")
                         
-                # Se estiver ativo, verificar recuo de 0.25%
+                # Se estiver ativo, verificar recuo de 0.50%
                 if pos['trailing_active']:
                     peak = pos['peak_price']
                     if direction == 'LONG':
-                        drawdown_price = peak * 0.9975
+                        drawdown_price = peak * 0.9950
                         if cur_price <= drawdown_price:
                             log(f"⚡ [TRAILING-LOCK] Recuo detectado em {symbol} (Pico: {peak:.4f}, Atual: {cur_price:.4f}). Fechando a mercado!")
                             await execute_trailing_close(client, symbol, direction, qty, log)
                             # Remove localmente para não disparar de novo
                             await futures_state.remove(symbol)
                     else: # SHORT
-                        drawdown_price = peak * 1.0025
+                        drawdown_price = peak * 1.0050
                         if cur_price >= drawdown_price:
                             log(f"⚡ [TRAILING-LOCK] Recuo detectado em {symbol} (Pico: {peak:.4f}, Atual: {cur_price:.4f}). Fechando a mercado!")
                             await execute_trailing_close(client, symbol, direction, qty, log)

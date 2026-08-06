@@ -220,6 +220,9 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                     is_green_candle = cur_price > cur_open
                     is_red_candle = cur_price < cur_open
                     
+                    from core.futures_cvd_reader import evaluate_cvd
+                    cvd_delta, buy_ratio, cvd_direction = await evaluate_cvd(client, symbol)
+                    
                     if rsi < 30 and is_green_candle:
                         if bb_lower and len(bb_lower) > 0 and bb_lower[-1] and cur_price <= bb_lower[-1]:
                             tech_dir = 'LONG'
@@ -227,9 +230,16 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                         if bb_upper and len(bb_upper) > 0 and bb_upper[-1] and cur_price >= bb_upper[-1]:
                             tech_dir = 'SHORT'
                             
+                    # Smart Relaxation: Se o RSI está próximo ao extremo e o CVD confirma agressão forte
+                    if not tech_dir:
+                        if rsi < 35 and is_green_candle and cvd_direction == 'LONG' and cvd_delta > 5000:
+                            tech_dir = 'LONG'
+                            log(f"🧠 [SMART RELAXATION] RSI em {rsi:.1f}, porém forte pressão de compra no CVD (Delta: {cvd_delta:.0f}). Validando LONG em {symbol}.")
+                        elif rsi > 65 and is_red_candle and cvd_direction == 'SHORT' and cvd_delta < -5000:
+                            tech_dir = 'SHORT'
+                            log(f"🧠 [SMART RELAXATION] RSI em {rsi:.1f}, porém forte pressão de venda no CVD (Delta: {cvd_delta:.0f}). Validando SHORT em {symbol}.")
+                            
                     if tech_dir:
-                        from core.futures_cvd_reader import evaluate_cvd
-                        cvd_delta, buy_ratio, cvd_direction = await evaluate_cvd(client, symbol)
                         # Aborta se CVD apontar forte para a direção oposta
                         if tech_dir == 'LONG' and cvd_direction == 'SHORT':
                             log(f"⚠️ [CVD] Abortando LONG em {symbol} devido a agressão vendedora massiva (Delta: {cvd_delta:.0f}).")
@@ -237,7 +247,7 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                             log(f"⚠️ [CVD] Abortando SHORT em {symbol} devido a agressão compradora massiva (Delta: {cvd_delta:.0f}).")
                         else:
                             direction = tech_dir
-                            trigger_reason = f"[TÉCNICO] RSI/BB Sniper. Filtro [CVD] Validou (Delta: {cvd_delta:.0f})"
+                            trigger_reason = f"[TÉCNICO] Validação Direcional. Filtro [CVD] Confirmou (Delta: {cvd_delta:.0f})"
                             
                 if direction:
                     # Re-avalia o saldo antes de entrar, pois operações anteriores no mesmo ciclo podem ter consumido a margem

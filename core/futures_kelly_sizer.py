@@ -8,18 +8,21 @@ async def calculate_optimal_margin(db, total_balance_usdt, log=print):
         
     try:
         # Busca estatísticas reais de Futuros
-        trades = db.get_recent_trades(limit=100) # Assumindo que db.get_recent_trades retorna os ultimos 100
+        trades_df = db.get_recent_trades(limit=100) # get_recent_trades retorna DataFrame
         
-        # Filtra apenas os trades do tipo FUTURES
-        futures_trades = [t for t in trades if isinstance(t, dict) and t.get('market_type') == 'FUTURES']
-        
+        if trades_df.empty:
+            futures_trades = []
+        else:
+            # Converte as linhas do DataFrame para dicionários
+            futures_trades = [row.to_dict() for _, row in trades_df.iterrows() if row.get('market_type') == 'FUTURES']
+            
         if len(futures_trades) < 10:
             # Sem histórico suficiente, usa 2% da banca conservadoramente
             allocation = total_balance_usdt * 0.02
             return min(max(allocation, 20.0), total_balance_usdt * 0.10)
             
-        wins = [float(t.get('total_result_net', 0)) for t in futures_trades if float(t.get('total_result_net', 0)) > 0]
-        losses = [abs(float(t.get('total_result_net', 0))) for t in futures_trades if float(t.get('total_result_net', 0)) <= 0]
+        wins = [float(t.get('Resultado Total Liquido', t.get('total_result_net', 0))) for t in futures_trades if float(t.get('Resultado Total Liquido', t.get('total_result_net', 0))) > 0]
+        losses = [abs(float(t.get('Resultado Total Liquido', t.get('total_result_net', 0)))) for t in futures_trades if float(t.get('Resultado Total Liquido', t.get('total_result_net', 0))) <= 0]
         
         W = len(wins) / len(futures_trades)
         L = 1 - W
