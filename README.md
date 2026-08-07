@@ -1,32 +1,32 @@
-# SpotBot Pro 🤖📈 — Institutional Quantitative AI Engine (v6.0)
+# SpotBot Pro 🤖📈 — Institutional Quantitative AI Engine (v7.0 - HedgeFund Edition)
 
 [![Python Version](https://img.shields.io/badge/python-3.10%2B%20%7C%203.12-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Binance Spot](https://img.shields.io/badge/Binance-Spot%20API-yellow.svg)](https://www.binance.com/)
+[![Binance Spot & Futures](https://img.shields.io/badge/Binance-Spot%20%26%20Futures-yellow.svg)](https://www.binance.com/)
 [![Google Gemini](https://img.shields.io/badge/Google-Gemini%202.5--Flash-4285F4.svg)](https://aistudio.google.com/)
-[![Architecture](https://img.shields.io/badge/Architecture-Wall%20Street%20Quant%20v5.0-purple.svg)](https://github.com/giovannebotelho/spotbot-pro-hedgefund)
+[![Architecture](https://img.shields.io/badge/Architecture-HedgeFund%20Quant%20v7.0-purple.svg)](https://github.com/giovannebotelho/spotbot-pro-hedgefund)
 
-**SpotBot Pro v6.0** é um algoritmo de negociação quantitativa de nível institucional projetado com os pilares da microestrutura de mercado das grandes mesas de Wall Street (**Order Flow CVD Tape Reading, Cointegration Pair Trading, Correlation Lead-Lag Alpha, Smart Recovery DCA em Suportes de Fibonacci e Kelly Criterion Position Sizing**), integrado à **Inteligência Artificial Generativa do Google Gemini (SDK `google-genai`)**.
+**SpotBot Pro v7.0** é um algoritmo de negociação quantitativa de nível institucional projetado com os pilares da microestrutura de mercado das grandes mesas de Wall Street (**Order Flow CVD Tape Reading, 15m Bollinger Band Sniper, 20x Isolated Futures Leverage, Cointegration Pair Trading, Correlation Lead-Lag Alpha, Smart Recovery DCA em Suportes de Fibonacci e Kelly Criterion Position Sizing**), integrado à **Inteligência Artificial Generativa do Google Gemini (SDK `google-genai`)** e com **suporte completo para o Mercado de Futuros (Binance USDS-M Futures)**.
 
 ---
 
-## 🏛️ Arquitetura Quantitativa v6.0
+## 🏛️ Arquitetura Quantitativa v7.0
 
 ```mermaid
 graph TD
-    subgraph Quant_Engine_v6 ["🚀 SpotBot Pro v6.0 Architecture"]
+    subgraph Quant_Engine_v7 ["🚀 SpotBot Pro v7.0 Architecture (Spot + Futures)"]
         F5["📰 FASE 5 (v4.0): AI Panic News Scanner<br/>CryptoPanic + IA Gemini 2.5 Flash (Score 0-100)"] --> F1
         F1["🧪 FASE 1 (v5.0): Smart Recovery DCA & Flash Dump Protection<br/>Recompra em Suporte Fibonacci 61.8% e Override de PnL"] --> F2
         F2["⚡ FASE 2 (v5.0): Correlation Lead-Lag Alpha Engine<br/>Antecipação de impulso do BTC 1m em Altcoins (1.5x)"] --> F3
         F3["📊 FASE 3 (v5.0): Order Flow CVD Tape Reading<br/>Análise de agressão a mercado em 500 trades (Buys >= 60%)"] --> F4
-        F4["🔒 FASE 4 (v6.0): Trailing Profit Lock (Market Sell)<br/>Trava de lucro aos 75% da meta TP com Market Sell"] --> KC
-        KC["🏆 FASE 5 (v5.0): Kelly Criterion Position Sizing<br/>Dimensionamento ótimo (Half-Kelly) via estatísticas do SQLite"] --> OCO["🎯 Ordem OCO Enviada para a Binance (BRT Timezone)"]
+        F4["🎯 FASE 4 (v7.0): 15m Bollinger Band Sniper & Futures Engine<br/>Operações alavancadas 20x Isoladas + Reversão à Média Extrema"] --> KC
+        KC["🏆 FASE 5 (v5.0): Kelly Criterion Position Sizing<br/>Dimensionamento ótimo (Half-Kelly) via estatísticas do SQLite/Postgres"] --> OCO["🎯 Ordens OCO (Spot) e Posições Alavancadas (Futuros)"]
     end
 ```
 
 ---
 
-## 🚀 Armas Quantitativas da Versão v6.0
+## 🚀 Armas Quantitativas da Versão v7.0
 
 ### 1. 🧪 Smart Recovery DCA em Suportes de Fibonacci
 - **Proteção Contra Pavios**: Em *flash dumps* causados por liquidações de derivativos na Binance, o robô efetua uma única recompra de 50% no Suporte Institucional de Fibonacci (61.8% / 78.6%).

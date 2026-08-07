@@ -1,19 +1,21 @@
 # 📖 DOCUMENTAÇÃO TÉCNICA DE ARQUITETURA E ENGENHARIA DE SOFTWARE
-## SPOTBOT PRO v5.0.0-WALL_STREET_QUANT — SISTEMA INSTITUCIONAL DE TRADING ALGORÍTMICO QUANTITATIVO E INTELIGÊNCIA ARTIFICIAL
+## SPOTBOT PRO v7.0.0-HEDGE_FUND — SISTEMA INSTITUCIONAL DE TRADING ALGORÍTMICO QUANTITATIVO E INTELIGÊNCIA ARTIFICIAL
 
 ---
 
 ### 📋 SUMÁRIO EXECUTIVO
-- **Nome do Sistema**: SpotBot Pro (Wall Street Quantitative Engine)
-- **Versão de Software**: `v5.0.0-WALL_STREET_QUANT`
+- **Nome do Sistema**: SpotBot Pro (HedgeFund & Futures Quantitative Engine)
+- **Versão de Software**: `v7.0.0-HEDGE_FUND`
 - **Classificação de Confiabilidade**: *Critical Fault-Tolerant System (Medical-Grade Standard ISO/IEC 25010)*
 - **Arquitetura**: Multi-threaded Async I/O (Python `asyncio`), Event-Driven WebSockets & Neural AI Synthesis
 - **Exchange Suportada**: Binance Spot & Binance Futures (API REST v3/v1 & WebSocket User/Market Streams)
 - **Modelos Quantitativos Integrados**:
+  - 15m Bollinger Band Sniper Engine (Mean Reversion em 15m)
+  - 20x Isolated Futures Engine & Liquidation Risk-Buffer Guard
   - Kelly Criterion & Monte Carlo Position Sizing ($f^*$)
   - Cointegration Pair Trading & Statistical Arbitrage ($Z\text{-Score} \le -2.0\sigma$)
   - Order Flow Cumulative Volume Delta (CVD Tape Reading em 500 Trades)
-  - Correlation Lead-Lag Alpha Engine (BTC 1m Momentum Lead)
+  - Correlation Lead-Lag Alpha Engine (BTC 1m Momentum Lead 0.3%)
   - Smart Recovery DCA em Suportes de Fibonacci (61.8% e 78.6%)
   - AI Sentiment & Market Panic Scanner (CryptoPanic + Gemini 2.5 Flash)
   - Multi-Timeframe Confluence Matrix (4H + 1H + 15M $\ge 70\%$)
@@ -22,9 +24,9 @@
 
 ---
 
-# CAPÍTULO 1: FILOSOFIA QUANTITATIVA E CASCATA DE VALIDAÇÃO v5.0
+# CAPÍTULO 1: FILOSOFIA QUANTITATIVA E CASCATA DE VALIDAÇÃO v7.0
 
-O **SpotBot Pro v5.0** opera sob o conceito de **Filtros Quantitativos Hierárquicos v5.0** (Cascata de Validação em 9 Camadas), onde cada sinal deve passar por todos os filtros de proteção antes da execução na Binance:
+O **SpotBot Pro v7.0** opera sob o conceito de **Filtros Quantitativos Hierárquicos v7.0** (Cascata de Validação em 9 Camadas em Tempo Real em Spot e Futuros):
 
 ```text
 [Dados de Mercado em Tempo Real (WebSockets & REST Spot/Futures)]

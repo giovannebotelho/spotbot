@@ -105,7 +105,7 @@ async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "Comandos disponíveis:\n"
         "📋 `/plan` - Visualizar e aprovar o Implementation Plan\n"
         "📝 `/walkthrough` - Visualizar o relatório de tarefas (Walkthrough)\n"
-        "📊 `/status` - Ver status do Git e do robô SpotBot Pro v6.0\n"
+        "📊 `/status` - Ver status do Git e do robô SpotBot Pro v7.0\n"
         "🔍 `/diff` - Ver alterações pendentes no código\n"
         "💬 `/prompt <texto>` - Enviar novo comando/instrução para a workspace\n"
         "📋 `/logs` - Ver últimos logs do robô\n"
@@ -207,7 +207,7 @@ async def query_gemini_ai(prompt: str) -> str:
         
         instr_file = WORKSPACE_DIR / ".agents" / "gemini_instructions.txt"
         sys_instruction = (
-            "Você é a IA assistente do projeto SpotBot Pro v6.0 / Antigravity.\n"
+            "Você é a IA assistente do projeto SpotBot Pro v7.0 / Antigravity.\n"
             "Responda sempre em Português do Brasil (pt-BR) de forma direta, clara, elegante e tecnicamente precisa.\n"
         )
         if instr_file.exists():

@@ -1,6 +1,17 @@
 # Changelog
 Todos os registros de evolução da arquitetura do **SpotBot Pro** estão listados aqui.
 
+## [v7.0] - HedgeFund & Futures Market Edition
+### Added
+- **Mercado de Futuros Integrado (20x Isolated Leverage):** Motor de trading paralelo (`core/futures_engine.py`) operando simultaneamente com o Mercado Spot.
+- **15m Bollinger Band Sniper Engine:** Motor especialista em reversão à média extrema calculando bandas de Bollinger e RSI no gráfico de 15m.
+- **Futures Liquidation Buffer Guard (`futures_risk_manager.py`):** Sistema automatizado de proteção que valida e ajusta a alavancagem garantindo margem de segurança de no mínimo 15% entre o Stop Loss e o Preço de Liquidação.
+- **Futures Order Flow CVD & Lead-Lag Alpha (1m):** Algoritmo de fita de agressão e rastreamento de microsurtos (0.3% BTC / 0.4% ETH em 1m).
+- **Dashboard Web & Telegram Bot Dual Mode:** Telas, gráficos e submenus adaptados para visualização unificada de posições Spot (OCO) e Futuros.
+- **Suporte Híbrido SQLite / PostgreSQL 24/7:** Execução local em SQLite e em nuvem via PostgreSQL (injetado via `DATABASE_URL` no Railway).
+
+---
+
 ## [v6.0]
 ### Added
 - **Trailing Profit Lock (Market Sell):** Nova trava de lucros ao atingir 75% da meta TP, garantindo o fechamento imediato via Market Sell na menor queda, sem risco de expiração da OCO.

@@ -601,7 +601,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
 
         elif cmd in ['/ajuda', '/help', '/menu']:
             return (
-                "📚 <b>COMANDOS DISPONÍVEIS (SPOTBOT PRO v6.1)</b>\n"
+                "📚 <b>COMANDOS DISPONÍVEIS (SPOTBOT PRO v7.0)</b>\n"
                 "━━━━━━━━━━━━━━━━━━━\n"
                 "📊 /status - Status do ativo em foco, RSI e confluência MTF\n"
                 "💰 /saldo - Saldos USDT, BNB e fracionamento de vagas\n"

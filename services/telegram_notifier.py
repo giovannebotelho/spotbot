@@ -236,7 +236,7 @@ class TelegramBot:
                 if cmd_data.startswith('sub_'):
                     menu_type = cmd_data.replace('sub_', '')
                     titles = {
-                        "main": "🤖 <b>MENU PRINCIPAL — SPOTBOT PRO v6.0</b>\nSelecione o ambiente de operação:",
+                        "main": "🤖 <b>MENU PRINCIPAL — SPOTBOT PRO v7.0</b>\nSelecione o ambiente de operação:",
                         "spot": "🟢 <b>MERCADO SPOT</b>\nGerencie suas posições OCO e análises sem alavancagem:",
                         "status": "📊 <b>PAINEL SPOT (Status & Saldos)</b>\nConsulte o estado do robô, saldos e performance acumulada:",
                         "posicoes": "📈 <b>PAINEL SPOT (Posições OCO)</b>\nMonitore ordens ativas ou execute encerramentos:",
@@ -246,7 +246,7 @@ class TelegramBot:
                         "ia": "🤖 <b>PAINEL INTELIGÊNCIA IA GEMINI</b>\nAnálise de sentimento e relatórios preditivos:",
                         "config": "🛠️ <b>OPERAÇÕES & CONFIGURAÇÕES</b>\nComandos de sistema, relatórios PDF e controle de operação:"
                     }
-                    msg_text = titles.get(menu_type, "🤖 <b>PAINEL SPOTBOT PRO v6.0</b>")
+                    msg_text = titles.get(menu_type, "🤖 <b>PAINEL SPOTBOT PRO v7.0</b>")
                     await send_telegram_message(self.token, chat_id, msg_text, reply_markup=self.get_menu_keyboard(menu_type))
                 elif cmd_data.startswith('/'):
                     response_text = await self.command_handler(cmd_data)

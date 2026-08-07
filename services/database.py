@@ -235,7 +235,7 @@ class DatabaseManager:
                 get_val("slippage", 0.0),
                 get_val("initial_stop_loss", 0.0),
                 get_val("dca_levels", 0),
-                get_val("bot_version", "v6.0"),
+                get_val("bot_version", "v7.0"),
                 json.dumps(data_row, default=str),
                 get_val("market_type", "SPOT"),
                 get_val("leverage", 1),

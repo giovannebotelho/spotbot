@@ -32,7 +32,7 @@ class NumberedCanvas(canvas.Canvas):
         
         # Cabeçalho (Páginas > 1)
         if self._pageNumber > 1:
-            self.drawString(54, 750, "SPOTBOT PRO v5.0 — GUIA EXECUTIVO PARA O INVESTIDOR")
+            self.drawString(54, 750, "SPOTBOT PRO v7.0 — GUIA EXECUTIVO PARA O INVESTIDOR")
             self.setStrokeColor(colors.HexColor("#CBD5E1"))
             self.setLineWidth(0.5)
             self.line(54, 744, 558, 744)
@@ -43,7 +43,7 @@ class NumberedCanvas(canvas.Canvas):
         self.line(54, 45, 558, 45)
 
         self.setFont("Helvetica", 8)
-        self.drawString(54, 32, "SpotBot Pro v5.0 (Wall Street Edition) • Inteligência Quantitativa & IA Generativa")
+        self.drawString(54, 32, "SpotBot Pro v7.0 (HedgeFund Edition) • Inteligência Quantitativa & IA Generativa")
         page_str = f"Página {self._pageNumber} de {page_count}"
         self.drawRightString(558, 32, page_str)
         self.restoreState()
@@ -128,7 +128,7 @@ def create_executive_pdf(output_filename="docs/SpotBot_Pro_Guia_Executivo_do_Usu
     # CABEÇALHO DA CAPA / PRIMEIRA PÁGINA
     # ==========================================
     story.append(Spacer(1, 10))
-    story.append(Paragraph("🤖 SpotBot Pro v5.0 (Wall Street Edition)", title_style))
+    story.append(Paragraph("🤖 SpotBot Pro v7.0 (HedgeFund & Futures Edition)", title_style))
     story.append(Paragraph("<b>O Guia Definitivo do Investidor</b> — Entenda Como Funciona o Seu Piloto Automático Quantitativo Sem Jargões Complicados", subtitle_style))
     story.append(HRFlowable(width="100%", thickness=2, color=ACCENT, spaceAfter=15))
 
@@ -139,7 +139,7 @@ def create_executive_pdf(output_filename="docs/SpotBot_Pro_Guia_Executivo_do_Usu
     intro_text = (
         "Se você já tentou investir no mercado de criptomoedas manualmente, certamente viveu este dilema: "
         "o medo de comprar na hora errada, a dúvida se deve vender ou esperar subir mais, ou a ansiedade de olhar o celular no meio da noite. "
-        "O <b>SpotBot Pro v5.0</b> foi criado para eliminar 100% da emoção humana dos seus investimentos. "
+        "O <b>SpotBot Pro v7.0</b> foi criado para eliminar 100% da emoção humana dos seus investimentos. "
         "Ele funciona como um <b>Piloto Automático de Alta Precisão</b>, que analisa o mercado 24 horas por dia, 7 dias por semana, "
         "usando os mesmos modelos matemáticos dos grandes fundos de investimento de Wall Street combinados com a Inteligência Artificial do Google Gemini."
     )
@@ -237,7 +237,7 @@ def create_executive_pdf(output_filename="docs/SpotBot_Pro_Guia_Executivo_do_Usu
         [Paragraph("<b>/noticias</b>", table_cell), Paragraph("Mostra a análise de sentimento da IA Gemini e as notícias mais recentes do mercado cripto.")],
         [Paragraph("<b>/ocos</b> ou <b>/ordens</b>", table_cell), Paragraph("Exibe todas as ordens abertas na Binance com o valor exato de TP (Lucro) e SL (Segurança).")],
         [Paragraph("<b>/saldo</b>", table_cell), Paragraph("Mostra o seu saldo em dólares (USDT), BNB e a alocação de banca calculada pelo Critério de Kelly.")],
-        [Paragraph("<b>/top20</b>", table_cell), Paragraph("Exibe o ranking das 5 moedas mais fortes do mercado no momento.")],
+        [Paragraph("<b>/top40</b>", table_cell), Paragraph("Exibe o ranking das 5 moedas mais fortes do mercado no momento.")],
         [Paragraph("<b>/lucro</b>", table_cell), Paragraph("Exibe o seu lucro líquido acumulado total e a taxa de vitória (%) das operações.")],
         [Paragraph("<b>/relatorio</b>", table_cell), Paragraph("Gera e envia no Telegram um relatório executivo em PDF completo com estatísticas da semana.")],
         [Paragraph("<b>/stop</b> ou <b>/cancel</b>", table_cell), Paragraph("Botão de emergência para pausar o robô de forma limpa e segura a qualquer momento.")]
@@ -271,7 +271,7 @@ def create_executive_pdf(output_filename="docs/SpotBot_Pro_Guia_Executivo_do_Usu
 
     story.append(Spacer(1, 15))
     story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceAfter=10))
-    story.append(Paragraph("<b>SpotBot Pro v5.0</b> — Engenharia Quantitativa Institucional & Inteligência Artificial Generativa.", ParagraphStyle('FooterTag', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, alignment=1, textColor=PRIMARY)))
+    story.append(Paragraph("<b>SpotBot Pro v7.0</b> — Engenharia Quantitativa Institucional & Inteligência Artificial Generativa.", ParagraphStyle('FooterTag', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=9, alignment=1, textColor=PRIMARY)))
 
     doc.build(story, canvasmaker=NumberedCanvas)
     print(f"SUCCESS: PDF Executivo do Usuario gerado com sucesso em: {output_filename}")
