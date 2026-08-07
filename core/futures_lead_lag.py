@@ -45,9 +45,9 @@ async def evaluate_lead_lag(client, symbol):
     
     # Define a direção baseada nos líderes
     impulse_direction = None
-    if btc_impulse >= 0.8 or eth_impulse >= 1.0:
+    if btc_impulse >= 0.3 or eth_impulse >= 0.4:
         impulse_direction = 'LONG'
-    elif btc_impulse <= -0.8 or eth_impulse <= -1.0:
+    elif btc_impulse <= -0.3 or eth_impulse <= -0.4:
         impulse_direction = 'SHORT'
         
     if not impulse_direction:

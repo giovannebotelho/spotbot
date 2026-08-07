@@ -335,7 +335,11 @@ async def update_data():
             sl_price = engine.bot_status_data.get('sl_price', 0.0)
 
         market_data = engine.shared_market_data
-        if market_data['dates'] and candle_chart and (not selected_chart_symbol or (selected_chart_symbol.endswith('_spot') and base_selected in engine.active_positions)):
+        
+        # Só injeta os candles do Scanner se estiver na aba FOCO
+        is_foco = not selected_chart_symbol or selected_chart_symbol == 'foco'
+        
+        if market_data['dates'] and candle_chart and is_foco:
             current_sig = (active_symbol, price_str, len(market_data['dates']), market_data['dates'][-1] if market_data['dates'] else '', tp_price, sl_price, entry_price)
             if current_sig != _last_chart_sig:
                 _last_chart_sig = current_sig
@@ -389,7 +393,7 @@ async def update_data():
             fut_sl_price = futures_engine.bot_futures_status_data.get('sl_price', 0.0)
 
         fut_market_data = getattr(futures_engine, 'shared_futures_market_data', None)
-        if fut_market_data and fut_market_data['dates'] and candle_chart and (not selected_chart_symbol or (selected_chart_symbol.endswith('_fut') and base_selected in fut_state)):
+        if fut_market_data and fut_market_data['dates'] and candle_chart and is_foco:
             fut_sig = (fut_active_symbol, fut_price_str, len(fut_market_data['dates']), fut_market_data['dates'][-1] if fut_market_data['dates'] else '', fut_tp_price, fut_sl_price, fut_entry_price)
             # using same _last_chart_sig check logic but for futures (create a new one)
             global _last_fut_chart_sig

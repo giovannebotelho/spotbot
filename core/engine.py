@@ -379,7 +379,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
             finally:
                 if c: await c.close_connection()
 
-        elif cmd in ['/top20', '/scanner']:
+        elif cmd in ['/top40', '/scanner']:
             c = None
             try:
                 c = await BinanceAsyncClient.create(api_key, api_secret)

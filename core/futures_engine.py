@@ -239,14 +239,14 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                         if bb_upper and len(bb_upper) > 0 and bb_upper[-1] and cur_price >= bb_upper[-1]:
                             tech_dir = 'SHORT'
                             
-                    # Smart Relaxation: Se o RSI está próximo ao extremo e o CVD confirma agressão forte
+                    # Smart Relaxation: Se o RSI está próximo ao extremo e o CVD confirma agressão forte (direcional confirmada)
                     if not tech_dir:
-                        if rsi < 35 and is_green_candle and cvd_direction == 'LONG' and cvd_delta > 5000:
+                        if rsi < 35 and is_green_candle and cvd_direction == 'LONG':
                             tech_dir = 'LONG'
-                            log(f"🧠 [SMART RELAXATION] RSI em {rsi:.1f}, porém forte pressão de compra no CVD (Delta: {cvd_delta:.0f}). Validando LONG em {symbol}.")
-                        elif rsi > 65 and is_red_candle and cvd_direction == 'SHORT' and cvd_delta < -5000:
+                            log(f"🧠 [SMART RELAXATION] RSI em {rsi:.1f}, porém forte pressão de compra no CVD. Validando LONG em {symbol}.")
+                        elif rsi > 65 and is_red_candle and cvd_direction == 'SHORT':
                             tech_dir = 'SHORT'
-                            log(f"🧠 [SMART RELAXATION] RSI em {rsi:.1f}, porém forte pressão de venda no CVD (Delta: {cvd_delta:.0f}). Validando SHORT em {symbol}.")
+                            log(f"🧠 [SMART RELAXATION] RSI em {rsi:.1f}, porém forte pressão de venda no CVD. Validando SHORT em {symbol}.")
                             
                     if tech_dir:
                         # Aborta se CVD apontar forte para a direção oposta
