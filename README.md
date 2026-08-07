@@ -68,7 +68,7 @@ graph TD
   - `/noticias` ou `/sentimento`: Exibe a classificação de pânico e notícias via **IA Gemini 2.5 Flash**.
   - `/ocos` ou `/ordens`: Exibe os valores exatos de Take Profit, Stop Loss e posições ativas.
   - `/saldo`: Saldos USDT, BNB e cálculo do **Lote Máximo do Critério de Kelly**.
-  - `/top20` ou `/scanner`: Varre o Rank de Força Relativa (RS vs BTC) dos 20 maiores criptoativos.
+  - `/top40` ou `/scanner`: Varre o Rank de Força Relativa (RS vs BTC) dos 40 maiores criptoativos.
   - `/lucro` ou `/perf`: Lucro líquido acumulado e Win Rate acumulado do banco SQLite.
   - `/relatorio` ou `/pdf`: Gera e envia o **Relatório Executivo em PDF** no Telegram.
 
