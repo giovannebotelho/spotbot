@@ -235,7 +235,7 @@ async def monitor_oco_lifecycle(
                                         variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, TRADING_CONFIG['volume_avg'], 
                                         amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid,
                                         total_difference_liquid, gemini_response, bnb_balance_free * bnb_price,
-                                        confluence_score, slippage, stop_loss, dca_count, "v6.0"
+                                        confluence_score, slippage, stop_loss, dca_count, "v7.0"
                                     )
                                     try:
                                         save_to_csv(data_row)
@@ -299,7 +299,7 @@ async def monitor_oco_lifecycle(
                                 variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, TRADING_CONFIG['volume_avg'], 
                                 amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid,
                                 total_difference_liquid, gemini_response, bnb_balance_free * bnb_price,
-                                confluence_score, slippage, stop_loss, dca_count, "v6.0"
+                                confluence_score, slippage, stop_loss, dca_count, "v7.0"
                             )
                             try:
                                 save_to_csv(data_row)
@@ -360,7 +360,7 @@ async def monitor_oco_lifecycle(
                             variation_24h, candle_variation, ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, TRADING_CONFIG['volume_avg'], 
                             amplitude, macd_current, signal_line_current, lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid,
                             total_difference_liquid, gemini_response, bnb_balance_free * bnb_price,
-                            confluence_score, slippage, stop_loss, dca_count, "v6.0"
+                            confluence_score, slippage, stop_loss, dca_count, "v7.0"
                         )
                         try:
                             save_to_csv(data_row)

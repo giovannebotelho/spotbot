@@ -146,7 +146,7 @@ cd spotbot-pro-hedgefund
 .\env_spotbot\Scripts\activate
 pip install -r requirements.txt
 
-# 3. Executar o Dashboard Web e Robô SpotBot Pro v6.0
+# 3. Executar o Dashboard Web e Robô SpotBot Pro v7.0
 python run.py --mode dashboard
 ```
 

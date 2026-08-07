@@ -176,7 +176,7 @@ def interpret_gemini_response(response_text):
 
 def analyze_news_sentiment_with_gemini(headlines, api_key=None):
     """
-    FASE 5 (v4.0): Classificador de Sentimento e Pânico Noticioso via IA Gemini.
+    FASE 5 (v7.0): Classificador de Sentimento e Pânico Noticioso via IA Gemini.
     Avalia manchetes de notícias do mercado cripto e atribui uma nota de sentimento de 0 (Pânico) a 100 (Extase).
     Retorna: (sentiment_score: int, is_panic: bool, summary: str)
     """
@@ -226,7 +226,7 @@ def analyze_news_sentiment_with_gemini(headlines, api_key=None):
 
 def generate_post_trade_synthesis(symbol, outcome, entry_price, exit_price, pnl_net, api_key=None):
     """
-    FASE 3 (v6.0): Gera uma síntese executiva curta da IA Gemini após a conclusão de uma operação (TP ou SL).
+    FASE 3 (v7.0): Gera uma síntese executiva curta da IA Gemini após a conclusão de uma operação (TP ou SL).
     """
     global _last_429_time
     if time.time() - _last_429_time < COOLDOWN_429_SECONDS:
@@ -261,7 +261,7 @@ def generate_post_trade_synthesis(symbol, outcome, entry_price, exit_price, pnl_
 
 def auto_tune_risk_profile(btc_trend, win_rate, recent_pnl, api_key=None):
     """
-    FASE 3 (v6.0): Avalia as condições de mercado via IA Gemini e sugere o perfil de risco ideal.
+    FASE 3 (v7.0): Avalia as condições de mercado via IA Gemini e sugere o perfil de risco ideal.
     Retorna: (profile_name: str, rationale: str) -> "Conservador", "Moderado" ou "Agressivo"
     """
     global _last_429_time

@@ -1,6 +1,6 @@
-# ☁️ GUIA DE INFRAESTRUTURA & DEPLOY: SPOTBOT PRO v5.0 (LOCAL & NUVEM)
+# ☁️ GUIA DE INFRAESTRUTURA & DEPLOY: SPOTBOT PRO v7.0 (LOCAL & NUVEM RAILWAY)
 
-Este guia documenta como rodar o **SpotBot Pro v5.0 (Wall Street Edition)** com 100% de estabilidade e baixa latência, tanto **localmente no seu computador (recomendado)** quanto na **nuvem 24/7 (Railway / Render / VPS)**.
+Este guia documenta como rodar o **SpotBot Pro v7.0 (HedgeFund & Futures Edition)** com 100% de estabilidade e baixa latência, tanto **localmente no seu computador (recomendado)** quanto na **nuvem 24/7 (Railway / Render / VPS)**.
 
 ---
 

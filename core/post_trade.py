@@ -74,7 +74,7 @@ def create_data_row(order_count, saldo_inicial_usdt, quantia_usdt_investimento_i
                     rsi, executed_condition, vwap, candle_open, candle_high, candle_low, candle_close, candle_volume, variation_24h, candle_variation,
                     ema7, ema15, ema25, ema50, ema100, ema200, candle_patterns, volume_avg, amplitude, macd_current, signal_line_current, 
                     lower_band, middle_band, upper_band, trend_is_up, fee, trade_result_liquid, total_difference_liquid, gemini_response, bnb_balance_usdt,
-                    confluence_score=0.0, slippage=0.0, initial_stop_loss=0.0, dca_levels=0, bot_version="v6.0"):
+                    confluence_score=0.0, slippage=0.0, initial_stop_loss=0.0, dca_levels=0, bot_version="v7.0"):
     return {
         "Índice da Ordem": order_count,
         "Saldo Inicial em USDT": round(saldo_inicial_usdt, 2),
