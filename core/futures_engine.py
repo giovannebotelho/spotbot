@@ -232,21 +232,22 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                     from core.futures_cvd_reader import evaluate_cvd
                     cvd_delta, buy_ratio, cvd_direction = await evaluate_cvd(client, symbol)
                     
-                    if rsi < 30 and is_green_candle:
-                        if bb_lower and len(bb_lower) > 0 and bb_lower[-1] and cur_price <= bb_lower[-1]:
-                            tech_dir = 'LONG'
-                    elif rsi > 70 and is_red_candle:
-                        if bb_upper and len(bb_upper) > 0 and bb_upper[-1] and cur_price >= bb_upper[-1]:
+                    # Exaustão Extrema: Shortar o topo que rompeu a banda superior (independente se verde ou vermelho), ou Long no fundo.
+                    if bb_upper and len(bb_upper) > 0 and bb_upper[-1] and cur_price >= bb_upper[-1]:
+                        if rsi > 60:
                             tech_dir = 'SHORT'
+                    elif bb_lower and len(bb_lower) > 0 and bb_lower[-1] and cur_price <= bb_lower[-1]:
+                        if rsi < 40:
+                            tech_dir = 'LONG'
                             
-                    # Smart Relaxation: Se o RSI está próximo ao extremo e o CVD confirma agressão forte (direcional confirmada)
+                    # Smart Relaxation: Se o RSI aponta exaustão e o Tape Reading (CVD) mostra força contrária confirmada
                     if not tech_dir:
-                        if rsi < 35 and is_green_candle and cvd_direction == 'LONG':
+                        if rsi < 45 and cvd_direction == 'LONG':
                             tech_dir = 'LONG'
-                            log(f"🧠 [SMART RELAXATION] RSI em {rsi:.1f}, porém forte pressão de compra no CVD. Validando LONG em {symbol}.")
-                        elif rsi > 65 and is_red_candle and cvd_direction == 'SHORT':
+                            log(f"🧠 [SMART RELAXATION] RSI em {rsi:.1f} com CVD comprador massivo. Validando LONG antecipado em {symbol}.")
+                        elif rsi > 55 and cvd_direction == 'SHORT':
                             tech_dir = 'SHORT'
-                            log(f"🧠 [SMART RELAXATION] RSI em {rsi:.1f}, porém forte pressão de venda no CVD. Validando SHORT em {symbol}.")
+                            log(f"🧠 [SMART RELAXATION] RSI em {rsi:.1f} com CVD vendedor massivo. Validando SHORT antecipado em {symbol}.")
                             
                     if tech_dir:
                         # Aborta se CVD apontar forte para a direção oposta
