@@ -593,30 +593,36 @@ def login():
         else:
             ui.notify('Acesso Negado', type='negative')
 
-    ui.colors(primary='#0284C7', secondary='#64748b', accent='#10B981', positive='#10B981', negative='#F43F5E', dark='#0B0E14')
+    ui.colors(primary='#0ea5e9', secondary='#64748b', accent='#10b981', positive='#10b981', negative='#f43f5e', dark='#020617')
     ui.add_head_html('''
         <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
         <link rel="shortcut icon" href="/assets/favicon.ico">
         <link rel="apple-touch-icon" href="/assets/logo.png">
+        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
         <style>
-            body { background-color: #0B0E14; color: #f8fafc; font-family: 'Inter', sans-serif; }
-            .zinc-input .q-field__native { color: white !important; }
-            .zinc-input .q-field__label { color: #64748b !important; }
-            .zinc-input .q-field__control:before { border-color: #1e293b !important; }
+            body { background: radial-gradient(circle at top left, #0f172a, #020617 100%); color: #f8fafc; font-family: 'Outfit', sans-serif; margin: 0; }
+            .glass-panel { background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.05); }
+            .zinc-input .q-field__native { color: white !important; font-family: 'Outfit', sans-serif; }
+            .zinc-input .q-field__label { color: #94a3b8 !important; font-family: 'Outfit', sans-serif; }
+            .zinc-input .q-field__control:before { border-color: rgba(255,255,255,0.1) !important; }
         </style>
     ''')
 
-    with ui.column().classes('w-full h-screen items-center justify-center bg-[#0B0E14] px-4'):
-        with ui.card().classes('w-full max-w-sm p-6 lg:p-8 bg-[#121722] border border-sky-500/20 shadow-[0_0_40px_rgba(2,132,199,0.1)] items-center gap-6 rounded-2xl'):
+    with ui.column().classes('w-full h-screen items-center justify-center px-4 relative overflow-hidden'):
+        ui.element('div').classes('absolute -top-[20%] -left-[10%] w-[50%] h-[50%] bg-sky-600/20 rounded-full blur-[120px] pointer-events-none')
+        ui.element('div').classes('absolute -bottom-[20%] -right-[10%] w-[50%] h-[50%] bg-indigo-600/20 rounded-full blur-[120px] pointer-events-none')
+        
+        with ui.card().classes('w-full max-w-sm p-8 glass-panel shadow-[0_0_40px_rgba(14,165,233,0.15)] items-center gap-6 rounded-3xl transition-transform hover:scale-[1.02] duration-500'):
             with ui.column().classes('items-center gap-2'):
-                ui.image('/assets/logo.png').classes('w-12 h-12 rounded-xl shadow-lg border border-sky-500/30')
-                ui.label('SPOTBOT PRO v7.0').classes('text-2xl font-bold tracking-wider text-white')
-                ui.label('v7.0 - HEDGEFUND & FUTURES EDITION').classes('text-xs text-emerald-400 tracking-widest uppercase ml-2')
+                ui.image('/assets/logo.png').classes('w-16 h-16 rounded-2xl shadow-[0_0_20px_rgba(14,165,233,0.4)] border border-sky-400/30 animate-pulse')
+                ui.label('SPOTBOT PRO v7.0').classes('text-3xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-sky-400 to-indigo-400 drop-shadow-sm')
+                ui.label('HEDGEFUND QUANTITATIVE ENGINE').classes('text-[0.65rem] text-emerald-400 tracking-[0.2em] font-bold uppercase text-center')
             
-            username = ui.input('Usuário').classes('w-full zinc-input').props('dark outlined dense')
-            password = ui.input('Senha', password=True, password_toggle_button=True).classes('w-full zinc-input').props('dark outlined dense').on('keydown.enter', try_login)
+            username = ui.input('Usuário').classes('w-full zinc-input').props('dark outlined')
+            password = ui.input('Senha', password=True, password_toggle_button=True).classes('w-full zinc-input').props('dark outlined').on('keydown.enter', try_login)
             
-            ui.button('ENTRAR NO TERMINAL', on_click=try_login).props('unelevated').classes('w-full bg-gradient-to-r from-sky-700 to-sky-600 hover:from-sky-600 hover:to-sky-500 text-white font-bold tracking-wider py-2 rounded-lg shadow-lg')
+            ui.button('INICIAR TERMINAL', on_click=try_login).props('unelevated').classes('w-full bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-bold tracking-widest py-3 rounded-xl shadow-lg transition-all hover:shadow-[0_0_20px_rgba(14,165,233,0.4)]')
+
 
 @ui.page('/')
 async def index():
@@ -628,24 +634,31 @@ async def index():
     global ai_signal_label, ai_reason_markdown, ai_reason_container, ai_card, risk_profile_select, paper_trading_switch
     global chart_symbol_badge, start_btn, stop_btn, cancel_btn
     
-    ui.colors(primary='#0284C7', secondary='#64748b', accent='#10B981', positive='#10B981', negative='#F43F5E', dark='#0B0E14')
+    ui.colors(primary='#0ea5e9', secondary='#64748b', accent='#10b981', positive='#10b981', negative='#f43f5e', dark='#020617')
     
     ui.add_head_html('''
         <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
         <link rel="shortcut icon" href="/assets/favicon.ico">
         <link rel="apple-touch-icon" href="/assets/logo.png">
+        <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
         <style>
             :root { --nicegui-default-padding: 0.5rem; }
-            body { background-color: #0B0E14; color: #f8fafc; font-family: 'Inter', system-ui, -apple-system, sans-serif; overflow-x: hidden; }
-            ::-webkit-scrollbar { width: 6px; height: 6px; }
-            ::-webkit-scrollbar-track { background: #0B0E14; }
-            ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
-            ::-webkit-scrollbar-thumb:hover { background: #334155; }
-            .obsidian-card { background: #121722; border: 1px solid rgba(255, 255, 255, 0.08); }
-            .input-zinc .q-field__native { color: #f8fafc !important; }
-            .input-zinc .q-field__label { color: #64748b !important; }
-            .input-zinc .q-field__control:before { border-color: #1e293b !important; }
+            body { background: radial-gradient(circle at 50% 0%, #0f172a, #020617 100%); color: #f8fafc; font-family: 'Outfit', system-ui, -apple-system, sans-serif; overflow-x: hidden; margin: 0; }
+            ::-webkit-scrollbar { width: 4px; height: 4px; }
+            ::-webkit-scrollbar-track { background: transparent; }
+            ::-webkit-scrollbar-thumb { background: rgba(14, 165, 233, 0.3); border-radius: 4px; }
+            ::-webkit-scrollbar-thumb:hover { background: rgba(14, 165, 233, 0.6); }
+            
+            .glass-panel { background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+            .glass-card { background: linear-gradient(135deg, rgba(30, 41, 59, 0.5) 0%, rgba(15, 23, 42, 0.6) 100%); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1); }
+            .obsidian-card { background: rgba(2, 6, 23, 0.6); border: 1px solid rgba(14, 165, 233, 0.15); box-shadow: inset 0 0 20px rgba(14, 165, 233, 0.02); backdrop-filter: blur(8px); }
+            
+            .input-zinc .q-field__native { color: #f8fafc !important; font-family: 'Outfit', sans-serif; }
+            .input-zinc .q-field__label { color: #94a3b8 !important; font-family: 'Outfit', sans-serif; }
+            .input-zinc .q-field__control:before { border-color: rgba(255,255,255,0.08) !important; }
+            .input-zinc .q-field__control:hover:before { border-color: rgba(14,165,233,0.5) !important; }
+            
             .terminal-font { font-family: 'JetBrains Mono', monospace; }
 
             @keyframes marquee {
@@ -655,29 +668,34 @@ async def index():
             .animate-marquee {
                 display: flex;
                 width: 200%;
-                animation: marquee 30s linear infinite;
+                animation: marquee 35s linear infinite;
             }
             .animate-marquee:hover {
                 animation-play-state: paused;
             }
+            
+            .glow-text-emerald { text-shadow: 0 0 10px rgba(16, 185, 129, 0.5); }
+            .glow-text-sky { text-shadow: 0 0 10px rgba(14, 165, 233, 0.5); }
+            .glow-text-rose { text-shadow: 0 0 10px rgba(244, 63, 94, 0.5); }
         </style>
     ''')
 
-    # Container Principal Responsivo com Scroll Vertical Liberado no PC e Mobile
-    with ui.row().classes('w-full min-h-screen overflow-x-hidden overflow-y-auto flex-col lg:flex-row flex-wrap lg:flex-nowrap gap-0 bg-[#0B0E14]'):
+    # Container Principal Responsivo
+    with ui.row().classes('w-full min-h-screen overflow-x-hidden overflow-y-auto flex-col lg:flex-row flex-wrap lg:flex-nowrap gap-0 relative z-10'):
+        ui.element('div').classes('absolute -top-[10%] -left-[5%] w-[30%] h-[30%] bg-sky-600/10 rounded-full blur-[100px] pointer-events-none z-0')
         
         # Painel Esquerdo de Configurações & Métricas
-        with ui.column().classes('w-full lg:w-64 h-auto lg:h-full border-b lg:border-b-0 lg:border-r border-slate-800 bg-[#0E121B] p-3 gap-2.5 flex-shrink-0 text-slate-300 overflow-y-auto'):
+        with ui.column().classes('w-full lg:w-64 h-auto lg:h-full border-b lg:border-b-0 lg:border-r border-white/5 glass-card p-4 gap-3 flex-shrink-0 text-slate-300 overflow-y-auto z-10'):
             with ui.column().classes('w-full gap-1'):
                 ui.label('MODO DE MONITORAMENTO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
                 symbol_select = ui.select(
                     options=['⚡ SCANNER TOP 40', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'LINKUSDT', 'NEARUSDT'],
                     value='⚡ SCANNER TOP 40'
-                ).classes('w-full input-zinc bg-[#121722] rounded-lg').props('dark outlined dense')
+                ).classes('w-full input-zinc glass-panel rounded-lg').props('dark outlined dense')
 
             with ui.column().classes('w-full gap-1'):
                 ui.label('VALOR USDT POR ORDEM').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
-                investment_input = ui.input(value='Dinâmico (Min $10)').classes('w-full input-zinc bg-[#121722] rounded-lg').props('dark outlined dense readonly')
+                investment_input = ui.input(value='Dinâmico (Min $10)').classes('w-full input-zinc glass-panel rounded-lg').props('dark outlined dense readonly')
 
             with ui.column().classes('w-full gap-1'):
                 ui.label('PERFIL DE RISCO').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
@@ -685,7 +703,7 @@ async def index():
                     options=list(RISK_PROFILES.keys()),
                     value=settings.ACTIVE_RISK_PROFILE,
                     on_change=lambda e: set_risk_profile(e.value)
-                ).classes('w-full input-zinc bg-[#121722] rounded-lg').props('dark outlined dense')
+                ).classes('w-full input-zinc glass-panel rounded-lg').props('dark outlined dense')
 
             with ui.column().classes('w-full gap-1'):
                 ui.label('PAPER TRADING').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest mt-1')
@@ -696,10 +714,10 @@ async def index():
 
             with ui.column().classes('w-full gap-2 mt-1'):
                 ui.label('PERFORMANCE').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
-                with ui.row().classes('w-full justify-between items-center p-2 rounded-xl bg-[#121722] border border-slate-800'):
+                with ui.row().classes('w-full justify-between items-center p-2 rounded-xl glass-panel border border-slate-800'):
                     ui.label('Lucro Total').classes('text-xs text-slate-400')
                     total_profit_val = ui.label('$0.00').classes('font-mono text-sm font-bold text-[#10B981]')
-                with ui.row().classes('w-full justify-between items-center p-2 rounded-xl bg-[#121722] border border-slate-800'):
+                with ui.row().classes('w-full justify-between items-center p-2 rounded-xl glass-panel border border-slate-800'):
                     ui.label('Taxa de Vitória').classes('text-xs text-slate-400')
                     win_rate_val = ui.label('0.0%').classes('font-mono text-sm font-bold text-sky-400')
 
@@ -715,11 +733,11 @@ async def index():
 
             with ui.column().classes('w-full gap-2 mt-2'):
                 ui.label('MERCADO FUTUROS (HedgeFund)').classes('text-[0.6rem] font-bold text-slate-500 tracking-widest')
-                with ui.row().classes('w-full justify-between items-center p-2 rounded-xl bg-[#2a1215] border border-rose-900/50'):
+                with ui.row().classes('w-full justify-between items-center p-2 rounded-xl glass-panel border border-rose-500/30 shadow-[inset_0_0_15px_rgba(244,63,94,0.05)]'):
                     ui.label('Saldo Futuros').classes('text-xs text-slate-400')
                     futures_usdt_val = ui.label('$0.00').classes('font-mono text-sm font-bold text-rose-400')
                 
-                with ui.row().classes('w-full justify-between items-center p-2 rounded-xl bg-[#2a1215] border border-rose-900/50'):
+                with ui.row().classes('w-full justify-between items-center p-2 rounded-xl glass-panel border border-rose-500/30 shadow-[inset_0_0_15px_rgba(244,63,94,0.05)]'):
                     ui.label('Lucro (Futuros)').classes('text-xs text-slate-400')
                     futures_profit_val = ui.label('$0.00').classes('font-mono text-sm font-bold text-rose-400')
 
@@ -728,11 +746,11 @@ async def index():
                 status_ui = ui.markdown('**Aguardando...**').classes('text-xs text-slate-300 leading-relaxed w-full break-words')
 
         # Área Principal (Direita com Scroll Vertical Habilitado)
-        with ui.column().classes('w-full lg:flex-1 h-auto lg:h-full overflow-y-auto p-0 bg-[#0B0E14] flex-col gap-0 min-w-0'):
+        with ui.column().classes('w-full lg:flex-1 h-auto lg:h-full overflow-y-auto p-0 bg-transparent flex-col gap-0 min-w-0 z-10 relative'):
             
             # Header Ticker Neon com Botoes de Acao Sincronizados e Logo PNG
-            with ui.row().classes('w-full h-10 bg-[#080B10] border-b border-slate-800 items-center px-3 justify-between flex-shrink-0 relative text-xs flex-nowrap'):
-                with ui.row().classes('items-center gap-2 z-10 bg-[#080B10] pr-3 border-r border-slate-800 flex-shrink-0'):
+            with ui.row().classes('w-full h-12 glass-card border-b border-white/5 items-center px-4 justify-between flex-shrink-0 relative text-xs flex-nowrap shadow-lg'):
+                with ui.row().classes('items-center gap-2 z-10 pr-4 border-r border-white/10 flex-shrink-0'):
                     ui.image('/assets/logo.png').classes('w-6 h-6 rounded-md shadow-md')
                     ui.label('SPOTBOT PRO v7.0').classes('font-bold tracking-wider text-white text-xs')
                     ui.label('v7.0 HEDGEFUND').classes('text-[0.55rem] font-bold text-sky-400/80 tracking-widest hidden sm:inline')
@@ -750,7 +768,7 @@ async def index():
                         ui.label('24h Vol: $78.4B').classes('text-slate-400')
 
                 # Botoes de Acao Touch-Friendly (START, STOP, CANCEL, LOGOUT)
-                with ui.row().classes('items-center gap-1.5 sm:gap-2 z-10 bg-[#080B10] ml-auto flex-shrink-0'):
+                with ui.row().classes('items-center gap-1.5 sm:gap-2 z-10 glass-panel ml-auto flex-shrink-0'):
                     start_btn = ui.button(on_click=start_bot).props('unelevated dense').classes('bg-[#059669] hover:bg-[#10B981] text-white font-bold px-2 sm:px-3 py-1 text-xs rounded-md tracking-wider transition-all shadow-md')
                     with start_btn:
                         ui.label('▶️').classes('text-xs')
@@ -779,7 +797,7 @@ async def index():
                     ui.button(icon='logout', on_click=logout).props('flat dense size=sm color=slate-400')
 
             # Barra Superior Estilo Binance com Botao Drawer da IA Gemini (100% Limpo Sem Sobrepor o Grafico!)
-            with ui.row().classes('w-full h-8 bg-[#121722] border-b border-slate-800 px-3 items-center justify-between flex-shrink-0 z-20'):
+            with ui.row().classes('w-full h-8 glass-panel border-b border-slate-800 px-3 items-center justify-between flex-shrink-0 z-20'):
                 with ui.row().classes('items-center gap-2'):
                     ui.icon('psychology', size='xs', color='sky-400')
                     ui.label('ANÁLISE IA GEMINI:').classes('text-[0.65rem] font-bold text-slate-400 tracking-wider')
@@ -794,13 +812,13 @@ async def index():
                 ai_toggle_btn = ui.button('🧠 Ver Análise IA ❯', on_click=toggle_ai_drawer).props('flat dense size=xs color=sky-400').classes('text-[0.65rem] font-semibold')
 
             # Conteúdo Expansível do Painel IA Gemini (Movido para cima a pedido do usuário)
-            ai_reason_container = ui.card().classes('w-full p-3 bg-[#121722] border-b border-slate-800 text-xs text-slate-300 transition-all flex-shrink-0')
+            ai_reason_container = ui.card().classes('w-full p-3 glass-panel border-b border-slate-800 text-xs text-slate-300 transition-all flex-shrink-0')
             ai_reason_container.set_visibility(False)
             with ai_reason_container:
                 ai_reason_markdown = ui.markdown('_IA Gemini monitorando mercado..._').classes('text-xs text-slate-300 leading-relaxed')
 
             # Barra de Abas do Gráfico (Multi-Ativo) & Legenda Estilo Binance (Sub-abas)
-            with ui.row().classes('w-full min-h-[48px] bg-[#0B0E14] border-b border-slate-800/80 px-2 sm:px-3 items-center justify-between gap-2 flex-shrink-0 z-20 overflow-x-auto flex-nowrap'):
+            with ui.row().classes('w-full min-h-[48px] glass-panel border-b border-white/10 px-2 sm:px-3 items-center justify-between gap-2 flex-shrink-0 z-20 overflow-x-auto flex-nowrap'):
                 with ui.row().classes('items-center gap-1 flex-shrink-0 min-h-[40px]'):
                     render_chart_tabs()
 
@@ -817,15 +835,15 @@ async def index():
             # Área do Gráfico
             with ui.column().classes('w-full flex-shrink-0 h-[470px] lg:h-[64vh] min-h-[420px] p-0 border-b border-slate-800 relative'):
                 with ui.row().classes('absolute top-3 right-4 z-20 items-center gap-2'):
-                    ui.button(icon='refresh', on_click=lambda: asyncio.create_task(change_chart_asset(selected_chart_symbol if selected_chart_symbol else 'foco'))).props('dense flat color=sky-400 size=sm').classes('bg-[#121722] border border-sky-500/30 rounded-lg shadow-md px-2 py-1').tooltip('Recarregar Gráfico')
+                    ui.button(icon='refresh', on_click=lambda: asyncio.create_task(change_chart_asset(selected_chart_symbol if selected_chart_symbol else 'foco'))).props('dense flat color=sky-400 size=sm').classes('glass-panel border border-sky-500/30 rounded-lg shadow-md px-2 py-1').tooltip('Recarregar Gráfico')
                     futures_chart_symbol_badge = ui.label('').classes('obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-rose-400 border border-rose-900/50 backdrop-blur-md shadow-lg')
                     chart_symbol_badge = ui.label('🪙 BTCUSDT').classes('obsidian-card px-3 py-1 rounded-xl text-xs font-bold font-mono text-sky-400 border border-sky-500/30 backdrop-blur-md shadow-lg')
                 candle_chart = ui.echart(get_main_chart_options()).classes('w-full h-full')
 
             # Painel Inferior (Execuções + Terminal Output Sincronizado)
-            with ui.row().classes('w-full flex-shrink-0 flex-col lg:flex-row gap-0 bg-[#0B0E14] min-h-[280px]'):
-                with ui.column().classes('w-full lg:w-3/5 h-64 lg:h-72 border-b lg:border-b-0 lg:border-r border-slate-800/80 bg-[#0B0E14] p-0 flex-col'):
-                    with ui.row().classes('w-full h-8 items-center px-4 border-b border-slate-800 bg-[#121722]/50 justify-between flex-shrink-0'):
+            with ui.row().classes('w-full flex-shrink-0 flex-col lg:flex-row gap-0 bg-transparent min-h-[280px]'):
+                with ui.column().classes('w-full lg:w-3/5 h-64 lg:h-72 border-b lg:border-b-0 lg:border-r border-white/5 bg-transparent p-0 flex-col'):
+                    with ui.row().classes('w-full h-8 items-center px-4 border-b border-white/5 glass-panel justify-between flex-shrink-0'):
                         ui.label('HISTÓRICO DE EXECUÇÕES').classes('text-[0.6rem] font-bold text-slate-400 tracking-widest')
                         ui.icon('history', size='xs', color='slate-500')
                      
@@ -836,7 +854,7 @@ async def index():
                     ).classes('w-full h-full no-shadow bg-transparent text-slate-300').props('flat dense square')
                     
                     recent_trades_table.add_slot('header', r'''
-                       <q-tr :props="props" class="bg-[#121722] text-slate-400 text-xs font-semibold">
+                       <q-tr :props="props" class="glass-panel text-slate-400 text-xs font-semibold">
                            <q-th v-for="col in props.cols" :key="col.name" :props="props">
                                {{ col.label }}
                            </q-th>
@@ -864,12 +882,12 @@ async def index():
                         </q-tr>
                     ''')
 
-                with ui.column().classes('w-full lg:w-2/5 h-64 lg:h-72 bg-[#0B0E14] p-0 flex-col'):
-                    with ui.row().classes('w-full h-8 items-center px-4 border-b border-slate-800 bg-[#121722]/50 gap-2 flex-shrink-0'):
+                with ui.column().classes('w-full lg:w-2/5 h-64 lg:h-72 bg-transparent border-t lg:border-t-0 border-white/5 p-0 flex-col'):
+                    with ui.row().classes('w-full h-8 items-center px-4 border-b border-white/5 glass-panel gap-2 flex-shrink-0'):
                        ui.icon('terminal', size='xs', color='sky-400')
                        ui.label('TERMINAL OUTPUT (SINCRONIZADO)').classes('text-[0.6rem] font-bold text-slate-400 tracking-widest')
                      
-                    log_ui = ui.log(max_lines=300).classes('w-full h-[calc(100%-2rem)] font-mono text-[0.65rem] bg-[#080B10] text-emerald-400 p-3 rounded-none border-none leading-tight overflow-y-auto')
+                    log_ui = ui.log(max_lines=300).classes('w-full h-[calc(100%-2rem)] font-mono text-[0.65rem] glass-card text-emerald-400 p-3 rounded-none border-none leading-tight overflow-y-auto shadow-[inset_0_0_20px_rgba(0,0,0,0.5)]')
                     
                     # Popula com os logs recentes sincronizados do buffer
                     for past_msg in list(logs_buffer):
