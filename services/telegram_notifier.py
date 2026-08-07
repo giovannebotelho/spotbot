@@ -105,7 +105,7 @@ class TelegramBot:
             return {
                 "inline_keyboard": [
                     [
-                        {"text": "🏆 Top 20 Ranking", "callback_data": "/top20"},
+                        {"text": "🏆 Top 40 Ranking", "callback_data": "/top40"},
                         {"text": "🔄 Rescan de Mercado", "callback_data": "/status"},
                     ],
                     [
@@ -166,7 +166,7 @@ class TelegramBot:
                         {"text": "📈 Posições OCO", "callback_data": "sub_posicoes"},
                     ],
                     [
-                        {"text": "⚡ Top 20 Scanner", "callback_data": "sub_scanner"},
+                        {"text": "⚡ Top 40 Scanner", "callback_data": "sub_scanner"},
                         {"text": "⚙️ Perfil de Risco", "callback_data": "sub_risco"},
                     ],
                     [

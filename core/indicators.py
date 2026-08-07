@@ -535,7 +535,7 @@ def calculate_lead_lag_alpha(btc_klines, altcoin_klines):
     """
     FASE 2 (v5.0): Motor de Antecipação (Lead-Lag Alpha Engine).
     Avalia a aceleração de preço/volume do BTCUSDT nos últimos 60 a 180 segundos
-    e verifica se há divergência favorável (Lag) na altcoin do Top 20.
+    e verifica se há divergência favorável (Lag) na altcoin do Top 40.
     Retorna: (is_btc_lead: bool, btc_impulse_pct: float, alpha_msg: str)
     """
     if not btc_klines or len(btc_klines) < 3:

@@ -156,8 +156,7 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                         continue
                     
                     # Fetch Klines 15m
-                    from config.settings import TRADING_CONFIG
-                    interval = TRADING_CONFIG['interval']
+                    interval = '15m' # Alterado de TRADING_CONFIG['interval'] para focar em 15m scalping
                     klines = await get_futures_klines(client, symbol, interval=interval, limit=100)
                 except Exception as e:
                     # Ignora silenciosamente erros de símbolos inválidos no futuros (ex: SHIBUSDT -> 1000SHIBUSDT)
@@ -321,7 +320,9 @@ async def run_futures_bot(client, bsm, db, log=print, status=print):
                     step_dec = Decimal(step_size_str)
                     quantized_qty = (qty_dec / step_dec).quantize(Decimal('1'), rounding=ROUND_DOWN) * step_dec
                     qty = float(quantized_qty)
-                    if qty <= 0: continue
+                    if qty <= 0:
+                        log(f"⚠️ Quantidade calculada ({qty_dec}) menor que lote mínimo ({step_size_str}) em {symbol}. Ignorando.")
+                        continue
                     
                     try:
                         from core.futures_order_manager import place_futures_trade_with_protection

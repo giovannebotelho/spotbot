@@ -34,7 +34,7 @@ graph TD
 
 ### 2. ⚡ Correlation Lead-Lag Alpha Engine (Motor de Antecipação BTC/ETH)
 - **Arbitragem Temporal**: Detecta quando o `BTCUSDT` sofre um surto de volume e preço ($\ge +0.25\%$ em 3m) no gráfico de 1 minuto.
-- **Entrada Antecipada**: Entra na altcoin do Top 20 que ainda está em atraso estatístico (*Lag*) **antes** que o movimento se espalhe, alocando multiplicador **1.5x**.
+- **Entrada Antecipada**: Entra na altcoin do Top 40 que ainda está em atraso estatístico (*Lag*) **antes** que o movimento se espalhe, alocando multiplicador **1.5x**.
 
 ### 3. 📊 Order Flow Cumulative Volume Delta (CVD Tape Reading)
 - **Leitura de Agressão**: Analisa as últimas 500 negociações executadas a mercado (*Market Orders*) na Binance Spot.

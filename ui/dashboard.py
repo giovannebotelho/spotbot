@@ -317,7 +317,7 @@ async def update_data():
             fut_active_symbols = list(futures_state.get_all_sync().keys())
             if fut_active_symbols:
                 fut_active_str = " | ".join([f"{s}" for s in fut_active_symbols])
-                futures_chart_symbol_badge.text = f"🚀 VAGAS FUTUROS ({len(fut_active_symbols)}/{futures_engine.MAX_CONCURRENT_POSITIONS_FUTURES}): [{fut_active_str}]"
+                futures_chart_symbol_badge.text = f"🚀 VAGAS FUTUROS ({len(fut_active_symbols)}/3): [{fut_active_str}]"
                 futures_chart_symbol_badge.set_visibility(True)
             else:
                 futures_chart_symbol_badge.set_visibility(False)

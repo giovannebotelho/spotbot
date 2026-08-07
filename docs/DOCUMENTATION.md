@@ -102,7 +102,7 @@ Avalia a variação percentual de preço e volume do `BTCUSDT` nas velas de 1 mi
 
 $$\Delta P_{\text{BTC}} = \frac{P_{\text{BTC, t}} - P_{\text{BTC, t-3}}}{P_{\text{BTC, t-3}}} \times 100$$
 
-- **Sinal de Antecipação**: Se $\Delta P_{\text{BTC}} \ge +0.25\%$ em 3m com volume $1.5\times$ acima da média e a altcoin do Top 20 ainda não acompanhou ($\Delta P_{\text{Alt}} \le 0.7 \times \Delta P_{\text{BTC}}$), entra comprado antecipadamente na altcoin com multiplicador **1.5x**.
+- **Sinal de Antecipação**: Se $\Delta P_{\text{BTC}} \ge +0.25\%$ em 3m com volume $1.5\times$ acima da média e a altcoin do Top 40 ainda não acompanhou ($\Delta P_{\text{Alt}} \le 0.7 \times \Delta P_{\text{BTC}}$), entra comprado antecipadamente na altcoin com multiplicador **1.5x**.
 
 ---
 

@@ -608,7 +608,7 @@ async def run_bot(log_callback=None, investment_amount=None, selected_symbol=Non
                 "📈 /lucro ou /perf - Lucro líquido acumulado e Win Rate\n"
                 "⚡ /posicoes ou /ocos - Ordens OCO e posições ativas\n"
                 "📰 /noticias - Sentimento de mercado e notícias CryptoPanic\n"
-                "🔥 /top20 ou /scanner - Ranking de Força Relativa do Top 20\n"
+                "🔥 /top40 ou /scanner - Ranking de Força Relativa do Top 40\n"
                 "📄 /relatorio ou /pdf - Gera e envia Relatório Semanal PDF\n"
                 "🛑 /stop - Pausa o bot com segurança\n"
                 "📱 /menu ou /ajuda - Exibe o menu interativo com subcategorias"
